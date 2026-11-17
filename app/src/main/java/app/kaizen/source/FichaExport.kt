@@ -17,6 +17,14 @@ interface FichaExportDao {
     /** Las [limit] fichas siguientes a [after] por id: paginar por clave y no por posición evita repetir o saltar filas si se guarda una ficha mientras se exporta. */
     @Query("SELECT * FROM AnimeFicha WHERE anilistId > :after ORDER BY anilistId LIMIT :limit")
     fun page(after: Long, limit: Int): List<AnimeFicha>
+
+    /** Los anime con la ficha descargada con esta versión de la consulta (solo esas valen para compartir entre equipos). */
+    @Query("SELECT anilistId FROM AnimeFicha WHERE consulta = :version")
+    fun idsOf(version: Int): List<Long>
+
+    /** Las fichas de esta versión con id en [from, to). */
+    @Query("SELECT * FROM AnimeFicha WHERE anilistId >= :from AND anilistId < :to AND consulta = :version ORDER BY anilistId")
+    fun range(from: Long, to: Long, version: Int): List<AnimeFicha>
 }
 
 /**
@@ -79,6 +87,33 @@ internal object FichaExport {
         }
         return Result(target, rows)
     }
+
+    /** Las fichas [rows] como bytes en el mismo formato que el fichero (para dejarlas en la carpeta de red). */
+    fun encode(rows: List<AnimeFicha>): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        GZIPOutputStream(out).bufferedWriter(Charsets.UTF_8).use { w ->
+            w.write(JSONObject().put("formato", FORMAT).put("version", VERSION).put("creado", System.currentTimeMillis()).put("filas", rows.size).toString()); w.newLine()
+            rows.forEach { w.write(toLine(it).toString()); w.newLine() }
+            w.write(JSONObject().put("fin", rows.size).toString()); w.newLine()
+        }
+        return out.toByteArray()
+    }
+
+    /** Las fichas de [bytes]; null si no es de Kaizen, está cortado o mal formado. */
+    fun decode(bytes: ByteArray): List<AnimeFicha>? = runCatching {
+        BufferedReader(InputStreamReader(GZIPInputStream(bytes.inputStream()), Charsets.UTF_8)).use { input ->
+            val head = JSONObject(input.readLine() ?: return null)
+            if (head.optString("formato") != FORMAT || head.optInt("version") != VERSION) return null
+            val rows = mutableListOf<AnimeFicha>()
+            var end: Int? = null
+            input.lineSequence().forEach { line ->
+                check(end == null)
+                val row = JSONObject(line)
+                if (row.has("fin")) end = row.getInt("fin") else rows += fromLine(row)
+            }
+            rows.takeIf { end == it.size }
+        }
+    }.getOrNull()
 
     private fun b64(bytes: ByteArray?) = bytes?.let { Base64.getEncoder().encodeToString(it) }
 

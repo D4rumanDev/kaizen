@@ -4,6 +4,12 @@ import app.kaizen.commons.DebugLog
 import app.kaizen.commons.KaizenBackup
 import app.kaizen.commons.KaizenSettings
 import app.kaizen.commons.SmbBackup
+import app.kaizen.commons.logError
+import app.kaizen.commons.runCatchingCoop
+import app.kaizen.database.CatalogDB
+import app.kaizen.database.UserDB
+import app.kaizen.source.AnilistShare
+import app.kaizen.source.CatalogBuilder
 import app.kaizen.source.spec.RepoConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
@@ -86,6 +92,13 @@ object SyncManager {
         val done = outcome
         val full = DeviceSync.Report(report.merged, report.skipped, report.uploadedBytes, done?.removedHere ?: 0, (done?.heldBack ?: false) || (done?.heldRemote ?: false), report.deleted)
         DebugLog.info("Datos", "Sincronización: $full")
+        // Las uniones con AniList viajan con el catálogo; un fallo aquí no invalida la sincronización de estados.
+        runCatchingCoop {
+            val share = AnilistShare.run(store(), UserDB.INSTANCE.animeFuenteDao(), CatalogDB.INSTANCE.animeFichaDao(), CatalogDB.INSTANCE.fichaExportDao())
+            DebugLog.info("Datos", share.toString())
+            // Con enlaces nuevos, las series de distintas webs que son el mismo anime se unen.
+            if (share.linksIn > 0) runCatchingCoop { CatalogBuilder.regroup() }.onFailure(::logError)
+        }.onFailure(::logError)
         KaizenSettings.syncLastAt = System.currentTimeMillis()
         full
     } }
