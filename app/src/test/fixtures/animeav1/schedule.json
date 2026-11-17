@@ -1,0 +1,56 @@
+[
+ {
+  "id": 3137,
+  "title": "Yamato yo, Towa ni: Rebel 3199",
+  "synopsis": "x",
+  "poster": null,
+  "slug": "yamato-yo-towa-ni-rebel-3199",
+  "startDate": "2024-07-19",
+  "createdAt": "2025-11-11 06:39:55.011461+00",
+  "category": {
+   "id": 2,
+   "name": "Pel\u00edcula"
+  },
+  "latestEpisode": {
+   "id": 45282,
+   "number": 14,
+   "createdAt": "2025-11-11T06:46:14.99082+00:00"
+  }
+ },
+ {
+  "id": 4382,
+  "title": "Uchi no Otouto-domo ga Sumimasen",
+  "synopsis": "x",
+  "poster": null,
+  "slug": "uchi-no-otouto-domo-ga-sumimasen",
+  "startDate": "2026-07-04",
+  "createdAt": "2026-07-03 13:08:02.73179+00",
+  "category": {
+   "id": 1,
+   "name": "TV Anime"
+  },
+  "latestEpisode": {
+   "id": 60390,
+   "number": 14,
+   "createdAt": "2026-10-09T16:41:54.237682+00:00"
+  }
+ },
+ {
+  "id": 4412,
+  "title": "Sora wa Akai Kawa no Hotori",
+  "synopsis": "x",
+  "poster": null,
+  "slug": "sora-wa-akai-kawa-no-hotori",
+  "startDate": "2026-07-08",
+  "createdAt": "2026-07-07 13:11:27.145557+00",
+  "category": {
+   "id": 1,
+   "name": "TV Anime"
+  },
+  "latestEpisode": {
+   "id": 60431,
+   "number": 15,
+   "createdAt": "2026-10-13T18:00:29.462732+00:00"
+  }
+ }
+]

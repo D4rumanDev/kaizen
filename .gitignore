@@ -1,0 +1,61 @@
+# Gradle, Kotlin y compilación
+.gradle
+.kotlin/
+build
+captures
+.externalNativeBuild
+*.apk
+
+# IDE y sistema
+.idea
+*.iml
+.DS_Store
+
+# Secretos, firma y configuración local (nunca se versionan)
+local.properties
+app/google-services.json
+keys.keystore
+*.pepk
+*.jks
+*.pass
+*.p12
+*.pem
+.env
+*.env
+!.env.example
+!*.env.example
+/.claude/
+
+# Copias y restos locales
+/backups/
+/app/amazon/
+*.log
+*.psd
+*.zip
+/*.png
+
+# JSON: se ignoran salvo los que son parte del proyecto
+*.json
+!app/src/main/assets/*.json
+!app/src/main/assets/sources/*.json
+!app/src/test/fixtures/**/*.json
+!app/schemas/**/*.json
+!.rsc/*.json
+!.vscode/*.json
+__pycache__/
+.eol-off
+*.eol-tmp
+!.claude/settings.json
+
+# Solo local: no se versionan (el repositorio lleva lo imprescindible para compilar, probar y entender la app)
+/.vscode/
+/.rsc/
+/art/
+/docs/wiki/sdd/
+/docs/wiki/pendientes.md
+/tools/basic-memory/
+/tools/audit/dead-code.txt
+/docs/wiki/plan-configuracion.md
+/CLAUDE.md
+/AGENTS.md
+/.markdownlint.json

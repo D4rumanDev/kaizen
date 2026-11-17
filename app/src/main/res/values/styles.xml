@@ -1,0 +1,27 @@
+<resources>
+
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorAccent</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowContentTransitions">true</item>
+    </style>
+
+    <!-- Temas de TV: pantalla completa y fondo negro; el contenido es de Compose. -->
+    <style name="AppTheme.TV.Base" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:colorPrimary">#424242</item>
+        <item name="android:colorPrimaryDark">#1b1b1b</item>
+        <item name="android:colorAccent">@color/colorAccent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <!-- La ficha se abre y se cierra sin animación de ventana: el menú lateral no parpadea al pasar de una ficha a otra. -->
+    <style name="AppTheme.TV.Ficha" parent="AppTheme.TV.Base">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+</resources>

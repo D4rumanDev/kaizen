@@ -1,0 +1,181 @@
+apply plugin: 'com.android.application'
+apply plugin: 'com.google.devtools.ksp'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+def localProperties = new Properties()
+localProperties.load(new FileInputStream(rootProject.file("local.properties")))
+
+// Firma de KAIZEN (alias origami). La contraseña se lee de un fichero aparte para que no
+// pase por local.properties ni por la línea de órdenes; sin keystore el APK sale sin firmar.
+def keystoreDir = localProperties['KAIZEN_KEYSTORE_DIR'] ?: "${System.getProperty('user.home')}/.android"
+def keystoreFile = file("$keystoreDir/kaizen-tvlibre.jks")
+def keystorePassFile = file("$keystoreDir/kaizen-tvlibre.pass")
+def canSign = keystoreFile.exists() && keystorePassFile.exists()
+
+// Informes de estabilidad de Compose (solo si se pide): ./gradlew :app:compileDebugKotlin -PcomposeReports=true; salen en app/build/compose_reports y compose_metrics
+composeCompiler {
+    if (project.hasProperty('composeReports')) {
+        reportsDestination = layout.buildDirectory.dir('compose_reports')
+        metricsDestination = layout.buildDirectory.dir('compose_metrics')
+    }
+}
+
+android {
+    compileSdk 37
+    defaultConfig {
+        applicationId "app.kaizen"
+        minSdkVersion 26
+        targetSdkVersion 36
+        versionCode 239
+        versionName "6.0.8"
+        multiDexEnabled true
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        if (canSign) {
+            kaizen {
+                def password = keystorePassFile.text.trim()
+                storeFile keystoreFile
+                storePassword password
+                keyAlias 'origami'
+                keyPassword password
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            // Se instala al lado de la app de la TV (otro paquete, con sus propios datos): LeakCanary se prueba sin tocar la instalación real. Sin sufijo, la firma de depuración chocaría con la de `tv`.
+            applicationIdSuffix '.debug'
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'proguard-android.txt'
+            if (canSign) signingConfig signingConfigs.kaizen
+        }
+        tv {
+            initWith release
+            matchingFallbacks = ['release']
+            // Kaizen: ARM de 64 bits (tvbox) y de 32 bits (TV y otras Android TV); sin x86
+            ndk { abiFilters 'arm64-v8a' }
+        }
+    }
+    sourceSets {
+        // AGP 9 ya no crea las pruebas del tipo `tv`: se prueban con `debug`, que lleva los mismos recursos y manifiesto.
+        debug {
+            res.srcDirs += 'src/tv/res'
+            manifest.srcFile 'src/tv/AndroidManifest.xml'
+        }
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+        viewBinding = true
+    }
+    compileOptions {
+        sourceCompatibility = '17'
+        targetCompatibility = '17'
+    }
+    packagingOptions {
+        resources {
+            excludes += ['AndroidManifest.xml']
+            excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF']
+        }
+    }
+    namespace 'app.kaizen'
+    androidResources {
+        // Solo español e inglés: las demás traducciones de las bibliotecas no se usan
+        localeFilters += ['es', 'en']
+    }
+}
+
+configurations.all {
+    resolutionStrategy { 
+        force 'org.jsoup:jsoup:1.23.2'
+        //force 'androidx.core:core-ktx:1.6.0'
+    }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+        google()
+        mavenCentral()
+        //jcenter()
+        maven { url "https://jitpack.io" }
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas".toString())
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    // Compose para TV (pantallas, ficha y reproductor)
+    implementation platform('androidx.compose:compose-bom:2026.09.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.tv:tv-material:1.1.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.11.0'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    // Túnel WireGuard para WARP (solo el tráfico de Kaizen; ajuste «Túnel WARP», apagado de fábrica). Apache-2.0; trae su motor nativo, sin instalar Go.
+    implementation 'com.wireguard.android:tunnel:1.0.20260102'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.11.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0'
+    implementation 'androidx.activity:activity-ktx:1.7.2' //Keep
+    implementation 'androidx.startup:startup-runtime:1.2.0'
+    // Instala app/src/main/baseline-prof.txt en el primer arranque (sideload, sin Play)
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.1'
+    implementation 'androidx.annotation:annotation:1.9.1'
+    implementation 'androidx.work:work-runtime-ktx:2.12.0'
+    implementation 'androidx.tvprovider:tvprovider:1.1.0'
+    implementation 'androidx.room:room-runtime:2.8.5'
+    implementation 'androidx.room:room-ktx:2.8.5'
+    implementation 'androidx.room:room-paging:2.8.5'
+    ksp 'androidx.room:room-compiler:2.8.5'
+    implementation 'androidx.paging:paging-runtime-ktx:3.5.3'
+    implementation 'androidx.paging:paging-compose:3.5.3'
+    implementation 'org.jsoup:jsoup:1.23.2'
+    implementation 'com.squareup.okhttp3:okhttp:5.5.0'
+    implementation 'com.google.code.gson:gson:2.14.0'
+    implementation 'androidx.media3:media3-common:1.11.1'
+    implementation 'androidx.media3:media3-ui:1.11.1'
+    implementation 'androidx.media3:media3-datasource:1.11.1'
+    implementation 'androidx.media3:media3-exoplayer:1.11.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.11.1'
+    implementation 'androidx.media3:media3-session:1.11.1'
+    implementation 'io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0'
+
+    //---------
+    implementation 'com.shamanland:xdroid-toaster:0.3.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'io.coil-kt.coil3:coil-compose:3.6.3'
+    implementation 'io.coil-kt.coil3:coil-network-okhttp:3.6.3'
+    implementation 'org.mozilla:rhino:1.9.1'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
+    // org.json real en los tests de JVM (el de android.jar es un stub que lanza excepción)
+    testImplementation 'org.json:json:20240303'
+    //Kotlin
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    //------
+    //Moon
+    //
+    //Applovin
+    //-------
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.work:work-testing:2.8.1'
+    // Detector de fugas solo en `debug` (no entra en el APK de TV): instalar `assembleDebug`, usar la app un rato y mirar «Leaks» en el launcher.
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
+}

@@ -1,0 +1,20 @@
+# Perfil de arranque de Kaizen (a mano, comodines): H = caliente, S = en el arranque, P = poscarga.
+# Gradle lo convierte en assets/dexopt/baseline.prof y androidx.profileinstaller lo instala en el primer
+# arranque (el APK va por sideload, sin Play). Las bibliotecas con perfil propio (media3, AndroidX...) ya lo traen.
+# Generado a mano porque el tvbox no tiene root (la generación automática con Macrobenchmark lo exige hasta API 33).
+HSPLapp/kaizen/**;->**(**)**
+Lapp/kaizen/**;
+HSPLandroidx/compose/**;->**(**)**
+Landroidx/compose/**;
+HSPLandroidx/media3/**;->**(**)**
+Landroidx/media3/**;
+HSPLandroidx/room/**;->**(**)**
+Landroidx/room/**;
+HSPLokhttp3/**;->**(**)**
+Lokhttp3/**;
+HSPLokio/**;->**(**)**
+Lokio/**;
+HSPLorg/jsoup/**;->**(**)**
+Lorg/jsoup/**;
+HSPLkotlinx/coroutines/**;->**(**)**
+Lkotlinx/coroutines/**;

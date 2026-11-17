@@ -1,0 +1,33 @@
+{
+  "id": 4412,
+  "categoryId": 1,
+  "title": "Sora wa Akai Kawa no Hotori",
+  "aka": { "en-us": "Red River", "ja-jp": "天は赤い河のほとり" },
+  "genres": [
+    { "id": 1, "name": "Acción", "type": 0, "slug": "accion", "malId": 1 },
+    { "id": 2, "name": "Aventura", "type": 0, "slug": "aventura", "malId": 2 }
+  ],
+  "synopsis": "Yuri, una bonita chica japonesa, está emocionada después de aprobar su examen de entrada a la universidad.",
+  "poster": null,
+  "backdrop": null,
+  "trailer": "qpFcQ1Bek08",
+  "status": 2,
+  "runtime": null,
+  "startDate": "2026-07-08",
+  "nextDate": "2026-07-07",
+  "endDate": null,
+  "waitDays": 7,
+  "featured": false,
+  "mature": false,
+  "episodesCount": 18,
+  "score": 5.87,
+  "votes": 2239,
+  "slug": "sora-wa-akai-kawa-no-hotori",
+  "malId": 63489,
+  "seasons": null,
+  "createdAt": "2026-07-07 13:11:27.145557+00",
+  "updatedAt": "2026-08-25 00:54:21.541482+00",
+  "category": { "id": 1, "name": "TV Anime", "slug": "tv-anime", "malId": "TV" },
+  "episodes": [ { "id": 59462, "number": 1 }, { "id": 59537, "number": 2 } ],
+  "relations": []
+}

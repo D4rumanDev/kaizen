@@ -1,0 +1,38 @@
+[
+ {
+  "commentsCount": 58,
+  "createdAt": "2026-10-13 18:42:55.501369+00",
+  "id": 60433,
+  "media": {
+   "id": 4497,
+   "slug": "dark-machine-the-animation",
+   "title": "Dark Machine: The Animation"
+  },
+  "number": 1,
+  "publishedAt": "2026-10-13 18:43:59.37+00"
+ },
+ {
+  "commentsCount": 34,
+  "createdAt": "2026-10-13 18:40:37.245024+00",
+  "id": 60432,
+  "media": {
+   "id": 4459,
+   "slug": "gensou-suikoden",
+   "title": "Gensou Suikoden"
+  },
+  "number": 2,
+  "publishedAt": "2026-10-13 18:41:41.585+00"
+ },
+ {
+  "commentsCount": 35,
+  "createdAt": "2026-10-13 18:00:29.462732+00",
+  "id": 60431,
+  "media": {
+   "id": 4412,
+   "slug": "sora-wa-akai-kawa-no-hotori",
+   "title": "Sora wa Akai Kawa no Hotori"
+  },
+  "number": 15,
+  "publishedAt": "2026-10-13 18:01:32.774+00"
+ }
+]

@@ -1,0 +1,50 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    ext.kotlin_version = '2.4.21'
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url 'https://maven.google.com/'
+            name 'Google'
+        }
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:9.4.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Compilador de Compose (misma versión que Kotlin)
+        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin_version"
+        // KSP para Room (sustituye a kapt; versión propia, independiente de la de Kotlin)
+        classpath "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:2.3.12"
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+        google()
+        mavenCentral()
+        // JCenter ya no existe: espejo de Aliyun SOLO para las librerías antiguas que no están en otro sitio
+        maven {
+            url "https://maven.aliyun.com/repository/jcenter"
+            content {
+                includeGroup "biz.kasual"
+                includeGroup "com.github.florent37"
+                includeGroup "com.mani"
+                includeGroup "com.mikhaellopez"
+                includeGroup "com.tbuonomo.andrui"
+                includeGroup "io.github.luizgrp.sectionedrecyclerviewadapter"
+                includeGroup "org.jetbrains.anko"
+                includeGroup "q.rorbin"
+            }
+        }
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

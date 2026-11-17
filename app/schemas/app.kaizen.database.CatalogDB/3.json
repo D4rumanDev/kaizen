@@ -1,0 +1,183 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "cf57ef1306c69a8862be44e39d612c55",
+    "entities": [
+      {
+        "tableName": "AnimeFicha",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`anilistId` INTEGER NOT NULL, `malId` INTEGER, `consulta` INTEGER NOT NULL, `descargada` INTEGER NOT NULL, `json` BLOB NOT NULL, `es` BLOB, `tituloRomaji` TEXT, `tituloIngles` TEXT, `tituloNativo` TEXT, `anio` INTEGER, `formato` TEXT, `nota` INTEGER, PRIMARY KEY(`anilistId`))",
+        "fields": [
+          {
+            "fieldPath": "anilistId",
+            "columnName": "anilistId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "malId",
+            "columnName": "malId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "consulta",
+            "columnName": "consulta",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descargada",
+            "columnName": "descargada",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "json",
+            "columnName": "json",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "es",
+            "columnName": "es",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "tituloRomaji",
+            "columnName": "tituloRomaji",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tituloIngles",
+            "columnName": "tituloIngles",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tituloNativo",
+            "columnName": "tituloNativo",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "anio",
+            "columnName": "anio",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "formato",
+            "columnName": "formato",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nota",
+            "columnName": "nota",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "anilistId"
+          ]
+        }
+      },
+      {
+        "tableName": "WebFicha",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fuente` TEXT NOT NULL, `slug` TEXT NOT NULL, `malId` INTEGER, `descargada` INTEGER NOT NULL, `json` BLOB NOT NULL, `nombres` TEXT NOT NULL, `anio` INTEGER, `inicio` INTEGER, `formato` TEXT, `estado` TEXT, `temporada` TEXT, `episodios` INTEGER, `adulto` INTEGER, PRIMARY KEY(`fuente`, `slug`))",
+        "fields": [
+          {
+            "fieldPath": "fuente",
+            "columnName": "fuente",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slug",
+            "columnName": "slug",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "malId",
+            "columnName": "malId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "descargada",
+            "columnName": "descargada",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "json",
+            "columnName": "json",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombres",
+            "columnName": "nombres",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "anio",
+            "columnName": "anio",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "inicio",
+            "columnName": "inicio",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "formato",
+            "columnName": "formato",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "temporada",
+            "columnName": "temporada",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "episodios",
+            "columnName": "episodios",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "adulto",
+            "columnName": "adulto",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fuente",
+            "slug"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_WebFicha_malId",
+            "unique": false,
+            "columnNames": [
+              "malId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_WebFicha_malId` ON `${TABLE_NAME}` (`malId`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cf57ef1306c69a8862be44e39d612c55')"
+    ]
+  }
+}

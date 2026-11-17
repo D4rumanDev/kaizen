@@ -1,0 +1,16 @@
+<resources>
+    <!-- Default screen margins, per the Android Design guidelines. -->
+
+    <!-- general -->
+
+
+    <!-- snackProgressBar -->
+
+    <!-- text -->
+
+    <!--ads dimens-->
+    <item name="gnt_medium_template_bottom_weight" format="float" type="dimen">0.4</item>
+    <item name="gnt_text_row_weight" format="float" type="dimen">0.25</item>
+    <item name="gnt_media_view_weight" format="float" type="dimen">1.0</item>
+    <item name="gnt_medium_template_top_weight" format="float" type="dimen">0.2</item>
+</resources>

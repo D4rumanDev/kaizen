@@ -1,0 +1,100 @@
+{
+ "id": 897,
+ "categoryId": 1,
+ "title": "Black Clover",
+ "aka": {
+  "ja-jp": "\u30d6\u30e9\u30c3\u30af\u30af\u30ed\u30fc\u30d0\u30fc"
+ },
+ "genres": [
+  {
+   "id": 1,
+   "name": "Acci\u00f3n",
+   "type": 0,
+   "slug": "accion",
+   "malId": 1
+  },
+  {
+   "id": 7,
+   "name": "Fantas\u00eda",
+   "type": 0,
+   "slug": "fantasia",
+   "malId": 10
+  },
+  {
+   "id": 13,
+   "name": "Shounen",
+   "type": 0,
+   "slug": "shounen",
+   "malId": 27
+  }
+ ],
+ "synopsis": "Asta y Yuno fueron abandonados en la misma iglesia el mismo d\u00eda. Criados juntos ",
+ "poster": null,
+ "backdrop": null,
+ "trailer": "vUjAxk1qYzQ",
+ "status": 0,
+ "runtime": null,
+ "startDate": "2017-10-03",
+ "nextDate": null,
+ "endDate": "2021-03-30",
+ "waitDays": 7,
+ "featured": false,
+ "mature": false,
+ "episodesCount": 171,
+ "score": 8.14,
+ "votes": 1001378,
+ "slug": "black-clover",
+ "malId": 34572,
+ "seasons": null,
+ "createdAt": "2025-04-09 18:04:14.64973+00",
+ "updatedAt": "2026-08-25 01:09:15.21344+00",
+ "category": {
+  "id": 1,
+  "name": "TV Anime",
+  "slug": "tv-anime",
+  "malId": "TV"
+ },
+ "episodes": [
+  {
+   "id": 14499,
+   "number": 1
+  },
+  {
+   "id": 14500,
+   "number": 2
+  },
+  {
+   "id": 14501,
+   "number": 3
+  }
+ ],
+ "relations": [
+  {
+   "type": 10,
+   "destination": {
+    "id": 900,
+    "slug": "mugyutto-black-clover",
+    "title": "Mugyutto! Black Clover",
+    "startDate": "2019-07-01"
+   }
+  },
+  {
+   "type": 5,
+   "destination": {
+    "id": 898,
+    "slug": "black-clover-mahou-tei-no-ken",
+    "title": "Black Clover: Mahou Tei no Ken",
+    "startDate": "2023-06-16"
+   }
+  },
+  {
+   "type": 2,
+   "destination": {
+    "id": 4454,
+    "slug": "black-clover-2nd-season",
+    "title": "Black Clover 2nd Season",
+    "startDate": "2026-10-03"
+   }
+  }
+ ]
+}

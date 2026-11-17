@@ -1,0 +1,5 @@
+# Una entrada por línea: nombre simple o nombre completamente cualificado.
+# Úsalo para APIs invocadas por reflexión, frameworks propios o configuración externa.
+# Ejemplos:
+# com.example.kaizen.plugins.LegacyBridge
+# registerPlaybackProvider

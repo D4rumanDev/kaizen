@@ -1,0 +1,271 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "09ea0c821ee6d7407d1da175974948e2",
+    "entities": [
+      {
+        "tableName": "FavoriteAV1",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aid` INTEGER NOT NULL, `name` TEXT NOT NULL, `slug` TEXT NOT NULL, `type` TEXT NOT NULL, `category` TEXT NOT NULL, `source` TEXT NOT NULL DEFAULT 'animeav1', `seriesId` INTEGER NOT NULL, PRIMARY KEY(`seriesId`))",
+        "fields": [
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slug",
+            "columnName": "slug",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'animeav1'"
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "seriesId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "seriesId"
+          ]
+        }
+      },
+      {
+        "tableName": "Record",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`eid` INTEGER NOT NULL, `name` TEXT NOT NULL, `number` REAL NOT NULL, `aid` INTEGER NOT NULL, `slug` TEXT NOT NULL, `date` INTEGER NOT NULL, `source` TEXT NOT NULL DEFAULT 'animeav1', `seriesId` INTEGER NOT NULL, PRIMARY KEY(`seriesId`, `number`))",
+        "fields": [
+          {
+            "fieldPath": "eid",
+            "columnName": "eid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aid",
+            "columnName": "aid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slug",
+            "columnName": "slug",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'animeav1'"
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "seriesId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "seriesId",
+            "number"
+          ]
+        }
+      },
+      {
+        "tableName": "UserMigration",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `doneAt` INTEGER NOT NULL, `favorites` INTEGER NOT NULL, `records` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "doneAt",
+            "columnName": "doneAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favorites",
+            "columnName": "favorites",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "records",
+            "columnName": "records",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "SeriesRedirect",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fromId` INTEGER NOT NULL, `toId` INTEGER NOT NULL, PRIMARY KEY(`fromId`))",
+        "fields": [
+          {
+            "fieldPath": "fromId",
+            "columnName": "fromId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toId",
+            "columnName": "toId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fromId"
+          ]
+        }
+      },
+      {
+        "tableName": "Ficha",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fuente` TEXT NOT NULL, `slug` TEXT NOT NULL, `seriesId` INTEGER NOT NULL, `anilistId` INTEGER, `estado` TEXT, `origen` TEXT, `nivel` TEXT, `puntuacion` REAL, `fecha` INTEGER, PRIMARY KEY(`fuente`, `slug`))",
+        "fields": [
+          {
+            "fieldPath": "fuente",
+            "columnName": "fuente",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slug",
+            "columnName": "slug",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "seriesId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "anilistId",
+            "columnName": "anilistId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "origen",
+            "columnName": "origen",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nivel",
+            "columnName": "nivel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "puntuacion",
+            "columnName": "puntuacion",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "fecha",
+            "columnName": "fecha",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fuente",
+            "slug"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Ficha_seriesId",
+            "unique": false,
+            "columnNames": [
+              "seriesId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Ficha_seriesId` ON `${TABLE_NAME}` (`seriesId`)"
+          },
+          {
+            "name": "index_Ficha_anilistId",
+            "unique": false,
+            "columnNames": [
+              "anilistId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Ficha_anilistId` ON `${TABLE_NAME}` (`anilistId`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '09ea0c821ee6d7407d1da175974948e2')"
+    ]
+  }
+}

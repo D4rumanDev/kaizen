@@ -1,0 +1,41 @@
+[
+ {
+  "id": "171",
+  "title": "Shingeki no Kyojin",
+  "synopsis": "x",
+  "categoryId": 1,
+  "slug": "shingeki-no-kyojin",
+  "category": {
+   "id": 1,
+   "name": "TV Anime",
+   "slug": "tv-anime",
+   "malId": "TV"
+  }
+ },
+ {
+  "id": "529",
+  "title": "Death Note",
+  "synopsis": "x",
+  "categoryId": 1,
+  "slug": "death-note",
+  "category": {
+   "id": 1,
+   "name": "TV Anime",
+   "slug": "tv-anime",
+   "malId": "TV"
+  }
+ },
+ {
+  "id": "538",
+  "title": "One Punch Man",
+  "synopsis": "x",
+  "categoryId": 1,
+  "slug": "one-punch-man",
+  "category": {
+   "id": 1,
+   "name": "TV Anime",
+   "slug": "tv-anime",
+   "malId": "TV"
+  }
+ }
+]
