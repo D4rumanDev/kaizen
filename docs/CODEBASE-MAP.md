@@ -36,8 +36,9 @@ app/kaizen/
 │   ├── exoplayer/ # Reproductor Media3 (PlaybackController, PlayerScreen, AFR, AniSkip)
 │   ├── search/, anime/, cards/, streaming/
 ├── commons/       # Infraestructura común
-│   ├── sync/      # Sincronización multi-dispositivo WebDAV (SyncManager, SyncDb, lápidas Removals.step, RemoteStore)
+│   ├── sync/      # Sincronización multi-dispositivo WebDAV o SMB (SyncManager, SyncDb, lápidas Removals.step, RemoteStore)
 │   ├── Smb*.kt    # Copias de seguridad en una carpeta de red SMB (SmbBackup, SmbFolder con jcifs, SmbErrors, SmbDiscovery por mDNS; sync/SmbStore sincroniza por esa carpeta); asistente en tv/settings/SmbPickerDialog
+│   ├── SensitiveBlur.kt # Desenfoque de carátulas (modo parental «Contenido sensible»): Transformation de Coil3 que reduce y amplía, válida en Android 9
 │   ├── warp/      # Túnel WireGuard/WARP integrado exclusivo para Kaizen (WarpTunnel, WarpPolicy)
 │   ├── HTTP: AppHttpClient, Network, FallbackDns, HostGate, TlsPolicy, RequestCounter
 │   ├── Almacenamiento: KaizenStore (puerta única a SharedPreferences), KaizenSettings, Tuning, SecretStore
@@ -58,7 +59,7 @@ app/kaizen/
 | **Fuentes** (definidas en JSON) | `ConfigurableSource`, `spec/` (`SourceSpec`, `RepoConfig`), `SourceHttp`, `SourceChallenge`, `AnimeSource` | Motor único de extracción basado en especificaciones declarativas (`assets/sources/*.json`). Reintentos, cookies de bypass y pausas automáticas. |
 | **Catálogo** (fichas recorridas de las fuentes) | `Catalog`, `CatalogBuilder`, `CatalogTables`, `CatalogState`, `CatalogSnapshot`, `CatalogSeed` | Recorrido periódico (cada 14 días) y agrupación en series. `CatalogSeed` permite descargar e importar catálogos unificados portables y firmados sin esperar al recorrido. |
 | **Identidad de las series** (tabla `Ficha` en `user-db`) | `SeriesIds`, `SeriesResolver`, `FichaTable`, `UserRows`, `SeriesDedupe`, `SeriesMatch`, `MergeProposals`, `UserTitles` | Asignación de ID único por serie. Las reglas de unión automática exigen coincidencia con AniList; el usuario puede unir o separar mediante `titles.json`. |
-| **Emparejado con AniList** | `AnilistMatcher`, `AnilistSync`, `AnilistSyncRunner`, `AnilistReview`, `AnilistCompare`, `LinkEvidence`, `AnilistSeed` | Enlace por evidencia (nombre, año, temporada, episodios, formato, `idMal`). Lo seguro se aplica solo; lo dudoso va a revisión. `AnilistSeed` provee enlaces pre-calculados firmados para instalaciones limpias. |
+| **Emparejado con AniList** | `AnilistMatcher`, `AnilistSync`, `AnilistSyncRunner`, `AnilistReview`, `AnilistCompare`, `LinkEvidence`, `AnilistSeed`, `AnilistShare` (enlaces y fichas por la carpeta de sincronización) | Enlace por evidencia (nombre, año, temporada, episodios, formato, `idMal`). Lo seguro se aplica solo; lo dudoso va a revisión. `AnilistSeed` provee enlaces pre-calculados firmados para instalaciones limpias. |
 | **Esquema de datos web** (`WebFicha`) | `WebFichaSchema`, `FichaData`, `FichaResuelta`, `WebFichaQuery`, `FichaFill` | `WebFicha` almacena estrictamente lo que la web declara en un JSON unificado. `FichaResuelta` combina AniList con datos web para visualización sin contaminar la entidad. `FichaFill` completa fichas de las webs en segundo plano. |
 | **Animeoteca** | `Animeoteca` | Enriquecimiento opcional de sinopsis y títulos en español. |
 | **Saltos de cabecera** | `AniSkip` | Detección de openings/endings con validación estricta de duración del vídeo (`forDuration`) y regla 50/50 (openings en la primera mitad, endings en la segunda). |

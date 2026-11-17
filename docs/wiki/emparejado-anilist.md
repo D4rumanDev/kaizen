@@ -93,6 +93,10 @@ casi todo es «TV» y que coincida no prueba nada. Una prueba en contra baja SEG
 - **Los datos de las webs no son iguales**: jkanime sin acentos, animeflv «Aventuras», verani con cadenas de TV como estudio, animegratis y animeav1 con bloqueos 403/404. Hay que normalizar y no fiarse de un campo.
 - **El registro puede ir por detrás**: antes de afirmar que algo no ocurrió hay que leerlo hasta el final (una pasada de emparejado ocurrió después de mi lectura).
 
+## 7b. Las uniones viajan entre equipos (18-nov)
+
+Los enlaces y las fichas de AniList son por equipo (`user-db` y `catalog-db`) y no salen en la copia de estados: una tele nueva repetía horas de emparejado (la TV iba por 32 fichas frente a 7.004 del tvbox). `AnilistShare` los pasa por la carpeta de la sincronización: enlaces aplicados (nunca pisan uno existente ni del usuario; rellenan fichas sin enlace o con uno automático no aplicado) y fichas de AniList en tramos de 5000 ids con el recuento en el nombre. Con enlaces nuevos se reagrupa el catálogo. El catálogo de `kaizen-sources` ya traía los `anilistId` como enlaces «mismo-id», pero no las fichas. Límite: dos equipos con el mismo número de fichas distintas en un tramo no se intercambian hasta que uno crezca. Pruebas: `AnilistShareTest`.
+
 ## 8. Pendiente
 
 Resumen y detalle de los límites conocidos (abajo). Lo que sigue abierto se lleva aparte, fuera del repositorio.

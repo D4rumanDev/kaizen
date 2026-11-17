@@ -64,6 +64,7 @@ Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`
    1. En los dos equipos: **Configuración › Copia de seguridad › Carpeta de red › Elegir carpeta en el NAS**. Escribe el servidor (o elige uno de los encontrados), usuario y contraseña, y la carpeta compartida (`video/kaizen`, sin `smb://`). **Conectar y elegir carpeta** comprueba el acceso y recorre el NAS; **Verificar y guardar** comprueba y guarda.
    2. En el equipo anterior: **Copiar ahora a la carpeta de red**.
    3. En el nuevo: **Restaurar desde la carpeta de red**.
+   Después, con la sincronización por la carpeta de red, favoritos, vistos y las **uniones con AniList** (enlaces y fichas) pasan solos entre los equipos al abrir la app y con la copia diaria; la primera vez en un equipo nuevo puede tardar.
    El NAS necesita SMB 2 o 3 y el firewall debe dejar entrar a la red local por SMB (445). Sin NAS: en el equipo anterior **Crear copia ahora**; en el nuevo, **Copia de seguridad › Local** (restaurar) o **Remota** (WebDAV, si la tienes configurada). Restaurar **sustituye** los datos del equipo nuevo: hazlo en un equipo recién instalado.
 4. **Ajustes que conviene mirar**: tamaño de la interfaz (Pantalla), servidor preferido (Fuentes y red), y activar «Control por ADB» (Depuración) solo si vas a usar `tools/tv.js`.
 

@@ -22,7 +22,7 @@ Bienvenido a la memoria persistente del proyecto **Kaizen** gestionada a través
 
 2. **[Arquitectura y Módulos](architecture.md)**
    - Visión general del módulo `:app`, el flujo de la web a la pantalla y los subsistemas.
-   - Sincronización multi-dispositivo WebDAV (`commons/sync/`) y convergencia con lápidas.
+   - Sincronización multi-dispositivo por WebDAV o carpeta de red SMB (`commons/sync/`), convergencia con lápidas y uniones con AniList que viajan con ella (`AnilistShare`).
    - Flujo de peticiones de scraping concurrente (`animeav1`, `animegratis`, `jkanime`, etc.).
    - Gestión de bases de datos (`CatalogDB`, `UserDB`, `CacheDB`) y copias portables (`CatalogSeed`, `SettingsBackup`).
    - Ciclo del reproductor multimedia (AFR, Media3, AniSkip con validación de duración).
