@@ -10,7 +10,7 @@ updated: 2026-11-17
 
 # Instalar Kaizen en otro equipo
 
-Guion paso a paso. El APK se publica como **release** del repositorio privado de GitHub (`D4rumanDev/kaizen`) y se instala desde un PC con ADB. Como el repositorio es privado, el equipo nuevo **no puede descargarlo solo**: se baja en el PC con `gh` (sesión iniciada) y se instala por red.
+Guion paso a paso. El APK se publica como **release** del repositorio público de GitHub (`D4rumanDev/kaizen`). Se puede instalar de dos formas: **desde el propio equipo** con una app de descargas (por ejemplo «Downloader»; opción C0) o **desde un PC con ADB** (opciones C1 a C6).
 
 Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`v6.0.8`). Las IPs reales no se escriben en el repositorio.
 
@@ -41,9 +41,15 @@ Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`
    - `arm64-v8a` → sigue.
    - `armeabi-v7a` (algunas TV y TV antiguas) → este APK **no arranca**; hay que compilar otro con ese filtro. Para y avisa.
 
-## C. Instalar (en el PC)
+## C0. Instalar desde el propio equipo (sin PC)
 
-1. **Bajar el APK**: `gh release download <VERSION> -R D4rumanDev/kaizen -p app-tv.apk -D <carpeta_nueva_vacia>`
+1. Instalar «Downloader» desde la tienda del equipo y permitirle «instalar apps desconocidas» (Ajustes → Seguridad y restricciones).
+2. En Downloader, abrir la dirección `https://github.com/D4rumanDev/kaizen/releases/download/<VERSION>/app-tv.apk`, esperar la descarga y pulsar «Instalar».
+3. Comprobar la versión en Configuración › Acerca de y seguir en D.
+
+## C. Instalar desde un PC con ADB
+
+1. **Bajar el APK** (sin sesión, el repositorio es público): `curl -L -o app-tv.apk https://github.com/D4rumanDev/kaizen/releases/download/<VERSION>/app-tv.apk` (o `gh release download <VERSION> -R D4rumanDev/kaizen -p app-tv.apk`), en una carpeta nueva y vacía.
 2. **Comprobar** que el hash coincide con el de las notas (`sha256sum`) y la firma (`apksigner verify --print-certs`).
 3. **Conectar**: `adb connect <IP_NUEVO>:5555` y aceptar el aviso en la pantalla del equipo («Permitir siempre»).
 4. **Instalar** (siempre con `-f`, almacenamiento interno, para evitar ANR por disco USB lento):
@@ -53,7 +59,7 @@ Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`
 
 ## D. Primer arranque y datos
 
-1. **Fuentes y catálogo**: la app arranca con las fuentes incluidas. En **Configuración › Biblioteca › Fuentes**, «Recorrer las fuentes que falten» para rellenar el catálogo (tarda varios minutos).
+1. **Fuentes y catálogo**: la app arranca con las fuentes incluidas. «Descargar del repositorio» (Configuración › Acerca de › Repositorio de descargas) está **apagado por defecto**: actívalo si quieres que baje fuentes y catálogo ya hechos de `kaizen-sources` (público). Si no, el catálogo se construye recorriendo las webs. En **Configuración › Biblioteca › Fuentes**, «Recorrer las fuentes que falten» para rellenar el catálogo (tarda varios minutos).
 2. **Verificación de webs**: si una fuente pide verificación (animegratis.net), aparece una tarjeta «Verificar fuente» en Recientes (se abre `/horario`). Pulsar «Listo» al terminar.
 3. **Traer tus datos** (favoritos, vistos, ajustes) del equipo anterior: en el equipo anterior, **Configuración › Copia de seguridad › Crear copia ahora**; en el nuevo, **Configuración › Copia de seguridad › Local** (restaurar) o **Remota** (WebDAV, si la tienes configurada). Restaurar **sustituye** los datos del equipo nuevo: hazlo en un equipo recién instalado.
 4. **Ajustes que conviene mirar**: tamaño de la interfaz (Pantalla), servidor preferido (Fuentes y red), y activar «Control por ADB» (Depuración) solo si vas a usar `tools/tv.js`.
@@ -70,4 +76,4 @@ Repetir A (compilar con la **misma firma**, subir `versionCode` en `app/build.gr
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Firma distinta de la instalada | No desinstalar sin copia; usar el APK firmado con la clave de siempre |
 | `INSTALL_PARSE_FAILED_NO_CERTIFICATES` | APK sin firmar | Compilar con el almacén de claves disponible (A.3) |
 | `adb: device unauthorized` | No se aceptó el aviso | Revocar autorizaciones de depuración en el equipo y repetir C.3 |
-| `gh release download` da 404 | Sesión de `gh` sin acceso al repositorio privado | `gh auth status`; iniciar sesión con la cuenta que lo ve |
+| La descarga da 404 | Versión o nombre de fichero mal escritos | Mirar la lista en `https://github.com/D4rumanDev/kaizen/releases` |
