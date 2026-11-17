@@ -370,8 +370,8 @@ object KaizenSettings {
     /** Fecha (de generación) del último catálogo de `kaizen-sources` aplicado: no se aplica uno más antiguo ni igual. */
     var catalogSeedAt: Long by longPref("kaizen_catalog_seed_at", 0L)
 
-    /** Descargas del repositorio de fuentes (fuentes por fichero, enlaces con AniList y catálogo). Apagadas por defecto mientras el del proyecto sea privado (ver `RepoConfig`). */
-    var repoDownloads: Boolean by booleanPref("kaizen_repo_downloads", false)
+    /** Descargas del repositorio de fuentes (fuentes por fichero, enlaces con AniList y catálogo). Encendidas por defecto desde que el repositorio del proyecto es público (ver `RepoConfig`). */
+    var repoDownloads: Boolean by booleanPref("kaizen_repo_downloads", true)
 
     /** URL base del repositorio (null = la del proyecto) y su clave pública (null = la del proyecto): son de confianza, ver `RepoConfig`. */
     var repoUrl: String? by stringPref("kaizen_repo_url", null)

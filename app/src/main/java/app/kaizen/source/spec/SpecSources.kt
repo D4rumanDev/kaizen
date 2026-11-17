@@ -71,7 +71,7 @@ object SpecSources {
      * Devuelve cuántas fuentes se han actualizado; un fallo de red o de verificación deja la caché como estaba.
      */
     fun refresh(force: Boolean = false): Int {
-        // Apagado por defecto mientras el repositorio del proyecto sea privado (ver RepoConfig); las fuentes de `assets/sources/` y la caché ya descargada siguen igual.
+        // Se puede apagar en Configuración › Acerca de (ver RepoConfig); apagado, las fuentes de `assets/sources/` y la caché ya descargada siguen igual.
         if (!RepoConfig.enabled) return 0
         val now = System.currentTimeMillis()
         if (!force && now - prefs.getLong("last_refresh", 0L) < REFRESH_INTERVAL_MS) return 0

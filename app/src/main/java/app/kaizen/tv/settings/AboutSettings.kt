@@ -57,7 +57,7 @@ internal class AboutSettingsItems {
         val sources = AnimeSources.all
         val repoProblem = { v: String -> if (v.isBlank() || RepoConfig.normalizeUrl(v) != null) null else "Debe ser una dirección https, sin usuario ni ? ni #" }
         return listOf(
-            CheckItem("Descargar del repositorio", "Fuentes, enlaces y catálogo. Apagado por defecto mientras el repositorio del proyecto sea privado", KaizenSettings::repoDownloads),
+            CheckItem("Descargar del repositorio", "Fuentes, enlaces y catálogo ya hechos, firmados, del repositorio público del proyecto", KaizenSettings::repoDownloads),
             TextItem("URL del repositorio", { RepoConfig.baseUrl + if (RepoConfig.isCustom) "" else " (el del proyecto)" },
                 { KaizenSettings.repoUrl.orEmpty() }, { KaizenSettings.repoUrl = it.ifBlank { null } }, repoProblem, "https://…/",
                 "Vacío usa el repositorio del proyecto. Todo lo que se baje debe ir firmado con la clave de abajo: sin firma válida no se usa nada."),

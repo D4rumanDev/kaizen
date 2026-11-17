@@ -16,7 +16,7 @@ import java.util.Base64
  * Reglas de la URL: `https`, con servidor, sin usuario ni contraseña, sin `?` ni `#`, acabada en `/`. La URL, la clave y el interruptor son de confianza: ni el control por ADB de
  * valores sueltos ni la restauración de una copia de ajustes los cambian desde un fichero (ver `SettingsBackup`).
  *
- * El interruptor ([enabled]) está **apagado por defecto** mientras el repositorio del proyecto sea privado (la app lo lee sin credenciales); al hacerlo público, se enciende por defecto.
+ * El interruptor ([enabled]) está **encendido por defecto** desde que el repositorio del proyecto es público (la app lo lee sin credenciales); un repositorio propio y privado no se puede leer sin credenciales, y entonces conviene apagarlo.
  */
 object RepoConfig {
     private const val MAX_URL = 200
