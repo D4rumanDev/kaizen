@@ -79,7 +79,7 @@ class SmbFolder(url: String, user: String?, password: String?) : RemoteFolder {
 
     override fun download(name: String, dest: File) {
         val temp = File(dest.parentFile, "${dest.name}.tmp")
-        SmbFileInputStream(file(name)).use { input -> temp.outputStream().use { out -> input.copyTo(out) } }
+        try { SmbFileInputStream(file(name)).use { input -> temp.outputStream().use { out -> input.copyTo(out) } } } catch (e: Exception) { temp.delete(); throw e }
         if (!temp.renameTo(dest)) { dest.delete(); check(temp.renameTo(dest)) { "no se pudo guardar ${dest.name}" } }
     }
 

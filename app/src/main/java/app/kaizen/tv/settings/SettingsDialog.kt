@@ -145,6 +145,9 @@ fun SettingsPanel(root: SettingsCategory, refresh: Int = 0, onDismiss: () -> Uni
         onDismissRequest = { if (openChoice != null) closeChoice() else if (stack.size > 1) { focusTitle = stack.last().second; stack = stack.dropLast(1) } else dismissAnimated() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        // La ventana del diálogo se ajusta a su contenido por defecto: al cambiar de nivel o cerrar, un instante con el contenido sin medir la encogía a una franja. Se fija a pantalla completa.
+        val window = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        androidx.compose.runtime.SideEffect { window?.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT) }
         AnimatedVisibility(visibleState = shown, modifier = Modifier.fillMaxSize(),
             enter = fadeIn(Motion.spec(PANEL_ANIMATION_MS)), exit = fadeOut(Motion.spec(PANEL_ANIMATION_MS))) {
         Box(Modifier.fillMaxSize().background(Black50)) {

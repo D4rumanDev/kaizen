@@ -13,7 +13,7 @@ import kotlin.reflect.KMutableProperty0
  */
 internal object SettingsFlags {
     /** «Contenido sensible» (modo parental con carátulas en blur), en Pantalla. */
-    const val SENSITIVE = false
+    const val SENSITIVE = true
 
     /** «Actualizaciones» (comprobar y avisar de versiones nuevas), en Acerca de. */
     const val UPDATES = false

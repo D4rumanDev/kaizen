@@ -39,11 +39,12 @@ object SmbBackup {
     /** Sube a la carpeta las copias locales que le faltan y poda las más viejas; devuelve cuántas subió. */
     suspend fun push(remote: RemoteFolder = folder(), local: File = KaizenBackup.directory, keep: Int = KaizenSettings.smbKeep): Int = withContext(Dispatchers.IO) {
         val have = remote.list()
-        val send = toUpload(local.listFiles().orEmpty().toList(), have)
+        val missing = toUpload(local.listFiles().orEmpty().toList(), have)
+        // Lo que la poda quitaría enseguida no se sube (si no, cada copia local vieja se subiría y se borraría en cada pasada).
+        val prune = toPrune(have.map { it.name } + missing.map { it.name }, keep)
+        val send = missing.filter { it.name !in prune }
         send.forEach { remote.upload(it) }
-        val names = have.map { it.name } + send.map { it.name }
-        val prune = toPrune(names, keep)
-        prune.forEach { remote.delete(it) }
+        prune.filter { name -> have.any { it.name == name } }.forEach { remote.delete(it) }
         DebugLog.info("Carpeta de red", "Copias subidas: ${send.size}; podadas en la carpeta: ${prune.size}")
         send.size
     }

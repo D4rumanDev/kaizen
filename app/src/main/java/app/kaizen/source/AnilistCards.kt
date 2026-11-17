@@ -10,7 +10,11 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /** Lo que una tarjeta de lista toma de AniList cuando la serie está enlazada: la nota (0 a 100), su portada, su título en romaji y el resumen del panel de datos. */
-internal class AnilistCard(val score: Int?, val cover: String?, val romaji: String?, val info: CardInfo? = null)
+/** [sensitive]: AniList la marca como adulta o tiene alguno de los géneros sensibles de los ajustes (para el modo parental). */
+internal class AnilistCard(val score: Int?, val cover: String?, val romaji: String?, val info: CardInfo? = null, private val adult: Boolean = false, private val genres: List<String> = emptyList()) {
+    /** Se lee al pintar (no al crear la tarjeta): así cambiar los géneros sensibles en los ajustes vale sin reiniciar. */
+    val sensitive: Boolean get() = adult || genres.any { it.lowercase() in KaizenSettings.sensitiveGenres }
+}
 
 /**
  * El resumen que enseña el panel de una tarjeta enfocada: sale de las fichas ya descargadas (sin red) y **siempre en español**. La sinopsis, de Animeoteca (capa `es` de la ficha de
@@ -43,7 +47,7 @@ internal object AnilistCards {
         if (row?.estado != AnimeFuente.APLICADO || row.anilistId == null) return null
         if (ficha == null || ficha.consulta != AnilistClient.FICHA_VERSION) return null
         val data = FichaData.ofAnilist(ficha) ?: return null
-        return AnilistCard(data.puntuacion, data.portada, data.romaji, CardInfo.of(data, web))
+        return AnilistCard(data.puntuacion, data.portada, data.romaji, CardInfo.of(data, web), data.adulto == true, data.generos)
     }
 
     /** Olvida lo memorizado de una serie: se llama al guardar su ficha de la web, que puede traer la sinopsis en español que la tarjeta no tenía. */

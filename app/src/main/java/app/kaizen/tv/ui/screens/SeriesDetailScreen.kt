@@ -264,7 +264,7 @@ private fun Poster(series: Series, anilistCover: String?, requester: FocusReques
     // Con la portada de AniList no se miden las de las fuentes (son varias peticiones a sus webs).
     LaunchedEffect(series.slug, series.source, anilistCover) { if (anilistCover == null) best = sharpestCover(context, series) ?: best }
     FocusCard(Modifier.width(POSTER_WIDTH).fillMaxHeight().focusRequester(requester).focusProperties { right = play }.semantics { contentDescription = "Portada de ${series.name}: ver portadas" }, onClick = { viewing = true }, background = White10) {
-        Cover(listOfNotNull(userCover(series.slug, series.source), anilistCover, best, series.imageUrl).distinct(), Modifier.weight(1f).fillMaxWidth().clip(CardImageShape), reuseCached = true)
+        Cover(listOfNotNull(userCover(series.slug, series.source), anilistCover, best, series.imageUrl).distinct(), Modifier.weight(1f).fillMaxWidth().clip(CardImageShape), reuseCached = true, blur = app.kaizen.tv.ui.components.rememberSensitive(series.source, series.slug))
     }
     if (viewing) {
         val covers = rememberLoadable(series) { listOfNotNull(anilistCover?.let { GalleryCover("AniList", it) }) + galleryCovers(series) }.valueOrNull

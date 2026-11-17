@@ -2,6 +2,9 @@
 
 package app.kaizen.tv.ui
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.kaizen.tv.ui.components.*
 
 import androidx.compose.ui.input.key.type
@@ -66,7 +69,8 @@ object CardMenu {
         val isContinue: Boolean = false
     )
 
-    private class Option(val label: String, val keepOpen: Boolean = false, val run: () -> Unit)
+    /** [group]: el encabezado bajo el que se agrupa (en las tarjetas de capítulo: «Capítulo» y «Serie»); null = sin encabezado. */
+    private class Option(val label: String, val keepOpen: Boolean = false, val group: String? = null, val run: () -> Unit)
 
     /** Diálogo de títulos abierto desde el menú. */
     private enum class TitleAction { MERGE, STATUS }
@@ -119,6 +123,9 @@ object CardMenu {
         KaizenDialog(onDismissRequest = onDismiss, title = dialogTitle) {
             LaunchedEffect(list) { runCatching { first.requestFocus() } }
             list.forEachIndexed { index, option ->
+                if (option.group != null && list.getOrNull(index - 1)?.group != option.group) {
+                    androidx.tv.material3.Text(option.group, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f), fontSize = 14.sp, modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp))
+                }
                 KaizenButton(
                     option.label,
                     onClick = { if (!option.keepOpen) { onDismiss(); CardMenuSignal.arm() }; option.run() },
@@ -146,27 +153,26 @@ object CardMenu {
 
     private fun options(activity: ComponentActivity, target: Target, seen: Boolean, favorite: Boolean, onTitle: (TitleAction) -> Unit): List<Option> = buildList {
         val record = target.chapter
+        // Con un capítulo, el menú se divide en lo del capítulo y lo de la serie; con una serie sola, solo lo de la serie y sin encabezados.
+        val chapterGroup = if (record != null) "Capítulo ${record.chapter()}" else null
+        val seriesGroup = if (record != null) "Serie · ${target.name}" else null
         if (record != null) {
-            add(Option(appString(R.string.ui_reproducir)) { TVServersFactory.start(activity, record) })
-            add(Option(appString(R.string.ui_elegir_servidor)) { TVServersFactory.start(activity, record, ServerChoice.ASK) })
+            add(Option(appString(R.string.ui_reproducir), group = chapterGroup) { TVServersFactory.start(activity, record) })
+            add(Option(appString(R.string.ui_elegir_servidor), group = chapterGroup) { TVServersFactory.start(activity, record, ServerChoice.ASK) })
+            add(Option(if (seen) appString(R.string.ui_marcar_como_no_visto) else appString(R.string.ui_marcar_como_visto), group = chapterGroup) { io { record.markSeen(!seen) } })
+            if (target.isContinue) add(Option(appString(R.string.ui_quitar_de_seguir_viendo), group = chapterGroup) { KaizenProgress.remove(record.progressKey(), record.eid) })
         }
-        // Lo que más se hace desde una tarjeta, arriba (lo dice la pista del panel de datos): favorito, estado y, después, lo demás.
-        add(Option(if (favorite) appString(R.string.ui_quitar_de_favoritos) else appString(R.string.ui_anadir_a_favoritos)) { toggleFavorite(target) })
-        add(Option("Estado: ${SeriesStatuses.of(target.name, AnimeSources.forUrl(target.animeUrl).id, target.slug).label}", keepOpen = true) { onTitle(TitleAction.STATUS) })
-        add(Option(appString(R.string.ui_abrir_ficha)) { TVAnimesDetails.start(activity, target.animeUrl) })
-        if (record != null) {
-            add(Option(if (seen) appString(R.string.ui_marcar_como_no_visto) else appString(R.string.ui_marcar_como_visto)) { io { record.markSeen(!seen) } })
-        }
+        // De la serie, lo que más se hace arriba: abrir la ficha, favorito y estado; después lo demás.
+        add(Option(appString(R.string.ui_abrir_ficha), group = seriesGroup) { TVAnimesDetails.start(activity, target.animeUrl) })
+        add(Option(if (favorite) appString(R.string.ui_quitar_de_favoritos) else appString(R.string.ui_anadir_a_favoritos), group = seriesGroup) { toggleFavorite(target) })
+        add(Option("Estado: ${SeriesStatuses.of(target.name, AnimeSources.forUrl(target.animeUrl).id, target.slug).label}", keepOpen = true, group = seriesGroup) { onTitle(TitleAction.STATUS) })
         val ficha = AnimeSources.forUrl(target.animeUrl).id
         val allowed = NotRecommended.allows(target.name, ficha, target.slug)
-        add(Option(if (allowed) appString(R.string.ui_no_recomendar) else appString(R.string.ui_volver_a_recomendar)) {
+        add(Option(if (allowed) appString(R.string.ui_no_recomendar) else appString(R.string.ui_volver_a_recomendar), group = seriesGroup) {
             NotRecommended.set(target.name, excluded = allowed, source = ficha, slug = target.slug)
             KaizenToast.show(if (allowed) appString(R.string.ui_no_se_recomendara) else appString(R.string.ui_se_volvera_a_recomendar))
         })
-        if (target.isContinue && record != null) {
-            add(Option(appString(R.string.ui_quitar_de_seguir_viendo)) { KaizenProgress.remove(record.progressKey(), record.eid) })
-        }
-        add(Option(appString(R.string.ui_unir_con_otra_serie), keepOpen = true) { onTitle(TitleAction.MERGE) })
+        add(Option(appString(R.string.ui_unir_con_otra_serie), keepOpen = true, group = seriesGroup) { onTitle(TitleAction.MERGE) })
     }
 
     internal fun mergeWith(source: String, slug: String, other: Catalog.Pick) {

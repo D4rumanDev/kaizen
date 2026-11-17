@@ -61,8 +61,8 @@ internal class ScreenSettingsItems(private val context: Context, private val ope
         ActionItem(appString(R.string.ui_secciones_del_menu), { "Mostrar, ocultar y organizar" }) { openMenuSections() }
     )
 
-    /** Preparado, sin efecto todavía: solo se enseña cuando [SettingsFlags.SENSITIVE] esté encendido. */
+    /** Modo parental: las carátulas de las series sensibles (adultas o de los géneros ecchi y hentai en AniList) salen desenfocadas en tarjetas y ficha. */
     private fun sensitiveItems() = listOf(
-        CheckItem("Carátulas con blur", "Desenfoca las carátulas de las series marcadas como sensibles", KaizenSettings::sensitiveBlur)
+        CheckItem("Carátulas con blur", "Desenfoca las carátulas de las series adultas o ecchi y hentai de AniList", KaizenSettings::sensitiveBlur)
     )
 }

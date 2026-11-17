@@ -72,6 +72,7 @@ import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.request.transformations
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -110,7 +111,7 @@ internal val cardRowSpacing: Dp get() = PosterVerticalSpacing * KaizenSettings.c
 
 /** Imagen con Coil: prueba cada URL por orden hasta que una carga (así una serie sin carátula en su fuente usa la de otra). */
 @Composable
-internal fun Cover(urls: List<String>, modifier: Modifier = Modifier, fit: Boolean = false, showLabel: Boolean = true, under: List<String> = emptyList(), reuseCached: Boolean = false) {
+internal fun Cover(urls: List<String>, modifier: Modifier = Modifier, fit: Boolean = false, showLabel: Boolean = true, under: List<String> = emptyList(), reuseCached: Boolean = false, blur: Boolean = false) {
     val candidates = remember(urls) { urls.filter { it.isNotBlank() }.distinct() }
     var attempt by remember(candidates) { mutableIntStateOf(0) }
     // Ninguna URL cargó (o no hay ninguna): se avisa en vez de dejar un hueco gris sin explicación.
@@ -118,15 +119,16 @@ internal fun Cover(urls: List<String>, modifier: Modifier = Modifier, fit: Boole
     val context = LocalContext.current
     val fade = Motion.ms(200)
     // Aparece con un fundido (solo si no estaba ya en la caché de memoria); la duración sigue a Ajustes › Interfaz › Animaciones.
-    val request = remember(candidates, attempt, fade, reuseCached) {
+    val request = remember(candidates, attempt, fade, reuseCached, blur) {
         ImageRequest.Builder(context).data(candidates.getOrNull(attempt)).crossfade(fade).apply {
+            if (blur) transformations(app.kaizen.commons.SensitiveBlur)
             // [reuseCached]: mientras llega la imagen a este tamaño se ve la ya cargada en otro (la de la tarjeta de la que se viene).
-            if (reuseCached) SingletonImageLoader.get(context).memoryCache?.keys.orEmpty().let { keys -> candidates.firstNotNullOfOrNull { url -> keys.firstOrNull { it.key == url } } }?.let { placeholderMemoryCacheKey(it) }
+            if (reuseCached && !blur) SingletonImageLoader.get(context).memoryCache?.keys.orEmpty().let { keys -> candidates.firstNotNullOfOrNull { url -> keys.firstOrNull { it.key == url } } }?.let { placeholderMemoryCacheKey(it) }
         }.build()
     }
     Box(modifier, contentAlignment = Alignment.Center) {
         // [under]: imagen que se ve por defecto; la principal la sustituye con un fundido cuando carga (y si no carga, se queda esta).
-        if (under.isNotEmpty()) Cover(under, Modifier.matchParentSize(), fit, showLabel = showLabel)
+        if (under.isNotEmpty()) Cover(under, Modifier.matchParentSize(), fit, showLabel = showLabel, blur = blur)
         AsyncImage(
             model = request,
             contentDescription = null,
