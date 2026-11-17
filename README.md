@@ -8,6 +8,7 @@ Aplicación de anime para Android TV (probada en un tvbox). Reúne varias fuente
 - Notas ponderadas de todas las fuentes activas, y recientes ordenados por fecha.
 - Buscar (texto, géneros y orden), Mejores en general, Inicio y Emisión.
 - Reproductor con las teclas multimedia del mando.
+- Copias de seguridad en una carpeta de red SMB (un NAS) para pasar favoritos, historial y ajustes de una tele a otra, con asistente para elegir la carpeta.
 - Estados de serie (Viendo, Completada, Pendiente, Descartada), sección «Mi lista», y orden y filtro por estado en un panel lateral oculto de cada lista.
 - Filas «Continuar viendo» y «Capítulos recientes» en la pantalla de inicio de Android TV, búsqueda tolerante a acentos y vocales largas, ficha con botones reorganizados, menú lateral ordenable (también «Fuentes») y estadísticas ampliadas.
 - El reproductor suelta la pantalla en pausa (a los 10 min se cierra, para el protector de pantalla), el contador de vistos y el corazón de favorito de las tarjetas siguen el mismo criterio que la ficha, y el panel lateral filtra por «Solo favoritas» y por capítulos vistos o no vistos en «Recientes».
