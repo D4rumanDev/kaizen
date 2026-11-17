@@ -28,7 +28,7 @@ Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`
    ```bash
    gh release create <VERSION> app/build/outputs/apk/tv/app-tv.apk \
      -R D4rumanDev/kaizen --title "Kaizen <VERSION>" \
-     --notes "APK firmado, solo arm64-v8a. SHA-256 del APK: <hash>"
+     --notes "APK firmado para arm64-v8a y armeabi-v7a. SHA-256 del APK: <hash>"
    ```
 
 7. **Verificar**: `gh release view <VERSION> -R D4rumanDev/kaizen` (el fichero está y pesa lo mismo que el local).
@@ -37,9 +37,8 @@ Notación: `<IP_NUEVO>` es la IP del equipo nuevo; `<VERSION>` es la versión (`
 
 1. **Opciones de desarrollador**: Ajustes → Preferencias del dispositivo → Acerca de → pulsar «Compilación» 7 veces.
 2. **Depuración por red**: Ajustes → Preferencias del dispositivo → Opciones de desarrollador → activar «Depuración USB» (o «Depuración de red/ADB por Wi-Fi»). Anota la IP (Ajustes → Red).
-3. **Comprobar la arquitectura**: el APK solo lleva **arm64-v8a** (`ndk.abiFilters` en `app/build.gradle`). Con el equipo conectado: `adb -s <IP_NUEVO>:5555 shell getprop ro.product.cpu.abi`.
-   - `arm64-v8a` → sigue.
-   - `armeabi-v7a` (algunas TV y TV antiguas) → este APK **no arranca**; hay que compilar otro con ese filtro. Para y avisa.
+3. **Arquitectura**: el APK lleva **arm64-v8a y armeabi-v7a** (`ndk.abiFilters` en `app/build.gradle`), así que sirve para el tvbox (64 bits) y para tele de 32 bits como la TV de 32 bits. Se puede comprobar con `adb -s <IP_NUEVO>:5555 shell getprop ro.product.cpu.abilist`. Si el equipo es x86, no sirve.
+4. **Ojo con las automatizaciones**: si el equipo tiene una automatización que cierra las apps de terceros (en la tele del salón, `tv_off_kill_apps` de Home Assistant), Kaizen se cierra a los segundos de abrirse; hay que excluir `app.kaizen`.
 
 ## C0. Instalar desde el propio equipo (sin PC)
 
