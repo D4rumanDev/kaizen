@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
 /**
  * Configuración › Copia de seguridad › Carpeta de red: dejar la carpeta SMB lista sin teclear una dirección con protocolo. Una sola pantalla con lo que hay que decir, en el orden en que
  * se piensa: **servidor** (con los encontrados en la red como sugerencia, ver [SmbDiscovery]), **usuario** y **contraseña** (o invitado) y la **carpeta compartida** (`video/kaizen`, sin
- * protocolo ni servidor). «Examinar» la elige recorriendo el servidor; «Verificar y guardar» comprueba que todo vale y entonces (solo entonces) lo guarda: cancelar no toca una
+ * protocolo ni servidor). «Conectar y elegir carpeta» comprueba servidor, usuario y contraseña (lista los recursos) y deja elegir la carpeta recorriendo el servidor; «Verificar y guardar» comprueba que todo vale y entonces (solo entonces) lo guarda: cancelar no toca una
  * configuración que funciona. Atrás sube un nivel al examinar y, desde el formulario, cierra.
  */
 @Composable
@@ -136,8 +136,8 @@ internal fun SmbPickerDialog(onDismiss: () -> Unit) {
                 when (code) {
                     0 -> save(createdLater = false)
                     1 -> save(createdLater = true)
-                    2 -> { statusIsError = true; status = "En $host no existe el recurso compartido «${path.first()}». Usa Examinar para ver los que hay." }
-                    else -> { statusIsError = true; status = "No existe esa ruta en $host. Usa Examinar para elegirla." }
+                    2 -> { statusIsError = true; status = "En $host no existe el recurso compartido «${path.first()}». Usa «Conectar y elegir carpeta» para ver los que hay." }
+                    else -> { statusIsError = true; status = "No existe esa ruta en $host. Usa «Conectar y elegir carpeta» para elegirla." }
                 }
             }.onFailure { logError(it); statusIsError = true; status = SmbErrors.describe(it, host) }
         }
@@ -212,7 +212,7 @@ private fun SmbForm(
     val verify = remember { FocusRequester() }
     // Con una carpeta ya configurada basta OK en «Verificar y guardar»; sin ella, se empieza por el servidor.
     LaunchedEffect(Unit) { runCatching { (if (hasSaved) verify else firstRow).requestFocus() } }
-    Text("Servidor, usuario y contraseña; después, la carpeta compartida donde guardar las copias.", color = White70, fontSize = Text16)
+    Text("1. Servidor, usuario y contraseña; pulsa «Conectar» para comprobarlos. 2. Elige la carpeta compartida donde guardar las copias.", color = White70, fontSize = Text16)
     if (suggestions.isNotEmpty()) {
         Text("Servidores encontrados en la red", color = White60, fontSize = Text14)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -221,8 +221,8 @@ private fun SmbForm(
     }
     FieldRow("Servidor", host.ifBlank { "Sin elegir" }, Modifier.focusRequester(firstRow)) {
         onEdit(TextItem("Servidor", { host }, { host }, { onHost(SmbFolder.normalizeServer(it) ?: it) },
-            { if (it.isEmpty() || SmbFolder.normalizeServer(it) != null) null else "Escribe el nombre o la IP, por ejemplo 192.0.2.10" },
-            "192.0.2.10", "El nombre o la IP del NAS o del PC, sin protocolo."))
+            { if (it.isEmpty() || SmbFolder.normalizeServer(it) != null) null else "Escribe el nombre o la IP, por ejemplo nas o nas.local" },
+            "nas", "El nombre o la IP del NAS o del PC, sin protocolo."))
     }
     FieldRow("Entrar como invitado", if (guest) "Sí (sin usuario ni contraseña)" else "No", Modifier, onGuest)
     if (!guest) {
@@ -241,10 +241,10 @@ private fun SmbForm(
                 if (parsed != null) onPath(parsed.first, parsed.second)
             },
             { if (it.isEmpty() || SmbFolder.parseLocation(it, withServer = false) != null) null else "Sin espacios raros ni ? # : * \" < > |" },
-            "video/kaizen", "El recurso compartido y la carpeta dentro, sin servidor ni protocolo: video/kaizen. O pulsa Examinar para elegirla."))
+            "video/kaizen", "El recurso compartido y la carpeta dentro, sin servidor ni protocolo: video/kaizen. O pulsa «Conectar y elegir carpeta»."))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
-        KaizenButton("Examinar", onClick = onBrowse, enabled = host.isNotBlank() && !busy)
+        KaizenButton("Conectar y elegir carpeta", onClick = onBrowse, enabled = host.isNotBlank() && !busy)
         KaizenButton(if (busy) "Comprobando…" else "Verificar y guardar", onClick = onVerify, modifier = Modifier.focusRequester(verify), enabled = host.isNotBlank() && path.isNotEmpty() && !busy)
         KaizenButton("Cancelar", onClick = onCancel)
     }
@@ -269,7 +269,7 @@ private fun ColumnScope.SmbBrowser(
     Text((listOf(host) + path).joinToString("  ›  "), color = White70, fontSize = Text16, maxLines = 1, overflow = TextOverflow.Ellipsis)
     Column(Modifier.weight(1f).fillMaxWidth()) {
         when {
-            loading -> Text("Conectando con $host…", color = White70, fontSize = Text18)
+            loading -> Text("Conectando con $host y comprobando usuario y contraseña…", color = White70, fontSize = Text18)
             error != null -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(error, color = FailureRed, fontSize = Text18)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

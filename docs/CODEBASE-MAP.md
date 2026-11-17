@@ -37,7 +37,7 @@ app/kaizen/
 │   ├── search/, anime/, cards/, streaming/
 ├── commons/       # Infraestructura común
 │   ├── sync/      # Sincronización multi-dispositivo WebDAV (SyncManager, SyncDb, lápidas Removals.step, RemoteStore)
-│   ├── Smb*.kt    # Copias de seguridad en una carpeta de red SMB (SmbBackup, SmbFolder con jcifs, SmbErrors, SmbDiscovery por mDNS); asistente en tv/settings/SmbPickerDialog
+│   ├── Smb*.kt    # Copias de seguridad en una carpeta de red SMB (SmbBackup, SmbFolder con jcifs, SmbErrors, SmbDiscovery por mDNS; sync/SmbStore sincroniza por esa carpeta); asistente en tv/settings/SmbPickerDialog
 │   ├── warp/      # Túnel WireGuard/WARP integrado exclusivo para Kaizen (WarpTunnel, WarpPolicy)
 │   ├── HTTP: AppHttpClient, Network, FallbackDns, HostGate, TlsPolicy, RequestCounter
 │   ├── Almacenamiento: KaizenStore (puerta única a SharedPreferences), KaizenSettings, Tuning, SecretStore

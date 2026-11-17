@@ -3,6 +3,7 @@ package app.kaizen.commons.sync
 import app.kaizen.commons.DebugLog
 import app.kaizen.commons.KaizenBackup
 import app.kaizen.commons.KaizenSettings
+import app.kaizen.commons.SmbBackup
 import app.kaizen.source.spec.RepoConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
@@ -22,7 +23,10 @@ object SyncManager {
     val url: String? get() = KaizenSettings.syncUrl?.let(RepoConfig::normalizeUrl)
 
     /** ¿Hay un destino configurado? */
-    val configured: Boolean get() = url != null
+    val configured: Boolean get() = url != null || SmbBackup.configured
+
+    /** Sin servidor WebDAV, la sincronización va por la carpeta de red SMB (la de las copias), si está elegida. */
+    val viaSmb: Boolean get() = url == null && SmbBackup.configured
 
     /**
      * Cambia el destino. Si cambia el **servidor** (el host), la contraseña (y con ella el usuario) se borra: una credencial guardada para un servidor no viaja a otro sin que
@@ -35,7 +39,9 @@ object SyncManager {
         KaizenSettings.syncUrl = value?.takeIf { it.isNotBlank() }
     }
 
-    internal fun store(): WebDavStore = WebDavStore(checkNotNull(url) { "sin destino de sincronización" }, KaizenSettings.syncUser.orEmpty(), KaizenSettings.syncPassword.orEmpty())
+    internal fun store(): RemoteStore =
+        if (viaSmb) SmbStore(SmbBackup.remote(), app.kaizen.App.context.cacheDir)
+        else WebDavStore(checkNotNull(url) { "sin destino de sincronización" }, KaizenSettings.syncUser.orEmpty(), KaizenSettings.syncPassword.orEmpty())
 
     private val lock = kotlinx.coroutines.sync.Mutex()
 

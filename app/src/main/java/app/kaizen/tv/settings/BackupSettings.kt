@@ -39,7 +39,7 @@ internal class BackupSettingsItems(private val context: Context, private val ope
     private fun shortDate(millis: Long) = DateFormat.getDateInstance(DateFormat.SHORT).format(millis)
 
     private fun remoteSummary(): String =
-        if (!SyncManager.configured) "Sin configurar (WebDAV)"
+        if (!SyncManager.configured) "Sin configurar (WebDAV o carpeta de red)"
         else KaizenSettings.syncLastAt.takeIf { it > 0 }?.let { "Última: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it)}" } ?: "Nunca"
 
     private fun smbSummary(): String =
@@ -84,8 +84,9 @@ internal class BackupSettingsItems(private val context: Context, private val ope
         ActionItem("Elegir carpeta en el NAS", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Servidor, usuario, contraseña y carpeta" }) { openSmbPicker() },
         TextItem("Editar la dirección a mano", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Sin configurar" },
             { app.kaizen.commons.SmbFolder.display(KaizenSettings.smbUrl) },
-            { KaizenSettings.smbUrl = if (it.isBlank()) null else app.kaizen.commons.SmbFolder.normalizeUrl(it) ?: KaizenSettings.smbUrl }, app.kaizen.commons.SmbFolder::problem, "192.0.2.10/video/kaizen",
+            { KaizenSettings.smbUrl = if (it.isBlank()) null else app.kaizen.commons.SmbFolder.normalizeUrl(it) ?: KaizenSettings.smbUrl }, app.kaizen.commons.SmbFolder::problem, "servidor/recurso/carpeta",
             "servidor/recurso/carpeta, sin protocolo (también vale \\\\servidor\\recurso\\carpeta). El usuario y la contraseña se cambian en «Elegir carpeta en el NAS»."),
+        choiceItem("Copias que se guardan en la carpeta de red (bajarlo borra las más viejas de allí)", KaizenSettings.SMB_KEEP_OPTIONS, KaizenSettings::smbKeep) { "$it de cada tipo" },
         CheckItem("Buscar servidores en la red", "Sugiere los NAS y PC que se anuncian por mDNS al elegir la carpeta", KaizenSettings::smbDiscovery),
         CheckItem("Copiar también la copia diaria", "Cada copia automática nueva se sube sola a la carpeta de red", KaizenSettings::smbAuto)
     )
@@ -101,10 +102,10 @@ internal class BackupSettingsItems(private val context: Context, private val ope
         return listOf(
             ActionItem("Sincronizar ahora", {
                 val last = KaizenSettings.syncLastAt
-                if (!SyncManager.configured) "Primero escribe el servidor WebDAV"
+                if (!SyncManager.configured) "Primero escribe el servidor WebDAV o elige la carpeta de red"
                 else if (last == 0L) "Nunca" else "Última: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(last)}"
             }) {
-                if (!SyncManager.configured) return@ActionItem KaizenToast.toast("Primero escribe el servidor WebDAV")
+                if (!SyncManager.configured) return@ActionItem KaizenToast.toast("Primero escribe el servidor WebDAV o elige la carpeta de red")
                 KaizenToast.toast("Sincronizando…")
                 AppScope.launch {
                     runCatchingCoop { SyncManager.now() }
@@ -119,7 +120,7 @@ internal class BackupSettingsItems(private val context: Context, private val ope
             TextItem("Contraseña del servidor", { if (KaizenSettings.syncPassword.isNullOrEmpty()) "Sin contraseña" else "Guardada (no se muestra)" }, { "" },
                 { if (it.isNotEmpty()) { KaizenSettings.syncPassword = it; if (KaizenSettings.syncPassword != it) KaizenToast.toastLong("No se pudo guardar la contraseña: el almacén de claves de la tele falla") } }, hint = "Escribe una nueva para cambiarla", masked = true,
                 help = "Se guarda cifrada en esta tele (Keystore), no sale en copias ni en el registro y solo se envía a ese servidor. Usa una contraseña de aplicación si tu servidor la ofrece."),
-            CheckItem("Sincronizar con la copia diaria", "Una vez al día, con la copia automática", KaizenSettings::syncAuto),
+            CheckItem("Sincronizar con la copia diaria", "Al abrir la app y una vez al día. Sin servidor WebDAV usa la carpeta de red", KaizenSettings::syncAuto),
             ActionItem("Este dispositivo", { "Id ${SyncManager.deviceId} (así se llama su fichero en el servidor)" }) { }
         )
     }

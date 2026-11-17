@@ -56,6 +56,7 @@ object KaizenSettings {
     val BACKUP_DAYS_OPTIONS = listOf(3, 7, 14, 30)
     /** Máximo de ficheros de copia. */
     val BACKUP_FILES_OPTIONS = listOf(10, 30, 60)
+    val SMB_KEEP_OPTIONS = listOf(2, 3, 5, 10)
     /** Tamaño máximo del registro de depuración, en KB. */
     val LOG_KB_OPTIONS = listOf(256, 512, 1024, 2048)
     /** Días que se guardan los intentos de conexión de las estadísticas. */
@@ -407,6 +408,8 @@ object KaizenSettings {
             prefs.edit { if (sealed == null) remove("kaizen_smb_password_enc") else putString("kaizen_smb_password_enc", sealed) }
         }
     var smbAuto: Boolean by booleanPref("kaizen_smb_auto", false)
+    /** Copias de cada tipo que quedan en la carpeta de red (aparte de las locales, que son más). */
+    var smbKeep: Int by intPref("kaizen_smb_keep", 3)
     /** El último servidor SMB con el que se conectó bien (precarga el formulario) y si se buscan servidores en la red (mDNS) para sugerirlos. */
     var smbLastServer: String? by stringPref("kaizen_smb_last_server", null)
     var smbDiscovery: Boolean by booleanPref("kaizen_smb_discovery", true)
@@ -415,7 +418,7 @@ object KaizenSettings {
     var syncLastAt: Long by longPref("kaizen_sync_last_at", 0L)
 
     /** Sincronizar también con la copia diaria. */
-    var syncAuto: Boolean by booleanPref("kaizen_sync_auto", false)
+    var syncAuto: Boolean by booleanPref("kaizen_sync_auto", true)
 
     /** Fuentes del repositorio que se descargan; vacío = todas. */
     var repoSources: Set<String>

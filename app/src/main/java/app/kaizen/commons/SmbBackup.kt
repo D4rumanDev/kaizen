@@ -14,6 +14,8 @@ object SmbBackup {
 
     val configured: Boolean get() = !KaizenSettings.smbUrl.isNullOrBlank()
 
+    internal fun remote(): RemoteFolder = folder()
+
     private fun folder(): RemoteFolder = SmbFolder(checkNotNull(KaizenSettings.smbUrl) { "sin carpeta de red" }, KaizenSettings.smbUser, KaizenSettings.smbPassword)
 
     private fun isBackupName(name: String) = name.endsWith(".json") && PREFIXES.any { name.startsWith(it) }
@@ -35,12 +37,14 @@ object SmbBackup {
         PREFIXES.flatMap { prefix -> names.filter { isBackupName(it) && it.startsWith(prefix) }.sortedDescending().drop(keep.coerceAtLeast(1)) }
 
     /** Sube a la carpeta las copias locales que le faltan y poda las más viejas; devuelve cuántas subió. */
-    suspend fun push(remote: RemoteFolder = folder(), local: File = KaizenBackup.directory, keep: Int = KaizenSettings.backupFiles): Int = withContext(Dispatchers.IO) {
+    suspend fun push(remote: RemoteFolder = folder(), local: File = KaizenBackup.directory, keep: Int = KaizenSettings.smbKeep): Int = withContext(Dispatchers.IO) {
         val have = remote.list()
         val send = toUpload(local.listFiles().orEmpty().toList(), have)
         send.forEach { remote.upload(it) }
         val names = have.map { it.name } + send.map { it.name }
-        toPrune(names, keep).forEach { remote.delete(it) }
+        val prune = toPrune(names, keep)
+        prune.forEach { remote.delete(it) }
+        DebugLog.info("Carpeta de red", "Copias subidas: ${send.size}; podadas en la carpeta: ${prune.size}")
         send.size
     }
 
@@ -49,12 +53,15 @@ object SmbBackup {
         local.mkdirs()
         val get = toDownload(remote.list(), local.listFiles().orEmpty().toList())
         get.forEach { entry -> File(local, entry.name).also { remote.download(entry.name, it); if (entry.modified > 0) it.setLastModified(entry.modified) } }
+        DebugLog.info("Carpeta de red", "Copias bajadas: ${get.size}")
         get.size
     }
 
     /** Baja lo que falta y restaura los estados de la copia más completa (solo añade, como siempre); null si ninguna copia vale. */
     suspend fun pullAndRestore(): Pair<Int, KaizenBackup.Summary?> {
         val downloaded = pull()
-        return downloaded to KaizenBackup.restoreBest()
+        val summary = KaizenBackup.restoreBest()
+        DebugLog.info("Carpeta de red", if (summary == null) "Restaurar: ninguna copia válida" else "Restaurar: copias bajadas $downloaded y datos restaurados")
+        return downloaded to summary
     }
 }

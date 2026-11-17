@@ -48,6 +48,8 @@ class BackupWork(context: Context, params: WorkerParameters) : CoroutineWorker(c
             // La comprobación inmediata solo se encola si de verdad toca; leer la carpeta de copias va fuera del hilo principal.
             AppScope.launch(Dispatchers.IO) {
                 runCatchingCoop { KaizenBackup.checkData() }.onFailure(::logError)
+                // Al abrir la app, con la sincronización automática: así lo visto en una tele llega a las demás sin esperar a la copia diaria.
+                if (KaizenSettings.syncAuto && app.kaizen.commons.sync.SyncManager.configured) runCatchingCoop { app.kaizen.commons.sync.SyncManager.now() }.onFailure(::logError)
                 if (KaizenBackup.isDue(KaizenBackup.latest()?.lastModified(), System.currentTimeMillis())) {
                     manager.enqueueUniqueWork(CATCH_UP, ExistingWorkPolicy.KEEP, OneTimeWorkRequestBuilder<BackupWork>().build())
                 }
