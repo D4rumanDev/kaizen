@@ -1,61 +1,133 @@
-# Gradle, Kotlin y compilación
-.gradle
+
+# ============================================================
+# GRADLE, KOTLIN Y COMPILACIÓN
+# ============================================================
+
+.gradle/
 .kotlin/
-build
-captures
-.externalNativeBuild
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Artefactos Android
 *.apk
+*.aab
+*.ap_
+*.dex
+*.class
 
-# IDE y sistema
-.idea
+# Artefactos de compilación
+*.hprof
+
+
+# ============================================================
+# IDE Y EDITORES
+# ============================================================
+
+.idea/
 *.iml
-.DS_Store
+.vscode/
 
-# Secretos, firma y configuración local (nunca se versionan)
+
+# ============================================================
+# SISTEMA OPERATIVO
+# ============================================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+
+# ============================================================
+# SECRETOS, FIRMA Y CONFIGURACIÓN LOCAL
+# ============================================================
+
 local.properties
 app/google-services.json
-keys.keystore
-*.pepk
+
+*.keystore
 *.jks
+*.pepk
 *.pass
 *.p12
+*.pfx
 *.pem
+*.key
+
 .env
+.env.*
 *.env
+*.env.*
 !.env.example
 !*.env.example
+
+# Claude Code: solo local (como CLAUDE.md y AGENTS.md)
 /.claude/
 
-# Copias y restos locales
+
+# ============================================================
+# COPIAS Y RESTOS LOCALES
+# ============================================================
+
 /backups/
 /app/amazon/
+
 *.log
 *.psd
 *.zip
+
+# Imágenes PNG exclusivamente en la raíz
 /*.png
 
-# JSON: se ignoran salvo los que son parte del proyecto
-*.json
-!app/src/main/assets/*.json
-!app/src/main/assets/sources/*.json
-!app/src/test/fixtures/**/*.json
-!app/schemas/**/*.json
-!.rsc/*.json
-!.vscode/*.json
-__pycache__/
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*~
+*.swp
+*.swo
 .eol-off
 *.eol-tmp
-!.claude/settings.json
 
-# Solo local: no se versionan (el repositorio lleva lo imprescindible para compilar, probar y entender la app)
-/.vscode/
+# Python
+__pycache__/
+*.py[cod]
+
+
+# ============================================================
+# JSON
+# Ignorar por defecto, permitir únicamente los necesarios
+# ============================================================
+
+*.json
+
+# Assets
+!app/src/main/assets/*.json
+!app/src/main/assets/sources/*.json
+
+# Tests y fixtures
+!app/src/test/fixtures/**/*.json
+
+# Esquemas
+!app/schemas/**/*.json
+
+
+# ============================================================
+# DOCUMENTACIÓN Y HERRAMIENTAS LOCALES
+# ============================================================
+
 /.rsc/
+# Fuentes de tools/make_brand.py (icono y banner): viven en local
 /art/
 /docs/wiki/sdd/
 /docs/wiki/pendientes.md
+/docs/wiki/plan-configuracion.md
+
 /tools/basic-memory/
 /tools/audit/dead-code.txt
-/docs/wiki/plan-configuracion.md
+
 /CLAUDE.md
 /AGENTS.md
 /.markdownlint.json
+
