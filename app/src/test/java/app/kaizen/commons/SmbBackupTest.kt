@@ -57,9 +57,14 @@ class SmbBackupTest {
         assertNull(SmbFolder.problem(""))
         assertNull(SmbFolder.problem("smb://192.0.2.10/video"))
         assertNull(SmbFolder.problem("smb://192.0.2.10/video/kaizen/copias"))
+        assertNull(SmbFolder.problem("192.0.2.10/video/kaizen"))
+        assertNull(SmbFolder.problem("\\\\nas\\video\\kaizen"))
+        assertNull(SmbFolder.problem("smb://192.0.2.10/video/mi carpeta"))
         assertNotNull(SmbFolder.problem("https://192.0.2.10/video"))
         assertNotNull(SmbFolder.problem("smb://192.0.2.10"))
+        assertNotNull(SmbFolder.problem("192.0.2.10"))
         assertNotNull(SmbFolder.problem("smb://usuario:clave@192.0.2.10/video"))
-        assertNotNull(SmbFolder.problem("smb://192.0.2.10/video/mi carpeta"))
+        assertNotNull(SmbFolder.problem("usuario@192.0.2.10/video"))
+        assertNotNull(SmbFolder.problem("smb://192.0.2.10/video?x"))
     }
 }

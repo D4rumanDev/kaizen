@@ -407,6 +407,9 @@ object KaizenSettings {
             prefs.edit { if (sealed == null) remove("kaizen_smb_password_enc") else putString("kaizen_smb_password_enc", sealed) }
         }
     var smbAuto: Boolean by booleanPref("kaizen_smb_auto", false)
+    /** El último servidor SMB con el que se conectó bien (precarga el formulario) y si se buscan servidores en la red (mDNS) para sugerirlos. */
+    var smbLastServer: String? by stringPref("kaizen_smb_last_server", null)
+    var smbDiscovery: Boolean by booleanPref("kaizen_smb_discovery", true)
     var smbLastAt: Long by longPref("kaizen_smb_last_at", 0L)
     var syncDeviceId: String? by stringPref("kaizen_sync_device_id", null)
     var syncLastAt: Long by longPref("kaizen_sync_last_at", 0L)

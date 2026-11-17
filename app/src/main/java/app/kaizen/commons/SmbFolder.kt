@@ -87,6 +87,20 @@ class SmbFolder(url: String, user: String?, password: String?) : RemoteFolder {
         file(name).takeIf { it.exists() }?.delete()
     }
 
+    /**
+     * Las carpetas de esta dirección; en la raíz del servidor (`smb://servidor/`), sus recursos compartidos. Sin los ocultos ni los administrativos y por orden alfabético.
+     * Sirve para examinar y, de paso, para comprobar que el servidor, el usuario y la clave valen: lanza la excepción que corresponda si no.
+     */
+    fun folders(): List<String> = visibleFolders(file().listFiles().orEmpty().filter { it.isDirectory }.map { it.name })
+
+    /** ¿Existe esta carpeta (o recurso compartido)? Lanza la excepción que corresponda si el servidor, el usuario o la clave no valen. */
+    fun exists(): Boolean = file().exists()
+
+    /** Crea una carpeta dentro de esta (falla si el recurso es de solo lectura o no hay permiso). */
+    fun makeFolder(name: String) {
+        file("$name/").mkdir()
+    }
+
     companion object {
         /** («DOMINIO», «usuario») de «DOMINIO\usuario» o «usuario@dominio»; sin dominio, el dominio va vacío. */
         fun splitUser(user: String): Pair<String, String> = when {
@@ -95,16 +109,62 @@ class SmbFolder(url: String, user: String?, password: String?) : RemoteFolder {
             else -> "" to user
         }
 
-        /** Por qué una dirección no vale (null si vale): `smb://servidor/recurso` y, si se quiere, una carpeta dentro. Sin usuario ni clave en ella. */
+        /** Los nombres de carpeta que se enseñan: sin «/» final, sin ocultos (punto) ni recursos administrativos (acaban en «$»), ordenados sin distinguir mayúsculas. */
+        fun visibleFolders(names: List<String>): List<String> =
+            names.map { it.trimEnd('/') }.filter { it.isNotEmpty() && !it.endsWith("$") && !it.startsWith(".") }.distinct().sortedBy { it.lowercase() }
+
+        /** El servidor que se quiso decir: acepta `192.0.2.10`, `nas`, `smb://nas/` o `smb://nas/video/x` y devuelve solo el nombre o la IP; null si no vale. */
+        fun normalizeServer(input: String): String? {
+            var v = input.trim()
+            if (v.startsWith("smb://", ignoreCase = true)) v = v.substring(6)
+            v = v.substringBefore('/').trim()
+            if (v.isEmpty() || v.any { it.isWhitespace() || it == '@' || it == '?' || it == '#' || it == '\\' }) return null
+            return v
+        }
+
+        /**
+         * Lo que se escribió como lugar, con o sin protocolo y con barras de cualquier tipo: `192.0.2.10/video/kaizen`, `smb://nas/video`, `\\\\nas\\video\\kaizen` (como en Windows) o solo
+         * `video/kaizen` si no hay servidor. Devuelve (servidor o null, [recurso, carpetas…]); null si trae caracteres que no valen.
+         */
+        fun parseLocation(input: String, withServer: Boolean): Pair<String?, List<String>>? {
+            var v = input.trim().replace('\\', '/')
+            val hadPrefix = v.startsWith("smb://", ignoreCase = true) || v.startsWith("//")
+            if (v.startsWith("smb://", ignoreCase = true)) v = v.substring(6)
+            v = v.trimStart('/')
+            if (v.any { it.isWhitespace() && it != ' ' || it == '?' || it == '#' || it == '@' || it == ':' || it == '*' || it == '"' || it == '<' || it == '>' || it == '|' }) return null
+            val parts = v.split('/').map { it.trim() }.filter { it.isNotEmpty() }
+            if (parts.any { it == "." || it == ".." }) return null
+            return if (withServer || hadPrefix) { if (parts.isEmpty()) null else parts.first() to parts.drop(1) } else null to parts
+        }
+
+        /** Una dirección guardada, sin el protocolo, para enseñarla (`192.0.2.10/video/kaizen`). */
+        fun display(url: String?): String = url.orEmpty().removePrefix("smb://").trimEnd('/')
+
+        /** La dirección de una carpeta: `smb://servidor/` más las partes de la ruta (recurso, carpetas…). */
+        fun urlOf(host: String, parts: List<String>): String = "smb://$host/" + parts.joinToString("/")
+
+        /** (servidor, [recurso, carpetas…]) de una dirección guardada; null si no es una dirección smb:// válida. */
+        fun splitUrl(url: String): Pair<String, List<String>>? {
+            if (url.isBlank() || problem(url) != null) return null
+            val (host, parts) = parseLocation(url, withServer = true) ?: return null
+            return host.orEmpty() to parts
+        }
+
+        /**
+         * Por qué una dirección no vale (null si vale). El protocolo es opcional: `servidor/recurso/carpeta` basta (con `smb://` o con barras de Windows también). Sin usuario ni clave
+         * en ella: van aparte.
+         */
         fun problem(url: String): String? {
             val v = url.trim()
             if (v.isEmpty()) return null
-            if (!v.startsWith("smb://", ignoreCase = true)) return "Debe empezar por smb://"
-            val rest = v.substring(6)
-            if ('@' in rest.substringBefore('/')) return "Sin usuario ni clave en la dirección: van en sus ajustes"
-            if (rest.any { it.isWhitespace() || it == '?' || it == '#' }) return "Sin espacios ni ? ni #"
-            val parts = rest.split('/').filter { it.isNotEmpty() }
-            return if (parts.size < 2) "Falta el recurso compartido: smb://servidor/recurso/carpeta" else null
+            if ("://" in v && !v.startsWith("smb://", ignoreCase = true)) return "Solo SMB: sin protocolo, o con smb://"
+            if ('@' in v.substringBefore('/')) return "Sin usuario ni clave en la dirección: van aparte"
+            val parsed = parseLocation(v, withServer = true) ?: return "Sin espacios raros ni ? # : * \" < > |"
+            return if (parsed.second.isEmpty()) "Falta el recurso compartido: servidor/recurso/carpeta" else null
         }
+
+        /** La dirección completa (`smb://servidor/recurso/carpeta`) de lo que se escribió; null si no vale. */
+        fun normalizeUrl(input: String): String? =
+            if (problem(input) != null || input.isBlank()) null else parseLocation(input, withServer = true)?.let { (host, parts) -> urlOf(host.orEmpty(), parts).trimEnd('/') }
     }
 }

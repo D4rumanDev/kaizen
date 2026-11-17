@@ -12,13 +12,14 @@ internal class SettingsCategories(
     context: Context,
     openPlayerButtons: () -> Unit = {},
     openMenuSections: () -> Unit = {},
-    openDebugLog: () -> Unit = {}
+    openDebugLog: () -> Unit = {},
+    openSmbPicker: () -> Unit = {}
 ) {
     private val player = PlayerSettingsItems(openPlayerButtons)
     private val screen = ScreenSettingsItems(context, openMenuSections)
     private val network = NetworkSettingsItems(context)
     private val data = DataSettingsItems()
-    private val backup = BackupSettingsItems(context)
+    private val backup = BackupSettingsItems(context, openSmbPicker)
     private val about = AboutSettingsItems()
     private val debug = DebugSettingsItems(openDebugLog)
 

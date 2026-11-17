@@ -23,7 +23,7 @@ import java.text.DateFormat
  * (sincronizar con otros dispositivos, WebDAV), **Mis ajustes** (guardar los de ahora como predeterminados y volver a ellos) y **Restablecer y vaciar**.
  * El repositorio de descargas no es una copia: está en Acerca de.
  */
-internal class BackupSettingsItems(private val context: Context) {
+internal class BackupSettingsItems(private val context: Context, private val openSmbPicker: () -> Unit = {}) {
     private val icon = R.drawable.settings_ic_backup
 
     /** La copia local y los restablecimientos son la misma tarea (guardar o deshacer): una sola categoría. */
@@ -80,15 +80,13 @@ internal class BackupSettingsItems(private val context: Context) {
                     .onFailure { logError(it); KaizenToast.toastLong("No se pudo restaurar: ${it.message ?: it.javaClass.simpleName}") }
             }
         },
-        TextItem("Carpeta de red (SMB)", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() } ?: "Sin configurar" }, { KaizenSettings.smbUrl.orEmpty() },
-            { KaizenSettings.smbUrl = it.trim().ifBlank { null } }, app.kaizen.commons.SmbFolder::problem, "smb://192.0.2.10/video/kaizen",
-            "Servidor, recurso compartido y carpeta: smb://servidor/recurso/carpeta. La carpeta se crea si no existe; el recurso lo crea el administrador del servidor. Solo SMB 2 y 3."),
-        TextItem("Usuario de la carpeta", { KaizenSettings.smbUser?.takeIf { it.isNotBlank() } ?: "Sin usuario (invitado)" }, { KaizenSettings.smbUser.orEmpty() }, { KaizenSettings.smbUser = it.trim().ifBlank { null } },
-            help = "El usuario del NAS (o DOMINIO\\usuario). Mejor una cuenta solo para esta carpeta."),
-        TextItem("Contraseña de la carpeta", { if (KaizenSettings.smbPassword.isNullOrEmpty()) "Sin contraseña" else "Guardada (no se muestra)" }, { "" },
-            { if (it.isNotEmpty()) { KaizenSettings.smbPassword = it; if (KaizenSettings.smbPassword != it) KaizenToast.toastLong("No se pudo guardar la contraseña: el almacén de claves de la tele falla") } },
-            hint = "Escribe una nueva para cambiarla", masked = true,
-            help = "Se guarda cifrada en esta tele (Keystore), no sale en copias ni en el registro y solo se envía a ese servidor."),
+        // Elegir la carpeta examinando el servidor, sin teclear su dirección (ver SmbPickerDialog).
+        ActionItem("Elegir carpeta en el NAS", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Servidor, usuario, contraseña y carpeta" }) { openSmbPicker() },
+        TextItem("Editar la dirección a mano", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Sin configurar" },
+            { app.kaizen.commons.SmbFolder.display(KaizenSettings.smbUrl) },
+            { KaizenSettings.smbUrl = if (it.isBlank()) null else app.kaizen.commons.SmbFolder.normalizeUrl(it) ?: KaizenSettings.smbUrl }, app.kaizen.commons.SmbFolder::problem, "192.0.2.10/video/kaizen",
+            "servidor/recurso/carpeta, sin protocolo (también vale \\\\servidor\\recurso\\carpeta). El usuario y la contraseña se cambian en «Elegir carpeta en el NAS»."),
+        CheckItem("Buscar servidores en la red", "Sugiere los NAS y PC que se anuncian por mDNS al elegir la carpeta", KaizenSettings::smbDiscovery),
         CheckItem("Copiar también la copia diaria", "Cada copia automática nueva se sube sola a la carpeta de red", KaizenSettings::smbAuto)
     )
 

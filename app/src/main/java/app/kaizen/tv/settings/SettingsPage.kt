@@ -43,7 +43,8 @@ internal fun SettingsPage() {
     var showButtons by remember { mutableStateOf(false) }
     var showSections by remember { mutableStateOf(false) }
     var showDebugLog by remember { mutableStateOf(false) }
-    val categories = remember { SettingsCategories(context, { showButtons = true }, { showSections = true }, { showDebugLog = true }).menu() }
+    var showSmbPicker by remember { mutableStateOf(false) }
+    val categories = remember { SettingsCategories(context, { showButtons = true }, { showSections = true }, { showDebugLog = true }, { showSmbPicker = true }).menu() }
     var open by remember { mutableStateOf<SettingsCategory?>(null) }
     var showStats by remember { mutableStateOf(false) }
     var library by remember { mutableStateOf<LibraryScreen?>(null) }
@@ -74,7 +75,7 @@ internal fun SettingsPage() {
     val requesters = remember { List(entries.size) { FocusRequester() } }
     var lastOpened by remember { mutableIntStateOf(0) }
     var hadOverlay by remember { mutableStateOf(false) }
-    val overlay = open != null || showStats || library != null || showDebugLog || showButtons || showSections
+    val overlay = open != null || showStats || library != null || showDebugLog || showButtons || showSections || showSmbPicker
     LaunchedEffect(overlay) {
         if (overlay) hadOverlay = true
         else if (hadOverlay) {
@@ -92,6 +93,7 @@ internal fun SettingsPage() {
     open?.let { SettingsPanel(it) { open = null } }
     library?.let { screen -> LibraryDialog(screen) { library = null } }
     if (showDebugLog) DebugLogDialog { showDebugLog = false }
+    if (showSmbPicker) SmbPickerDialog { showSmbPicker = false }
     if (showButtons) PlayerButtonsDialog { showButtons = false }
     if (showSections) MenuSectionsDialog { showSections = false }
     if (showStats) {
