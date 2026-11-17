@@ -397,6 +397,17 @@ object KaizenSettings {
             val sealed = value?.takeIf { it.isNotEmpty() }?.let { SecretStore.encrypt(it) ?: return }
             prefs.edit { remove("kaizen_sync_password"); if (sealed == null) remove("kaizen_sync_password_enc") else putString("kaizen_sync_password_enc", sealed) }
         }
+    /** Carpeta de red SMB (un NAS) para copiar las copias de seguridad y restaurarlas en otro equipo (ver `SmbBackup`): dirección, usuario, clave (cifrada, como la del servidor WebDAV) y si cada copia nueva se sube sola. */
+    var smbUrl: String? by stringPref("kaizen_smb_url", null)
+    var smbUser: String? by stringPref("kaizen_smb_user", null)
+    var smbPassword: String?
+        get() = prefs.getString("kaizen_smb_password_enc", null)?.let { SecretStore.decrypt(it) }
+        set(value) {
+            val sealed = value?.takeIf { it.isNotEmpty() }?.let { SecretStore.encrypt(it) ?: return }
+            prefs.edit { if (sealed == null) remove("kaizen_smb_password_enc") else putString("kaizen_smb_password_enc", sealed) }
+        }
+    var smbAuto: Boolean by booleanPref("kaizen_smb_auto", false)
+    var smbLastAt: Long by longPref("kaizen_smb_last_at", 0L)
     var syncDeviceId: String? by stringPref("kaizen_sync_device_id", null)
     var syncLastAt: Long by longPref("kaizen_sync_last_at", 0L)
 

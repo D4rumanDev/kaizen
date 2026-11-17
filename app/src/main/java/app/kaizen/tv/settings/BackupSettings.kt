@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 
 /**
- * Configuración › Copia de seguridad. Arriba, «Crear copia ahora» (lo más usado); debajo, cuatro submenús: **Local** (restaurar y copia automática), **Remota**
+ * Configuración › Copia de seguridad. Arriba, «Crear copia ahora» (lo más usado); debajo, cinco submenús: **Local** (restaurar y copia automática), **Carpeta de red** (copias en
+ * un NAS por SMB, para pasarlas a otra tele), **Remota**
  * (sincronizar con otros dispositivos, WebDAV), **Mis ajustes** (guardar los de ahora como predeterminados y volver a ellos) y **Restablecer y vaciar**.
  * El repositorio de descargas no es una copia: está en Acerca de.
  */
@@ -29,6 +30,7 @@ internal class BackupSettingsItems(private val context: Context) {
     fun items(): List<SettingItem> = listOf(
         createBackupItem(),
         submenu("Local", icon, { KaizenBackup.warning ?: "Restaurar y copia automática" }, ::localItems),
+        submenu("Carpeta de red", icon, ::smbSummary, ::smbItems),
         submenu("Remota", icon, ::remoteSummary, ::remoteItems),
         submenu("Mis ajustes", icon, { SettingsBackup.defaultsSavedAt()?.let { "Guardados el ${shortDate(it)}" } ?: "Aún sin guardar" }, ::myDefaultsItems),
         submenu("Restablecer y vaciar", icon, { "Ajustes de fábrica, caché" }, ::resetItems)
@@ -39,6 +41,56 @@ internal class BackupSettingsItems(private val context: Context) {
     private fun remoteSummary(): String =
         if (!SyncManager.configured) "Sin configurar (WebDAV)"
         else KaizenSettings.syncLastAt.takeIf { it > 0 }?.let { "Última: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it)}" } ?: "Nunca"
+
+    private fun smbSummary(): String =
+        if (!app.kaizen.commons.SmbBackup.configured) "Sin configurar (SMB, un NAS)"
+        else KaizenSettings.smbLastAt.takeIf { it > 0 }?.let { "Última: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(it)}" } ?: "Sin copiar todavía"
+
+    /**
+     * Carpeta de red: las copias de estados y de ajustes se añaden a una carpeta SMB de un NAS (nunca se borra ni se sobrescribe una; solo se podan las más viejas según «Máximo de
+     * copias») y se pueden bajar de ella para restaurar en otro equipo. SMB 2 y 3. La clave se guarda cifrada con el Keystore y no sale en copias ni en el registro.
+     */
+    private fun smbItems(): List<SettingItem> = listOf(
+        ActionItem("Copiar ahora a la carpeta de red", {
+            if (!app.kaizen.commons.SmbBackup.configured) "Primero escribe la carpeta" else "Sube las copias que falten (se crea una si no hay ninguna)"
+        }) {
+            if (!app.kaizen.commons.SmbBackup.configured) return@ActionItem KaizenToast.toast("Primero escribe la carpeta de red")
+            KaizenToast.toast("Copiando…")
+            AppScope.launch {
+                runCatchingCoop {
+                    if (KaizenBackup.latest() == null) KaizenBackup.export()
+                    app.kaizen.commons.SmbBackup.push()
+                }
+                    .onSuccess { KaizenSettings.smbLastAt = System.currentTimeMillis(); KaizenToast.toastLong(if (it == 0) "La carpeta ya tiene todas las copias" else "Subidas $it copias a la carpeta de red") }
+                    .onFailure { logError(it); KaizenToast.toastLong("No se pudo copiar: ${it.message ?: it.javaClass.simpleName}") }
+            }
+        },
+        ConfirmItem("Restaurar desde la carpeta de red", "Baja las copias que falten y restaura los estados de la más completa",
+            warning = "Se bajan a esta tele las copias de la carpeta de red que no tenga y se restauran los estados (favoritos, historial, progreso, estados de las series) de la más completa. " +
+                "Solo añade: no borra lo que ya hay aquí. Los ajustes no se tocan (se pueden restaurar después en Local).",
+            confirmLabel = "Restaurar") {
+            if (!app.kaizen.commons.SmbBackup.configured) return@ConfirmItem KaizenToast.toast("Primero escribe la carpeta de red")
+            KaizenToast.toast("Buscando copias en la carpeta de red…")
+            AppScope.launch {
+                runCatchingCoop { app.kaizen.commons.SmbBackup.pullAndRestore() }
+                    .onSuccess { (downloaded, summary) ->
+                        KaizenToast.toastLong(if (summary == null) "Bajadas $downloaded copias, pero ninguna vale para restaurar" else "Bajadas $downloaded copias. Añadido: $summary")
+                        runCatchingCoop { KaizenBackup.checkData() }.onFailure(::logError)
+                    }
+                    .onFailure { logError(it); KaizenToast.toastLong("No se pudo restaurar: ${it.message ?: it.javaClass.simpleName}") }
+            }
+        },
+        TextItem("Carpeta de red (SMB)", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() } ?: "Sin configurar" }, { KaizenSettings.smbUrl.orEmpty() },
+            { KaizenSettings.smbUrl = it.trim().ifBlank { null } }, app.kaizen.commons.SmbFolder::problem, "smb://192.0.2.10/video/kaizen",
+            "Servidor, recurso compartido y carpeta: smb://servidor/recurso/carpeta. La carpeta se crea si no existe; el recurso lo crea el administrador del servidor. Solo SMB 2 y 3."),
+        TextItem("Usuario de la carpeta", { KaizenSettings.smbUser?.takeIf { it.isNotBlank() } ?: "Sin usuario (invitado)" }, { KaizenSettings.smbUser.orEmpty() }, { KaizenSettings.smbUser = it.trim().ifBlank { null } },
+            help = "El usuario del NAS (o DOMINIO\\usuario). Mejor una cuenta solo para esta carpeta."),
+        TextItem("Contraseña de la carpeta", { if (KaizenSettings.smbPassword.isNullOrEmpty()) "Sin contraseña" else "Guardada (no se muestra)" }, { "" },
+            { if (it.isNotEmpty()) { KaizenSettings.smbPassword = it; if (KaizenSettings.smbPassword != it) KaizenToast.toastLong("No se pudo guardar la contraseña: el almacén de claves de la tele falla") } },
+            hint = "Escribe una nueva para cambiarla", masked = true,
+            help = "Se guarda cifrada en esta tele (Keystore), no sale en copias ni en el registro y solo se envía a ese servidor."),
+        CheckItem("Copiar también la copia diaria", "Cada copia automática nueva se sube sola a la carpeta de red", KaizenSettings::smbAuto)
+    )
 
     /** Local: restaurar (estados y ajustes) y cuántas copias automáticas se guardan. */
     private fun localItems(): List<SettingItem> = restoreItems() + backupOptionItems()

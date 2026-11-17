@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit
 class BackupWork(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         runCatchingCoop { KaizenBackup.exportIfDue() }.onFailure(::logError)
+        // Con carpeta de red y «copiar cada copia» activo: las copias que le falten (un fallo de red no es un error de la copia).
+        if (KaizenSettings.smbAuto && app.kaizen.commons.SmbBackup.configured) runCatchingCoop { app.kaizen.commons.SmbBackup.push() }.onFailure(::logError)
         runCatchingCoop { CatalogBuilder.saveSnapshotIfDue() }.onFailure(::logError)
         // Con la sincronización automática y un destino configurado: los estados con los de los otros dispositivos (un fallo de red no es un error de la copia).
         if (KaizenSettings.syncAuto && app.kaizen.commons.sync.SyncManager.configured) runCatchingCoop { app.kaizen.commons.sync.SyncManager.now() }.onFailure(::logError)

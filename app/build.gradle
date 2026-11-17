@@ -144,6 +144,8 @@ dependencies {
     implementation 'androidx.paging:paging-runtime-ktx:3.5.3'
     implementation 'androidx.paging:paging-compose:3.5.3'
     implementation 'org.jsoup:jsoup:1.23.2'
+    // Copias de seguridad en una carpeta de red SMB (un NAS): cliente SMB 2/3 en Java (LGPL-2.1).
+    implementation 'org.codelibs:jcifs:2.1.40'
     implementation 'com.squareup.okhttp3:okhttp:5.5.0'
     implementation 'com.google.code.gson:gson:2.14.0'
     implementation 'androidx.media3:media3-common:1.11.1'

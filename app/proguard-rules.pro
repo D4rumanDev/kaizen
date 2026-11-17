@@ -128,3 +128,12 @@
 
 # Headers se guarda con Gson en Room: sus campos no pueden cambiar de nombre entre versiones.
 -keep class app.kaizen.videoservers.Headers { *; }
+
+# jcifs (cliente SMB de las copias en una carpeta de red): usa clases opcionales que no estan en Android.
+-dontwarn jcifs.**
+-keep class jcifs.** { *; }
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-dontwarn org.slf4j.**
+-dontwarn javax.servlet.**
+-dontwarn org.bouncycastle.**

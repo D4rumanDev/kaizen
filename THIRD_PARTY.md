@@ -60,6 +60,10 @@ Varios iconos del menú, de las barras y del reproductor (por ejemplo `header_ic
 
 KAIZEN consulta, sin incluir su código, la API pública de AniList (<https://anilist.co>) para emparejar series y completar fichas, y la API de AniSkip (<https://api.aniskip.com>) para los saltos de opening y ending. Las series y los vídeos vienen de las webs de anime que el usuario activa como fuente; su contenido es de sus propietarios.
 
+## jcifs (cliente SMB)
+
+Cliente SMB 2/3 en Java (`org.codelibs:jcifs`, continuación de jcifs-ng), usado como dependencia para guardar las copias de seguridad en una carpeta de red (un NAS). Licencia **LGPL-2.1**: <https://github.com/codelibs/jcifs>. Trae como dependencias BouncyCastle (`bcprov`, licencia MIT: <https://www.bouncycastle.org/licence.html>) y SLF4J (MIT: <https://www.slf4j.org/license.html>).
+
 ## Otras dependencias
 
 Apache 2.0: AndroidX, Media3, OkHttp, Gson, Coil, Commons Text, Kotlin y kotlinx.coroutines. BSD de 3 cláusulas: NanoHTTPD. MIT: jsoup.
