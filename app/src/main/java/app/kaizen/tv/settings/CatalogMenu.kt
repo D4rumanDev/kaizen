@@ -30,6 +30,7 @@ import app.kaizen.commons.AppScope
 import app.kaizen.commons.appString
 import app.kaizen.commons.logError
 import app.kaizen.commons.runCatchingCoop
+import app.kaizen.source.AnimeSources
 import app.kaizen.source.CatalogBuilder
 import app.kaizen.source.CatalogOverview
 import app.kaizen.source.SeriesLedger
@@ -47,9 +48,12 @@ internal class StateFacts(val sources: Int, val walked: Int, val catalogSeries: 
 /** Lee las cifras del catálogo y de las uniones (solo base de datos, sin red); null si falla. */
 internal suspend fun loadStateFacts(): StateFacts? = runCatchingCoop {
     val sources = CatalogOverview.sources()
+    // «Fuentes recorridas» cuenta solo las activas: una fuente apagada no se recorre y no debe aparecer como «falta».
+    val active = AnimeSources.enabled.map { it.id }.toSet()
+    val used = sources.filter { it.source.id in active }
     val series = SeriesLedger.seriesFichas().values
     StateFacts(
-        sources = sources.size, walked = sources.count { it.walkedAt > 0 }, catalogSeries = sources.sumOf { it.series }, ledgerFichas = series.sumOf { it.size },
+        sources = used.size, walked = used.count { it.walkedAt > 0 }, catalogSeries = sources.sumOf { it.series }, ledgerFichas = series.sumOf { it.size },
         joined = series.count { it.size > 1 }, joinedFichas = series.filter { it.size > 1 }.sumOf { it.size },
         userMerges = UserTitles.rules.mergeCount(), userSplits = UserTitles.rules.splitCount()
     )

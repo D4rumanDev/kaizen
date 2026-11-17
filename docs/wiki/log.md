@@ -787,3 +787,11 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 - «Buscar» y «Configuración» son ahora botones de solo icono, a la derecha de la barra superior junto a la hora (`TopIconButton`).
 - Por comprobar con el mando: foco de vuelta al panel tras cerrar una pantalla, Atrás desde los iconos, altura de la tarjeta de decisión.
 - Fallo visto en la TV: al pulsar Buscar o Configuración se abría el menú lateral en «Inicio». Causa probable: `content.requestFocus()` se pedía en el mismo instante en que cambiaba la página, sin nada enfocable dentro, y el foco caía en el menú. Ahora se pide 200 ms después y solo si el foco no está ya en el menú (`TOP_SELECT_FOCUS_MS`). Sin confirmar en la TV.
+
+## 2026-11-17 · Primera instalación en otra tele (TV de 32 bits, Android 9, 32 bits) y repositorios públicos
+- `kaizen` y `kaizen-sources` pasan a públicos (auditados; historial de `kaizen` rehecho en un commit). Release `v6.0.8` con el APK firmado.
+- El APK era solo arm64-v8a: la TV es `armeabi-v7a` (`INSTALL_FAILED_NO_MATCHING_ABIS`). `ndk.abiFilters` lleva ahora `arm64-v8a` y `armeabi-v7a` (28,7 MB).
+- Primer arranque observado por ADB (`logcat`, `/sdcard/Android/data/app.kaizen/files/debug.jsonl` y capturas con `screencap`): con «Descargar del repositorio» apagado (valor de antes) no baja nada de GitHub y construye el catálogo recorriendo las webs (~217 s en el segundo arranque, 10.207 series). Encendido: baja el catálogo de partida del repositorio (10.837 series, 28.235 fichas; 96 s) y las uniones (16.803 ids absorbidos). Por eso las descargas vienen **encendidas por defecto** (`KaizenSettings.repoDownloads`).
+- «Fuentes recorridas» del resumen de Biblioteca cuenta solo las fuentes activas (decía «faltan 5» por las apagadas).
+- WebView 138 en Android 9: `NoClassDefFoundError: android.webkit.PacProcessor` al pedir el user agent al arrancar (se captura; la app sigue). Sin probar la verificación de fuentes con WebView en esa tele.
+- La automatización de Home Assistant `tv_off_kill_apps` hace `force-stop` de `app.kaizen` en la TV a los segundos de abrirla; relevo en Basic Memory (`handoffs/2026-11-17-kaizen-tv-ha`) para la sesión del RPi.
