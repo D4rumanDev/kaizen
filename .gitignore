@@ -84,6 +84,8 @@ app/google-services.json
 *.tmp
 *.temp
 *.bak
+*.orig
+*.rej
 *~
 *.swp
 *.swo
