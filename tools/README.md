@@ -32,6 +32,9 @@ Carpeta unificada de utilidades, scripts de mantenimiento, herramientas de audit
    - [`test-count.js`](#test-countjs)
    - [`vscode-java.js`](#vscode-javajs)
    - [`vscode-extensions.ps1`](#vscode-extensionsps1)
+   - [`animeoteca-sinopsis.console.js`](#animeoteca-sinopsisconsolejs)
+   - [`animeoteca-api-sniffer.console.js`](#animeoteca-api-snifferconsolejs)
+   - [`animeoteca-traducir.console.js`](#animeoteca-traducirconsolejs)
    - [`make_brand.py`](#make_brandpy)
 9. [Conector ADB (`tools/adb-device/`)](#9-conector-adb-toolsadb-device)
 
@@ -318,6 +321,19 @@ pwsh tools/vscode-extensions.ps1 -Apply             # desinstala
 pwsh tools/vscode-extensions.ps1 -Apply -JavaServer # además redhat.java
 ```
 - Nunca toca `anthropic.claude-code` ni `google.google-antigravity`. Es un ajuste de usuario de VS Code (no del repositorio) y se revierte con `code --install-extension <id>`.
+
+### `animeoteca-sinopsis.console.js`
+Script para la **consola del navegador** (no se ejecuta con Node): pide la sinopsis de una serie a `animeoteca.com/api/anilist.php` con la misma consulta GraphQL que AniList (`Media(id, type: ANIME) { description(asHtml: false) }`) y enseña el estado HTTP, la forma de la respuesta (con o sin envoltorio `data`), el título y la sinopsis.
+- Uso: abrir `https://animeoteca.com`, F12 › Consola, pegar el fichero y cambiar `ID` por el id de AniList. Hace una sola petición.
+- Sirve para comparar el diseño de esa API con `AnilistClient`; no lo usa la app.
+
+### `animeoteca-api-sniffer.console.js`
+Script para la **consola del navegador**: escucha (`fetch` y `XMLHttpRequest`) las llamadas que la propia web de Animeoteca hace a `/api/` (`translate.php`, `img.php`, `anilist.php`…) y muestra método, cuerpo y el principio de la respuesta. No inventa peticiones; no registra cabeceras ni cookies.
+- Uso: abrir `https://animeoteca.com`, F12 › Consola, pegarlo y usar la web sin recargar. `animeotecaLog()` resume lo capturado, `animeotecaStop()` lo desactiva y `animeotecaProbe(ruta, {method, body})` hace una petición a mano cuando ya se conoce la forma real.
+
+### `animeoteca-traducir.console.js`
+Script para la **consola del navegador**: pide la sinopsis (inglés) de una serie a `anilist.php` y se la manda a `translate.php` con `{"text": "…"}` para ver qué devuelve. Dos peticiones; solo manda `text`, sin adivinar otros parámetros.
+- Uso: abrir `https://animeoteca.com`, F12 › Consola, pegarlo y cambiar `ID` por el id de AniList.
 
 ### `make_brand.py`
 Genera el conjunto completo de iconos adaptativos, banners de Android TV (16:9) y recursos gráficos a partir de las imágenes maestras en `art/`:
