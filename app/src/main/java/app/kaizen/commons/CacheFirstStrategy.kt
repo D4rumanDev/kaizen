@@ -32,7 +32,10 @@ object CacheFirstStrategy : CacheStrategy {
 
     /** La imagen guardada se reutiliza sin preguntar a la web. */
     internal fun isReusable(cached: NetworkResponse, seed: Any = cached.responseMillis): Boolean =
-        cached.code in 200..299 && isImage(cached) && clock() - cached.responseMillis < Timings.spread(maxAgeMs, seed)
+        cached.code in 200..299 && isImage(cached) && (offline() || clock() - cached.responseMillis < Timings.spread(maxAgeMs, seed))
+
+    /** Sin conexión una imagen guardada vale aunque haya caducado: pedirla otra vez no puede salir bien y la portada se quedaría vacía. Las pruebas lo cambian. */
+    @Volatile internal var offline: () -> Boolean = { NetworkState.isOffline }
 
     internal fun isStorable(response: NetworkResponse): Boolean = response.code in 200..299 && isImage(response)
 

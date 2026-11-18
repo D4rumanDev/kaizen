@@ -62,6 +62,26 @@ class SourceStatusTest {
     }
 
     @Test
+    fun `sin Internet manda sobre pausa, medicion y fallo y no culpa a la fuente`() {
+        val net = app.kaizen.commons.NetworkState.Mode.NO_INTERNET
+        val s = sourceState(true, 5L, HostGate.CheckResult(false, null, 10_000, "x"), 1L to "fallo", false, clock, network = net)
+        assertEquals(SourceState(SourcesHealth.OFFLINE, "Sin Internet · se usa lo guardado"), s)
+        val manual = sourceState(true, 0L, null, null, true, clock, network = app.kaizen.commons.NetworkState.Mode.OFFLINE_MANUAL)
+        assertEquals(SourceState(SourcesHealth.OFFLINE, "Modo sin conexión · se usa lo guardado"), manual)
+        // Una fuente desactivada sigue diciendo que está desactivada.
+        assertEquals("✖ Desactivada", sourceState(false, 0L, null, null, false, clock, network = net).text)
+        assertEquals("Sin conexión: se usa lo guardado", sourcesSummary(listOf(s, s)))
+    }
+
+    @Test
+    fun `la tarjeta de red dice el estado y ofrece cambiarlo`() {
+        assertEquals(SourcesHealth.OK, networkSummary(app.kaizen.commons.NetworkState.Mode.ONLINE).first)
+        assertEquals(SourcesHealth.OFFLINE, networkSummary(app.kaizen.commons.NetworkState.Mode.NO_INTERNET).first)
+        assertTrue("detectado" in networkSummary(app.kaizen.commons.NetworkState.Mode.NO_INTERNET).second)
+        assertTrue("volver a conectar" in networkSummary(app.kaizen.commons.NetworkState.Mode.OFFLINE_MANUAL).second)
+    }
+
+    @Test
     fun `una fuente desactivada no se mide`() {
         assertEquals("✖ Desactivada", state(active = false, measuring = true, result = ok(100)).text)
     }

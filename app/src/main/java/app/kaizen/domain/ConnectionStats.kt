@@ -71,6 +71,16 @@ object ConnectionStats {
             "No lo causa tu red ni un servidor: guardar el debug.log (adb pull) para corregirlo."),
         LALIGA(23, "laliga", "Bloqueo de LaLiga", "Tu operador bloquea por IP las direcciones de Cloudflare mientras hay un partido de LaLiga, y la fuente está detrás de ellas.", Origin.NETWORK,
             "Se pasa solo al acabar el partido (suele ser un par de horas). Una VPN lo evita; cambiar el DNS no."),
+        NO_INTERNET(24, "sin-internet", "Red sin salida a Internet", "La TV está conectada a una red (el móvil como repetidor sin datos, un router sin línea) pero por ella no sale nada: fallan a la vez varias webs distintas y Android no da la red por validada.", Origin.NETWORK,
+            "Revisar los datos del móvil o la línea del router. Mientras tanto se usa lo guardado y no se abren pausas; al volver la salida se recupera solo."),
+        OFFLINE(25, "modo-sin-conexion", "Modo sin conexión activado", "El interruptor «Modo sin conexión» está encendido: no se pide nada a las webs y se usa solo lo guardado. No es un fallo.", Origin.DEVICE,
+            "Apagarlo en Configuración › Datos y caché › Modo sin conexión, o pulsando la tarjeta de red de «Fuentes»."),
+        PAUSED(26, "en-pausa", "Fuente en pausa", "Una web falló varias veces seguidas y se deja de consultar un rato (2 min, 5 min, 10 min y luego 1 h) para no parecer un ataque ni arriesgar que bloqueen la IP.", Origin.SOURCE,
+            "Esperar a que acabe la pausa o pulsar la fuente en «Fuentes» y «Comprobar todas»; si responde, vuelve a usarse."),
+        CLOUDFLARE(27, "cloudflare", "Cloudflare no responde", "El bypass de Cloudflare no consigue la verificación o ni siquiera llega a Cloudflare, así que las webs que la piden no se abren.", Origin.SERVER,
+            "Esperar a que acabe la pausa del bypass o lanzarlo a mano desde «Fuentes › Bypass Cloudflare»."),
+        HOME_CHANNEL(28, "canal-inicio", "Miniatura del canal de inicio no disponible", "El launcher descarga por su cuenta las imágenes del canal «Capítulos recientes» de la pantalla de inicio y, sin red o sin la imagen guardada, pinta un «!».", Origin.DEVICE,
+            "Con conexión se rellenan solas al renovar los recientes; las ya guardadas se sirven sin red."),
         OTHER(99, "otro", "Otro", "Un error que no encaja en los anteriores.", Origin.UNKNOWN,
             "Mirar el detalle técnico y el registro de depuración.");
 
@@ -163,7 +173,8 @@ object ConnectionStats {
     fun record(kind: Kind, name: String, ok: Boolean, cause: Cause? = null) {
         if (name.isBlank()) return
         // Sin red no es que la fuente o el servidor fallen: no se les carga el fallo (ensuciaría su porcentaje).
-        if (!ok && cause == Cause.NO_NETWORK) return
+        // Sin red, sin salida o en modo sin conexión no es culpa de la fuente ni del servidor: no cuenta.
+        if (!ok && (cause == Cause.NO_NETWORK || cause == Cause.NO_INTERNET || cause == Cause.OFFLINE)) return
         runCatching {
             synchronized(this) {
                 val today = dayOf(clock())

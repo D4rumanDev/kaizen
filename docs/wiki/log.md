@@ -5,7 +5,7 @@ tags:
   - rsc
   - activity
   - decisions
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 # Registro de Actividad y Decisiones (`log.md`)
@@ -13,6 +13,16 @@ updated: 2026-11-17
 Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, hitos y decisiones técnicas del proyecto Kaizen.
 
 ---
+
+## 2026-11-18 · Sin Internet: estado en Fuentes y modo sin conexión
+- Causa probable (hipótesis, sin probar en la TV): con el móvil de repetidor sin datos el tvbox ve una wifi con capacidad de Internet pero sin salida; `Network.isConnected` no exige validación, así que los fallos se atribuían a las webs y abrían las pausas de 2/5/10 min y 1 h (guardadas en disco). El «!» del canal «Capítulos recientes» es el launcher bajando por su cuenta las URL web de las miniaturas.
+- `NetworkState` (commons): modos `ONLINE`, `NO_INTERNET` (ninguna red con salida, o red sin validar y fallos de red de 2 webs distintas en 2 min sin ningún acierto) y `OFFLINE_MANUAL` (ajuste «Modo sin conexión» en Datos y caché). Callback de red: cambio inmediato. Al entrar o salir de `NO_INTERNET` se limpian las pausas de `HostGate`.
+- `HostGate`: sin conexión no sale ninguna petición (`OfflineException`, subclase de `HostDownException`: todo lo que ya trata una web en pausa la trata igual), los fallos no abren pausas, las guardadas se ignoran y `check`/`probe` no salen a la red.
+- «Fuentes»: estado nuevo `SourcesHealth.OFFLINE` (wifi tachado), tarjeta «Red» al principio (pulsar enciende o apaga el modo sin conexión), tarjetas con «Sin Internet · se usa lo guardado», sin medición inicial y «Reintentar conexión». El piloto del menú lateral lo refleja.
+- Catálogo de errores ampliado: E24 Red sin salida a Internet, E25 Modo sin conexión, E26 Fuente en pausa, E27 Cloudflare no responde, E28 Miniatura del canal de inicio no disponible. E24 y E25 no cuentan en las estadísticas de conexión.
+- Portadas: `CacheFirstStrategy` usa una imagen guardada aunque haya caducado si no hay conexión. Ojo: la caché se lee antes que `HostGate.allow`, así que una pausa no bloquea una portada fresca; el motivo de las portadas que no salen sigue por confirmar en la TV.
+- Miniaturas de las filas de inicio: `ChannelArt` + `ChannelArtProvider` (`content://app.kaizen.channelart`, exportado, solo lectura). Sirve desde la caché de disco de Coil solo las URL publicadas en una fila (`home_channel_art`, solo https); con conexión baja las que falten al sincronizar (8 s por imagen). Sin ellas y sin red se anota E28 y se deja la URL web. Revisado con android-security (ver pendientes).
+- E26 se anota al abrir cada pausa de `HostGate` (`markDown`) y E27 al pausar el bypass (`BypassStatus`). Tests en `NetworkStateTest`; 1123 tests y `assembleTv` en verde.
 
 ## 2026-11-17 · Configuración reorganizada (nueve tarjetas) y Biblioteca
 - Plan en [plan-configuracion.md](plan-configuracion.md) (dos revisiones de un auditor de UI). Implementado: nueve tarjetas (Reproductor, Pantalla, Biblioteca, Fuentes y red, Datos y caché, Copia de seguridad, Estadísticas, Acerca de, Depuración), un submenú de un nivel, miga de pan en el título del panel y foco que vuelve a la tarjeta de origen. `SettingsPage.kt` queda partido en un fichero por categoría.

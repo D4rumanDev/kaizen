@@ -76,7 +76,9 @@ object BypassStatus {
                 failures = 0
                 storage?.save(now + pause, strikes)
                 _snapshot.value = Snapshot(state, now, millis, now + pause)
-                onPause("Cloudflare no responde: no se reintentará solo durante ${if (pause >= 60 * 60_000L) "1 hora" else "${pause / 60_000L} minutos"}")
+                val lasts = if (pause >= 60 * 60_000L) "1 hora" else "${pause / 60_000L} minutos"
+                runCatching { app.kaizen.commons.AppErrors.record(app.kaizen.domain.ConnectionStats.Cause.CLOUDFLARE, app.kaizen.commons.AppErrors.Area.SOURCE, "Bypass en pausa $lasts (${state.name})", context = "Cloudflare") }
+                onPause("Cloudflare no responde: no se reintentará solo durante $lasts")
                 return
             }
         } else {

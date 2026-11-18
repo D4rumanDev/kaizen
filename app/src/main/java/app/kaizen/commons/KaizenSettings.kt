@@ -95,6 +95,9 @@ object KaizenSettings {
     val isGroupingEnabled: Boolean get() = prefs.getBoolean("group_notifications", true) && canGroupNotifications
 
     /** Qué User-Agent usa toda la app (ver [UserAgent]): «local» (el del navegador de esta TV) o «aleatorio». */
+    /** «Modo sin conexión»: no se piden cosas a las webs y se usa solo lo guardado (ver [NetworkState]). Apagado de fábrica. */
+    var offlineMode: Boolean by booleanPref("kaizen_offline_mode", false)
+
     var userAgentMode: String? by stringPref("kaizen_ua_mode", UserAgent.LOCAL)
 
     /** El User-Agent aleatorio ya generado (se crea la primera vez que hace falta y se conserva). */

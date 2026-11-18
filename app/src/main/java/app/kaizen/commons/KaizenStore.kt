@@ -56,6 +56,7 @@ object KaizenStore {
         Entry("kaizen_source_challenge", Scope.STATE, "Verificaciones de las webs que las piden"),
         Entry("kaizen_bypass", Scope.STATE, "Estado del bypass de Cloudflare"),
         Entry("home_channels", Scope.STATE, "Filas de la pantalla de inicio de Android TV"),
+        Entry("home_channel_art", Scope.STATE, "Miniaturas publicadas en las filas de inicio (las únicas que sirve ChannelArtProvider)"),
         Entry("kaizen_warp", Scope.SECRET, "Cuenta del túnel WARP"),
         Entry("kaizen_image_misses", Scope.CACHE, "Imágenes que no existen (404) para no pedirlas otra vez"),
         Entry("kaizen_api_cache", Scope.CACHE, "Respuestas guardadas de las APIs"),

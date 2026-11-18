@@ -64,6 +64,8 @@ object AppErrors {
         val coilStatus = chain.filterIsInstance<coil3.network.HttpException>().firstOrNull()?.response?.code
         val connection = if (coilStatus != null) ConnectionStats.causeOfHttp(coilStatus)
         else ConnectionStats.causeOfPlayback(PlaybackException.ERROR_CODE_UNSPECIFIED, e)
+        // Una red que no da salida (el móvil de repetidor sin datos) es de la red, y se distingue de «sin ninguna red».
+        if (NetworkState.mode.value == NetworkState.Mode.NO_INTERNET && (connection == Cause.DNS || connection == Cause.CONNECTION || connection == Cause.TIMEOUT)) return Cause.NO_INTERNET
         if (!online && (connection == Cause.DNS || connection == Cause.CONNECTION || connection == Cause.TIMEOUT)) return Cause.NO_NETWORK
         if (connection != Cause.OTHER) return connection
         // Sin causa de red: manda el área, y si no, un error de programación es de la app.

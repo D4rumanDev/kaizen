@@ -130,6 +130,13 @@
             android:screenOrientation="sensorLandscape"/>
 
 
+        <!-- Miniaturas de las filas de inicio de la TV: el launcher es otra aplicación y las lee por content://. Solo lectura y solo lo publicado (ChannelArt). -->
+        <provider
+            android:name=".tv.ChannelArtProvider"
+            android:authorities="${applicationId}.channelart"
+            android:exported="true"
+            android:grantUriPermissions="false" />
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

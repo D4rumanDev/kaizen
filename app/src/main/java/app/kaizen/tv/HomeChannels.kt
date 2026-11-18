@@ -55,6 +55,8 @@ object HomeChannels {
         val wanted = pickContinue(history, KaizenProgress.inProgress())
         val existing = existingWatchNext(context)
         val wantedIds = wanted.map { it.first.eid.toString() }.toSet()
+        // Primero se publica qué imágenes se pueden servir; después se dan al launcher como content:// (ver ChannelArt).
+        ChannelArt.register("continue", wanted.map { episodeImage(it.first) })
         existing.filterKeys { it !in wantedIds }.values.forEach { context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
         wanted.forEach { (record, progress) ->
             val program = WatchNextProgram.Builder()
@@ -66,7 +68,7 @@ object HomeChannels {
                 .setInternalProviderId(record.eid.toString())
                 .setTitle(record.name)
                 .setDescription(record.chapter())
-                .setPosterArtUri(episodeImage(record).toUri())
+                .setPosterArtUri(ChannelArt.forLauncher(context, episodeImage(record)).toUri())
                 .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
                 .setIntent(seriesIntent(context, record.animeUrl()))
                 .build()
@@ -89,6 +91,7 @@ object HomeChannels {
             prefs.edit().putLong(KEY_CHANNEL, channelId).putInt(KEY_LOGO, LOGO_VERSION).apply()
         }
         val recents = RecentsArchive.merge(Library.recentsNow()).take(MAX_ROWS)
+        ChannelArt.register("recents", recents.map { it.episodeImageUrl })
         context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(channelId), null, null)
         recents.forEach { recent ->
             helper.publishPreviewProgram(
@@ -97,7 +100,7 @@ object HomeChannels {
                     .setType(TvContractCompat.PreviewPrograms.TYPE_TV_EPISODE)
                     .setTitle(recent.name)
                     .setDescription(recent.chapter)
-                    .setPosterArtUri(recent.episodeImageUrl.toUri())
+                    .setPosterArtUri(ChannelArt.forLauncher(context, recent.episodeImageUrl).toUri())
                     .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
                     .setIntent(seriesIntent(context, recent.animeUrl))
                     .build()

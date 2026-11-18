@@ -69,7 +69,7 @@ import kotlinx.coroutines.flow.combine
 fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: Pair<Int, Long>?, onBackAtMenu: () -> Unit) {
     // Los ajustes de «Herramientas» (secciones visibles, reloj...) se aplican en cuanto cambian.
     val settingsChanges by produceState(0) { KaizenSettings.changes.collect { value += 1 } }
-    val health by remember { KaizenSettings.sourceIdsFlow.combine(HostGate.down) { _, _ -> SourcesHealth.current() } }
+    val health by remember { KaizenSettings.sourceIdsFlow.combine(HostGate.down) { _, _ -> SourcesHealth.current() }.combine(app.kaizen.commons.NetworkState.mode) { _, _ -> SourcesHealth.current() } }
         .collectAsStateWithLifecycle(SourcesHealth.current())
     // «Buscar» y «Configuración» son acciones, no secciones de contenido: van en la barra de arriba, no en el menú lateral.
     val headers = remember(settingsChanges) {

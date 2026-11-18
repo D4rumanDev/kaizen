@@ -1,6 +1,7 @@
 package app.kaizen.tv.ui
 
 import app.kaizen.commons.HostGate
+import app.kaizen.commons.NetworkState
 
 /** Estado de una fuente tal como lo pinta su tarjeta de «Fuentes»: piloto y texto. */
 internal data class SourceState(val health: SourcesHealth, val text: String)
@@ -21,9 +22,13 @@ internal fun sourceState(
     failure: Pair<Long, String>?,
     measuring: Boolean,
     clock: (Long) -> String,
-    laLiga: Boolean = false
+    laLiga: Boolean = false,
+    network: NetworkState.Mode = NetworkState.Mode.ONLINE
 ): SourceState = when {
     !active -> SourceState(SourcesHealth.OK, "✖ Desactivada")
+    // Sin Internet manda sobre todo lo demás: ni se mide ni se pausa, y no es culpa de la fuente (antes salía «No responde» o «En pausa»).
+    network == NetworkState.Mode.NO_INTERNET -> SourceState(SourcesHealth.OFFLINE, "Sin Internet · se usa lo guardado")
+    network == NetworkState.Mode.OFFLINE_MANUAL -> SourceState(SourcesHealth.OFFLINE, "Modo sin conexión · se usa lo guardado")
     // El operador bloquea la IP de la fuente por un partido (hayahora.futbol): se dice, en vez de «no responde» o «en pausa».
     laLiga -> SourceState(SourcesHealth.DOWN, "Bloqueo de LaLiga (E23) · se pasa al acabar el partido")
     pausedUntil > 0 -> SourceState(SourcesHealth.DOWN, "En pausa hasta ${clock(pausedUntil)}")
@@ -40,6 +45,7 @@ internal fun sourceState(
 
 /** Resumen de todas las fuentes activas para la tarjeta «Comprobar todas»: cuántas responden bien de las que se han medido. */
 internal fun sourcesSummary(states: List<SourceState>): String {
+    if (states.any { it.health == SourcesHealth.OFFLINE }) return "Sin conexión: se usa lo guardado"
     val measured = states.filter { it.health != SourcesHealth.CHECKING }
     if (states.isEmpty()) return ""
     if (measured.isEmpty()) return ""

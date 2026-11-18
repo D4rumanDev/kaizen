@@ -115,7 +115,13 @@ object HostGate {
     internal var onDown: (String) -> Unit = { KaizenToast.toastLong(it) }
 
     /** El servidor está en cortocircuito: no se le ha pedido nada. */
-    class HostDownException(host: String) : IOException("$host no responde")
+    open class HostDownException(host: String, message: String = "$host no responde") : IOException(message)
+
+    /**
+     * Sin conexión ([NetworkState]): no se le ha pedido nada a [host]. Es un [HostDownException] para que todo lo que ya trata una web
+     * en pausa (usar lo guardado, saltar a otra fuente) trate igual la falta de red, pero no cuenta como fallo ni abre una pausa.
+     */
+    class OfflineException(host: String) : HostDownException(host, "Sin conexión")
 
     /** Demasiadas peticiones esperando al mismo servidor. */
     class HostBusyException(host: String) : IOException("$host ocupado")
@@ -127,7 +133,7 @@ object HostGate {
     class ForbiddenException(url: String) : HttpStatusException("HTTP error fetching URL", 403, url)
 
     /** Comprobación de red para no culpar al servidor de un corte propio. */
-    internal var isNetworkUp: () -> Boolean = { Network.isConnected }
+    internal var isNetworkUp: () -> Boolean = { Network.isConnected && !NetworkState.isOffline }
 
     /** Reloj de la ventana de fallos (las pruebas lo adelantan). */
     @Volatile internal var clock: () -> Long = System::currentTimeMillis
@@ -146,13 +152,16 @@ object HostGate {
         return (state.lastErrorAt to error).takeIf { clock() - it.first < FAILURE_SHOWN_MS }
     }
 
-    fun isDown(host: String): Boolean = (hosts[host.removePrefix("www.")]?.downUntil ?: 0L) > System.currentTimeMillis()
+    /** Sin conexión las pausas no cuentan (se ignoran, no se borran): la causa es la red, no la web, y «Fuentes» lo dice con su propio estado. */
+    fun isDown(host: String): Boolean = !NetworkState.isOffline && (hosts[host.removePrefix("www.")]?.downUntil ?: 0L) > System.currentTimeMillis()
 
     /** Hora (ms) hasta la que [host] está en pausa, o 0. */
-    fun downUntil(host: String): Long = hosts[host.removePrefix("www.")]?.downUntil?.takeIf { it > System.currentTimeMillis() } ?: 0L
+    fun downUntil(host: String): Long =
+        if (NetworkState.isOffline) 0L else hosts[host.removePrefix("www.")]?.downUntil?.takeIf { it > System.currentTimeMillis() } ?: 0L
 
     fun <T> call(url: String, block: () -> T): T {
         val name = hostOf(url)
+        if (NetworkState.isOffline) throw OfflineException(name)
         val host = hosts.getOrPut(name) { Host() }
         if (System.currentTimeMillis() < host.downUntil) throw HostDownException(name)
         if (!host.lock.tryLock(MAX_WAIT_S, TimeUnit.SECONDS)) throw HostBusyException(name)
@@ -177,6 +186,7 @@ object HostGate {
      */
     fun allow(url: String) {
         val name = hostOf(url)
+        if (NetworkState.isOffline) throw OfflineException(name)
         if (System.currentTimeMillis() < (hosts[name]?.downUntil ?: 0L)) throw HostDownException(name)
     }
 
@@ -239,6 +249,9 @@ object HostGate {
     }
 
     private fun noteFailure(name: String, host: Host, e: IOException, label: String = name) {
+        // Primero a la detección de red: si con este fallo se da Internet por perdido, el `isNetworkUp()` de abajo ya dice que no
+        // y este fallo no abre una pausa (y las que abrieron los anteriores se borran).
+        if (!name.startsWith(SERVER_PREFIX)) NetworkState.noteFailure(name, e)
         if (isServerDown(e) && isNetworkUp()) {
             noteAttempt(name, ok = false, failure = e)
             // Al gestor único de errores con su número (E02, E05…): antes solo iba a las estadísticas y a un aviso, y el registro no lo mostraba.
@@ -269,6 +282,8 @@ object HostGate {
      */
     fun check(url: String): CheckResult {
         val name = hostOf(url)
+        // Sin conexión no se pregunta a la web: no habría respuesta que valiera y la pausa no debe tocarse.
+        if (NetworkState.isOffline) return CheckResult(false, null, 0, "sin conexión")
         val host = hosts.getOrPut(name) { Host() }
         val start = System.currentTimeMillis()
         if (!host.lock.tryLock(MAX_WAIT_S, TimeUnit.SECONDS)) return CheckResult(false, null, 0, "ocupado")
@@ -291,6 +306,7 @@ object HostGate {
      * (a diferencia de [check], que es una acción explícita y sí entra o sale de la pausa).
      */
     fun probe(url: String): CheckResult {
+        if (NetworkState.isOffline) return CheckResult(false, null, 0, "sin conexión")
         val start = System.currentTimeMillis()
         return try {
             val response = app.kaizen.source.SourceHttp.execute(url, timeoutSeconds = Tuning.patient(CHECK_TIMEOUT_MS.toLong()) / 1000L) { ignoreHttpErrors(); maxBodySize(1) }
@@ -344,6 +360,8 @@ object HostGate {
             pause
         }
         publish()
+        // Una vez por pausa, en el catálogo único: el fallo que la causó ya se anotó con su propia causa (E02, E05…); esta dice que la web quedó en pausa.
+        runCatching { AppErrors.record(app.kaizen.domain.ConnectionStats.Cause.PAUSED, AppErrors.Area.SOURCE, "${describe(pause)} de pausa", context = name) }
         // Al acabar la pausa la fuente vuelve sola: se avisa a quien escucha [down].
         AppScope.launch {
             delay(pause + 50)
@@ -354,6 +372,7 @@ object HostGate {
 
     /** El servidor responde: fuera de la pausa y sin pausas acumuladas. */
     private fun markUp(name: String, host: Host, publish: Boolean = true) {
+        if (!name.startsWith(SERVER_PREFIX)) NetworkState.noteSuccess(name)
         synchronized(host) {
             if (host.strikes > 0 || host.downUntil > 0) storage?.save(name, 0L, 0)
             if (host.lastError != null) { host.lastError = null; _failureVersion.value++ }

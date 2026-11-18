@@ -12,6 +12,9 @@ internal class DataSettingsItems {
     private val icon = R.drawable.ic_sync
 
     fun items(): List<SettingItem> = listOf(
+        CheckItem("Modo sin conexión", "No pide nada a las webs, no abre pausas de 2, 5 y 10 min y usa solo lo guardado (portadas aunque hayan caducado)", { KaizenSettings.offlineMode }) {
+            app.kaizen.commons.NetworkState.setManual(it)
+        },
         choiceItem(appString(R.string.ui_capitulos_recientes), KaizenSettings.RECENTS_OPTIONS, KaizenSettings::recentsCount) { "$it" },
         // Al cambiarlo se reprograma el trabajo periódico (si no, seguiría con el intervalo de antes).
         ChoiceItem("Actualizar los recientes cada", KaizenSettings.RECENTS_EVERY_OPTIONS.map { if (it < 60) "$it min" else "${it / 60} h" },

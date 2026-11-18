@@ -43,6 +43,7 @@ import app.kaizen.bypass.BypassStatus
 import app.kaizen.bypass.launchBypass
 import app.kaizen.commons.findActivity
 import app.kaizen.commons.HostGate
+import app.kaizen.commons.NetworkState
 import app.kaizen.tv.settings.setSourceActive
 import app.kaizen.commons.KaizenSettings
 import app.kaizen.source.AnimeSource
@@ -70,10 +71,13 @@ enum class SourcesHealth(val color: Color, val label: String) {
     PARTIAL(StatusWarn, "Alguna con fallos o en pausa"),
     DOWN(StatusDown, "Todas en pausa"),
     /** Aún sin medir (solo en la tarjeta de una fuente): círculo vacío, ni bueno ni malo. */
-    CHECKING(Color.Gray, "Midiendo");
+    CHECKING(Color.Gray, "Midiendo"),
+    /** Sin Internet (detectado o modo sin conexión): no es culpa de las fuentes, que ni se consultan. Icono de wifi tachado. */
+    OFFLINE(Color(0xFF8AB4F8), "Sin Internet");
 
     companion object {
         fun current(): SourcesHealth {
+            if (NetworkState.isOffline) return OFFLINE
             val selected = AnimeSources.selected
             val down = selected.count { HostGate.isDown(it.host) }
             val failing = selected.count { !HostGate.isDown(it.host) && HostGate.recentFailure(it.host) != null }
@@ -102,6 +106,17 @@ internal fun Led(health: SourcesHealth, size: androidx.compose.ui.unit.Dp = 24.d
             }, health.color)
             SourcesHealth.CHECKING -> drawCircle(health.color, radius = radius, style = androidx.compose.ui.graphics.drawscope.Stroke(width = radius / 3f))
             SourcesHealth.DOWN -> drawRect(health.color, topLeft = Offset(middle.x - radius, middle.y - radius), size = Size(radius * 2, radius * 2))
+            // Wifi tachado: punto, dos arcos y una raya en diagonal (forma propia: no depende solo del color).
+            SourcesHealth.OFFLINE -> {
+                val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = radius / 3.2f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                val base = Offset(middle.x, middle.y + radius * 0.75f)
+                drawCircle(health.color, radius = radius / 5f, center = base)
+                listOf(0.7f, 1.35f).forEach { reach ->
+                    val r = radius * reach
+                    drawArc(health.color, startAngle = -135f, sweepAngle = 90f, useCenter = false, topLeft = Offset(base.x - r, base.y - r), size = Size(r * 2, r * 2), style = stroke)
+                }
+                drawLine(Color.White, Offset(middle.x - radius, middle.y - radius), Offset(middle.x + radius, middle.y + radius), strokeWidth = radius / 3.2f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            }
         }
     }
 }
@@ -180,6 +195,8 @@ internal fun SourcesPage() {
     val lastCheck = remember { mutableStateMapOf<String, HostGate.CheckResult>() }
     var checking by remember { mutableStateOf(false) }
     val bypass by BypassStatus.snapshot.collectAsStateWithLifecycle()
+    // El estado de la red se ve al instante: sin esperar a ninguna medición.
+    val network by NetworkState.mode.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Al abrir se mide cada fuente sin tocar pausas (probe): así se ven los tiempos sin pulsar nada.
@@ -188,7 +205,10 @@ internal fun SourcesPage() {
     LaunchedEffect(Unit) { laLigaHosts = runCatching { app.kaizen.commons.LaLigaBlock.blockedHosts(AnimeSources.selected.map { it.host }) }.getOrDefault(emptySet()) }
     // Mientras dura esa primera medición las tarjetas no ponen texto, solo el círculo vacío (antes ponían «Activa» y a los segundos cambiaban).
     var probing by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
+    // Sin conexión no se mide nada; al volver la red se mide (la clave cambia y se relanza).
+    LaunchedEffect(network == NetworkState.Mode.ONLINE) {
+        if (network != NetworkState.Mode.ONLINE) { probing = false; return@LaunchedEffect }
+        probing = true
         try {
             val results = withContext(Dispatchers.IO) {
                 coroutineScope { AnimeSources.selected.map { source -> async { source to HostGate.probe("https://${source.host}/") } }.awaitAll() }
@@ -223,6 +243,13 @@ internal fun SourcesPage() {
         // Leer el valor aquí suscribe la rejilla: se rehace al cambiar las fuentes marcadas o las pausas.
         changes
         val selected = AnimeSources.selected
+        // La red, la primera tarjeta: dice si hay Internet y, al pulsarla, enciende o apaga el «Modo sin conexión».
+        item {
+            val (health, text) = networkSummary(network)
+            IconTextCard("Red\n$text", { NetworkState.setManual(network != NetworkState.Mode.OFFLINE_MANUAL) }) {
+                NetworkBadge(health, size = 40.dp)
+            }
+        }
         // Todas las fuentes: pulsar una la activa o la desactiva (como en los botones del reproductor); siempre queda al menos una.
         val all = AnimeSources.all
         items(all.size, key = { all[it].id }, contentType = { "source" }) { index ->
@@ -231,7 +258,7 @@ internal fun SourcesPage() {
             val pausedUntil = HostGate.downUntil(source.host)
             val result = lastCheck[source.id]
             val failure = HostGate.recentFailure(source.host)
-            val state = sourceState(active, pausedUntil, result, failure, probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts)
+            val state = sourceState(active, pausedUntil, result, failure, probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts, network)
             IconTextCard(if (state.text.isEmpty()) source.name else "${source.name}\n${state.text}", { setSourceActive(source.id, !active) },
                 background = if (active) ActiveCard else InactiveCard, contentColor = if (active) Color.White else InactiveContent) {
                 SourceLogo(source, size = 40.dp, disabled = !active, health = state.health)
@@ -246,11 +273,27 @@ internal fun SourcesPage() {
         item {
             // Cuántas de las fuentes activas responden bien, con lo ya medido.
             val summary = sourcesSummary(selected.map { source ->
-                sourceState(true, HostGate.downUntil(source.host), lastCheck[source.id], HostGate.recentFailure(source.host), probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts)
+                sourceState(true, HostGate.downUntil(source.host), lastCheck[source.id], HostGate.recentFailure(source.host), probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts, network)
             })
-            IconTextCard((if (checking) "Comprobando…" else "Comprobar todas") + if (summary.isNotEmpty()) "\n$summary" else "", { check(selected) }) { TintedIcon(R.drawable.ic_sync) }
+            val offline = network != NetworkState.Mode.ONLINE
+            val title = if (offline) "Reintentar conexión" else if (checking) "Comprobando…" else "Comprobar todas"
+            // Sin conexión no hay nada que comprobar: reintentar borra las pruebas de «sin Internet» y la siguiente petición lo decide de nuevo.
+            IconTextCard(title + if (summary.isNotEmpty()) "\n$summary" else "", { if (offline) NetworkState.retry() else check(selected) }) { TintedIcon(R.drawable.ic_sync) }
         }
     }
+}
+
+/** Estado y texto de la tarjeta «Red» de «Fuentes». Con conexión es neutra (círculo verde) y ofrece el modo sin conexión. */
+internal fun networkSummary(mode: NetworkState.Mode): Pair<SourcesHealth, String> = when (mode) {
+    NetworkState.Mode.ONLINE -> SourcesHealth.OK to "Con conexión · pulsa para el modo sin conexión"
+    NetworkState.Mode.NO_INTERNET -> SourcesHealth.OFFLINE to "Sin Internet (detectado) · pulsa para el modo sin conexión"
+    NetworkState.Mode.OFFLINE_MANUAL -> SourcesHealth.OFFLINE to "Modo sin conexión · pulsa para volver a conectar"
+}
+
+/** El piloto de la red a tamaño de logo: un cuadro con el piloto grande en el centro. */
+@Composable
+internal fun NetworkBadge(health: SourcesHealth, size: Dp = 56.dp) {
+    Box(Modifier.size(size).clip(ShapeLg).background(SurfaceMuted), contentAlignment = Alignment.Center) { Led(health, size * 0.7f) }
 }
 
 /** Color y texto del estado del bypass de Cloudflare para su tarjeta de «Fuentes». */

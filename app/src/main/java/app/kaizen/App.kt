@@ -142,6 +142,8 @@ class App : Application(), Configuration.Provider {
         OkHttp.initialize(this)
         // Los ajustes de medida (esperas, días, tamaños) llegan a los módulos que no leen preferencias.
         app.kaizen.commons.Tuning.apply()
+        // ¿Hay Internet de verdad? Sigue los cambios de red al instante (lo enseña «Fuentes») y el interruptor «Modo sin conexión».
+        app.kaizen.commons.NetworkState.start(this)
         configureImageLoader()
         // Después del cargador de imágenes: un restablecimiento automático vacía su caché.
         CrashGuard.install()
