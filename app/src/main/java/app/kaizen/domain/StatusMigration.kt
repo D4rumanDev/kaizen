@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import app.kaizen.tv.ui.KaizenToast
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Da estado una sola vez a las series que ya hay en el historial: las que están en emisión pasan a «Viendo» y las demás con todos
@@ -35,12 +36,12 @@ object StatusMigration {
     private const val MAX_ATTEMPTS = 3
 
     /** Espera tras arrancar: la migración pide muchas fichas y no debe competir con la carga de la pantalla principal. */
-    private const val START_DELAY_MS = 30_000L
+    private val START_DELAY = 30.seconds
 
     fun launch() {
         if (KaizenSettings.statusesMigrated) return
         AppScope.launch(Dispatchers.IO) {
-            kotlinx.coroutines.delay(START_DELAY_MS)
+            kotlinx.coroutines.delay(START_DELAY)
             if (KaizenSettings.statusesMigrated || !running.compareAndSet(false, true)) return@launch
             try {
                 // Solo cuenta como intento si hubo con qué trabajar (sin calendario, p. ej. sin red, no se gasta).

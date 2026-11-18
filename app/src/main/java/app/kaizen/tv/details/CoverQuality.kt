@@ -21,11 +21,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 
 /** Ancho en dp de una tarjeta de portada: la imagen elegida debe cubrirlo en píxeles reales de la pantalla. */
 internal const val COVER_TARGET_DP = 200
 
-private const val PROBE_TIMEOUT_MS = 6_000L
+private val PROBE_TIMEOUT = 6.seconds
 
 // Las medidas bajan la imagen entera: a lo sumo dos a la vez para no quitar red a la ficha.
 private val probeGate = Semaphore(2)
@@ -89,7 +90,7 @@ private suspend fun widthOf(context: Context, url: String): Int = try {
     // Se baja con un tamaño mínimo (decodificación casi gratis) y el ancho real se lee de la caché de disco sin decodificar la imagen.
     val loader = SingletonImageLoader.get(context)
     val request = ImageRequest.Builder(context).data(url).size(Size(1, 1)).memoryCachePolicy(CachePolicy.DISABLED).build()
-    val loaded = withTimeoutOrNull(PROBE_TIMEOUT_MS) { loader.execute(request) } is SuccessResult
+    val loaded = withTimeoutOrNull(PROBE_TIMEOUT) { loader.execute(request) } is SuccessResult
     // Sin la cabecera en la caché no hay ancho fiable (la imagen decodificada es de 1 px): cuenta como no medida.
     if (loaded) boundsWidth(loader.diskCache, url) ?: 0 else 0
 } catch (e: CancellationException) {

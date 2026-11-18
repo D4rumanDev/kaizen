@@ -72,6 +72,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Página «Buscar» del menú lateral: texto y géneros. Sin texto no se pide nada a las fuentes (solo salen los géneros);
@@ -81,7 +82,7 @@ import app.kaizen.commons.appString
 internal fun SearchPage(actions: CardActions) {
     var text by rememberSaveable { mutableStateOf("") }
     val sort = SortBy.TITLE
-    val query by remember { snapshotFlow { text }.debounce(QUERY_DELAY_MS) }.collectAsState(initial = text)
+    val query by remember { snapshotFlow { text }.debounce(QUERY_DELAY) }.collectAsState(initial = text)
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -162,4 +163,4 @@ private fun LazyGridScope.genreRows(onGenre: (Genre) -> Unit, first: FocusReques
     }
 }
 
-private const val QUERY_DELAY_MS = 450L
+private val QUERY_DELAY = 450.milliseconds

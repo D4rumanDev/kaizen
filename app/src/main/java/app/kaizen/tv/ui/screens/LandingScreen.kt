@@ -59,6 +59,7 @@ import app.kaizen.tv.details.TVAnimesDetails
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Kaizen: pantalla principal al estilo SmartTube: menú lateral con las secciones (se abre al enfocarlo) y, al lado, la
@@ -116,7 +117,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
     // Al bajar por el menú no se monta cada página que se cruza: la sección cambia tras un instante de foco quieto,
     // y solo si el foco sigue en el menú (si ya entró en la página, cambiarla le quitaría el foco).
     LaunchedEffect(focusedHeader) {
-        delay(FOCUS_SELECT_DELAY_MS)
+        delay(FOCUS_SELECT_DELAY)
         if (!contentFocused) selected = focusedHeader
     }
     var menuItem by remember { mutableStateOf<Any?>(null) }
@@ -130,7 +131,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
             withFrameNanos { }
             if (contentFocused || menuFocused) return@LaunchedEffect
             runCatching { menuTarget()?.requestFocus() }
-            delay(INITIAL_FOCUS_DELAY_MS)
+            delay(INITIAL_FOCUS_DELAY)
         }
     }
     // Al cerrar el panel de la derecha el foco vuelve a las tarjetas.
@@ -141,10 +142,10 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
         sidePanelOpen = false
         stripClosing = true
         scope.launch {
-            delay(MENU_REFOCUS_MS)
+            delay(MENU_REFOCUS)
             // Sin tarjetas (p. ej. un filtro que no deja ninguna) el foco quedaría en el panel que se quita o en la tira: al menú.
             if (stripFocused || !contentFocused) runCatching { menuTarget()?.requestFocus() }
-            delay(MENU_REFOCUS_MS)
+            delay(MENU_REFOCUS)
             stripClosing = false
         }
         Unit
@@ -187,7 +188,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
                     selected = it
                     // La página nueva tarda un instante en componerse: pedir el foco ya, sin nada enfocable dentro, lo dejaba sin dueño y caía en el menú lateral (que se abría en «Inicio»).
                     scope.launch {
-                        delay(TOP_SELECT_FOCUS_MS)
+                        delay(TOP_SELECT_FOCUS)
                         if (!menuFocused) runCatching { content.requestFocus() }
                     }
                 }
@@ -214,13 +215,13 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
         CardMenu.Menu(item) {
             menuItem = null
             scope.launch {
-                delay(MENU_REFOCUS_MS)
+                delay(MENU_REFOCUS)
                 if (!contentFocused) runCatching { content.requestFocus() }
                 // «Quitar de Seguir viendo»: la tarjeta desaparece cuando el modelo se recarga, un poco después de cerrar el menú, y el foco
-                // cae en el menú lateral, que tras FOCUS_SELECT_DELAY_MS cambiaría de sección (a Recientes). Se vigila un segundo y el foco
+                // cae en el menú lateral, que tras FOCUS_SELECT_DELAY cambiaría de sección (a Recientes). Se vigila un segundo y el foco
                 // vuelve al contenido en cuanto sale, antes de que eso pase.
                 if (item is app.kaizen.tv.anime.ContinueItem) repeat(REFOCUS_WATCH_TICKS) {
-                    delay(REFOCUS_WATCH_MS)
+                    delay(REFOCUS_WATCH)
                     if (!contentFocused) runCatching { content.requestFocus() }
                 }
             }
@@ -258,7 +259,7 @@ internal fun FixedContentArea(content: @Composable () -> Unit) {
 }
 
 private const val INITIAL_FOCUS_TRIES = 30
-private const val INITIAL_FOCUS_DELAY_MS = 250L
+private val INITIAL_FOCUS_DELAY = 250.milliseconds
 
 /** Un botón redondo con solo el icono (azul si es la sección en uso, blanco con el foco), como las entradas del menú lateral. */
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -289,8 +290,8 @@ private fun TopBar(current: Int, searchVisible: Boolean, @Suppress("UNUSED_PARAM
     }
 }
 
-private const val FOCUS_SELECT_DELAY_MS = 250L
-private const val TOP_SELECT_FOCUS_MS = 200L
-private const val MENU_REFOCUS_MS = 100L
-private const val REFOCUS_WATCH_MS = 50L
+private val FOCUS_SELECT_DELAY = 250.milliseconds
+private val TOP_SELECT_FOCUS = 200.milliseconds
+private val MENU_REFOCUS = 100.milliseconds
+private val REFOCUS_WATCH = 50.milliseconds
 private const val REFOCUS_WATCH_TICKS = 20

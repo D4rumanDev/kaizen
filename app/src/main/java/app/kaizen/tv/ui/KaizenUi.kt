@@ -86,6 +86,7 @@ import androidx.compose.ui.platform.LocalContext
 import app.kaizen.commons.appString
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import kotlin.time.Duration.Companion.seconds
 
 /** Estados de lo que se puede activar (secciones, botones): mismo criterio en la lista de organizar y en las vistas previas. */
 /** Color de los iconos de las tarjetas de [IconTextCard] (blanco, salvo en las que cambian de estado). */
@@ -183,6 +184,7 @@ private fun SkeletonHeader(pulse: State<Float>) {
     }
 }
 
+/** Int en ms a propósito: tween() de Compose lo pide así (frontera con la API, no un plazo propio). */
 private const val SKELETON_PULSE_MS = 700
 private const val SKELETON_COUNT = 24
 
@@ -398,14 +400,14 @@ internal fun Clock(showDate: Boolean, fontSize: TextUnit) {
     val now by produceState(Date()) {
         while (true) {
             value = Date()
-            delay(CLOCK_TICK_MS)
+            delay(CLOCK_TICK)
         }
     }
     val text = if (showDate) "${timeFormat.format(now)}  ·  ${dateFormat.format(now)}" else timeFormat.format(now)
     Text(text, color = Color.White, fontSize = fontSize)
 }
 
-private const val CLOCK_TICK_MS = 30_000L
+private val CLOCK_TICK = 30.seconds
 
 /** Claves únicas para una lista de Compose: si dos elementos repiten clave, la repetición lleva un sufijo (repetir una clave bloquea la app). */
 internal fun uniqueKeys(raw: List<String>): List<String> {

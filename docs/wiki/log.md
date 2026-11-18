@@ -14,6 +14,11 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-18 · Plazos a `Duration` (en curso)
+- Decisión: los plazos propios pasan de `Long` en ms con sufijo `_MS` a `kotlin.time.Duration` (el nombre ya no lleva la unidad: `LAZY_START_DELAY = 8.seconds`). Se quedan en `Long` los instantes (`currentTimeMillis`), las posiciones y duraciones de Media3 y AniSkip, y lo que persiste; las animaciones de Compose (`tween`) siguen en `Int` ms. Se convierte solo en la frontera con cada API (`.inWholeMilliseconds`).
+- Fase 1 hecha (plazos privados de un solo fichero): `App`, `TVMain` (`LAZY_START_DELAY` pasa a ser una sola definición, la de `App`), `LandingScreen`, `SeriesDetailScreen`, `SearchPage`, `DebugLogDialog`, `KaizenUi`, `ChannelArt`, `StatusMigration`, `CoverQuality`, `PosterGallery` y `LoadProgress`. 1123 tests y `assembleTv` en verde.
+- Pendiente: fase 2 (plazos compartidos y `Timings`/`Tuning`), fase 3 (fronteras: OkHttp, WorkManager, `TimeUnit`, `postDelayed`) y fase 4 (test que impide plazos nuevos en `Long`). `DAY_MS` está repetido en `Tuning`, `Removals`, `FichaFill`, `Timings` y `ApiCache`: se unifica en la fase 2.
+
 ## 2026-11-18 · Sin Internet: estado en Fuentes y modo sin conexión
 - Causa probable (hipótesis, sin probar en la TV): con el móvil de repetidor sin datos el tvbox ve una wifi con capacidad de Internet pero sin salida; `Network.isConnected` no exige validación, así que los fallos se atribuían a las webs y abrían las pausas de 2/5/10 min y 1 h (guardadas en disco). El «!» del canal «Capítulos recientes» es el launcher bajando por su cuenta las URL web de las miniaturas.
 - `NetworkState` (commons): modos `ONLINE`, `NO_INTERNET` (ninguna red con salida, o red sin validar y fallos de red de 2 webs distintas en 2 min sin ningún acierto) y `OFFLINE_MANUAL` (ajuste «Modo sin conexión» en Datos y caché). Callback de red: cambio inmediato. Al entrar o salir de `NO_INTERNET` se limpian las pausas de `HostGate`.

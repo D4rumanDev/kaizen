@@ -42,10 +42,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Ventana con las fases de abrir un capítulo (Cloudflare, servidores, servidor, capítulo). Solo aparece pasados
- * [SHOW_DELAY_MS] desde que se pidió: si todo va bien no molesta, y si algo tarda se ve en qué fase está. Atrás cancela
+ * [SHOW_DELAY] desde que se pidió: si todo va bien no molesta, y si algo tarda se ve en qué fase está. Atrás cancela
  * y llama a [onCancel], con la ventana a la vista o sin ella. Se puede ocultar mientras se pregunta al usuario (servidor,
  * calidad) y mostrar de nuevo después. Se puede llamar desde cualquier hilo.
  */
@@ -105,7 +106,7 @@ class LoadProgress private constructor(
 
     companion object {
         /** Tiempo que debe pasar desde que se pide el capítulo para que aparezca la ventana. */
-        const val SHOW_DELAY_MS = 5_000L
+        val SHOW_DELAY = 5.seconds
 
         fun show(activity: ComponentActivity, title: String, subtitle: String, onCancel: () -> Unit): LoadProgress {
             val progress = LoadProgress(activity, title, subtitle, onCancel)
@@ -114,7 +115,7 @@ class LoadProgress private constructor(
                 val view = ComposeView(activity)
                 progress.host = view
                 activity.onBackPressedDispatcher.addCallback(activity, progress.backCallback)
-                progress.handler.postDelayed(progress.arm, SHOW_DELAY_MS)
+                progress.handler.postDelayed(progress.arm, SHOW_DELAY.inWholeMilliseconds)
                 view.setContent {
                     KaizenTheme {
                         if (progress.armed.value && !progress.suppressed.value) {

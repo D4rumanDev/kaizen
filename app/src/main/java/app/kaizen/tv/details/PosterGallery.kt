@@ -49,6 +49,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.R
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
 
 /** Una portada de la serie y la fuente de la que viene. */
 internal class GalleryCover(val label: String, val url: String)
@@ -70,12 +71,12 @@ internal suspend fun galleryCovers(series: Series): List<GalleryCover> = withCon
 /** Si la imagen se puede cargar (una URL que no existe en esa fuente no entra en la galería). */
 private suspend fun loads(context: Context, url: String): Boolean = runCatchingCoop {
     // Tamaño mínimo (no se decodifica la imagen entera) y un tope de tiempo por fuente: una web lenta no retrasa a las demás.
-    withTimeoutOrNull(LOAD_TIMEOUT_MS) {
+    withTimeoutOrNull(LOAD_TIMEOUT) {
         SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(url).size(Size(PREFLIGHT_PX, PREFLIGHT_PX)).build()) is SuccessResult
     } == true
 }.getOrDefault(false)
 
-private const val LOAD_TIMEOUT_MS = 6_000L
+private val LOAD_TIMEOUT = 6.seconds
 private const val PREFLIGHT_PX = 64
 
 /**

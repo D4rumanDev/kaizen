@@ -115,18 +115,20 @@ import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.delay
 import app.kaizen.domain.NotRecommended
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 
 private val GutterStart = ContentPaddingHorizontal
 
 /** Cabecera baja (como Netflix o Prime): con ella las pestañas y los episodios quedan a la vista sin bajar. */
 private val HERO_HEIGHT = DetailHeaderMinHeight
 private val POSTER_WIDTH = DetailPosterWidth
-private const val REGROUP_WAIT_MS = 9_000L
+private val REGROUP_WAIT = 9.seconds
 /** Lo que tarda en desaparecer una ficha separada: el foco ya está en otra tarjeta. */
-private const val SEPARATE_HIDE_MS = 500L
+private val SEPARATE_HIDE = 500.milliseconds
 
 /** Lo que se espera a que el menú se cierre y devuelva el foco antes de moverlo a otra tarjeta. */
-private const val REFOCUS_AFTER_DIALOG_MS = 150L
+private val REFOCUS_AFTER_DIALOG = 150.milliseconds
 
 /** Acciones de la ficha que resuelve quien la aloja (reproducir, abrir otra ficha) o el modelo (favorito, vistos). */
 class FichaActions(
@@ -157,7 +159,7 @@ fun SeriesDetailScreen(state: FichaViewModel.State.Ready, actions: FichaActions)
         value = load()
         // Unir o separar reagrupa el catálogo en segundo plano (unos segundos): al terminar se relee con sus datos.
         if (titleChanges != firstChanges) {
-            delay(REGROUP_WAIT_MS)
+            delay(REGROUP_WAIT)
             value = load()
         }
     }
@@ -207,7 +209,7 @@ fun SeriesDetailScreen(state: FichaViewModel.State.Ready, actions: FichaActions)
                 val at = joined.indexOfFirst { it.sourceId == ficha.sourceId && it.slug == ficha.slug }
                 refocusKey = (joined.getOrNull(at + 1) ?: joined.getOrNull(at - 1))?.let { "${it.sourceId}:${it.slug}" }
                 scope.launch {
-                    delay(SEPARATE_HIDE_MS)
+                    delay(SEPARATE_HIDE)
                     refocusKey = null
                     separated = separated + (ficha.sourceId to ficha.slug)
                     separations += 1
@@ -642,7 +644,7 @@ private fun JoinedRow(
                 val episodes = rememberLoadable(ficha.sourceId to ficha.slug) { Catalog.episodeCount(ficha.sourceId, ficha.slug) ?: NO_EPISODES }.valueOrNull
                 val requester = remember { FocusRequester() }
                 if (refocusKey == "${ficha.sourceId}:${ficha.slug}") LaunchedEffect(refocusKey) {
-                    delay(REFOCUS_AFTER_DIALOG_MS)
+                    delay(REFOCUS_AFTER_DIALOG)
                     withFrameNanos { }
                     runCatching { requester.requestFocus() }
                     // Una sola vez por separación: si no, al volver la tarjeta a componerse (desplazamientos) robaría el foco.

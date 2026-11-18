@@ -38,6 +38,7 @@ import okhttp3.OkHttp
 import okhttp3.OkHttpClient
 import app.kaizen.commons.runCatchingCoop
 import app.kaizen.commons.AppScope
+import kotlin.time.Duration.Companion.seconds
 
 class App : Application(), Configuration.Provider {
 
@@ -79,14 +80,14 @@ class App : Application(), Configuration.Provider {
         TlsPolicy.install()
         // Mantenimiento que no hace falta para pintar la pantalla principal: espera a que ya tenga contenido (carga diferida).
         AppScope.launch {
-            delay(LAZY_START_DELAY_MS)
+            delay(LAZY_START_DELAY)
             runCatchingCoop { app.kaizen.commons.RecordSourceRepair.runOnce() }.onFailure(::logError)
             runCatchingCoop { app.kaizen.source.ApiCache.purgeOld() }.onFailure { logError(it, app.kaizen.commons.AppErrors.Area.CACHE) }
         }
         if (!WorkManager.isInitialized()) {
             WorkManager.initialize(this, Configuration.Builder().build())
         }
-        AppScope.launch { delay(LAZY_START_DELAY_MS); removeLeftoversOnce() }
+        AppScope.launch { delay(LAZY_START_DELAY); removeLeftoversOnce() }
         // Ids de serie en memoria: las pantallas los leen desde el hilo principal sin tocar la base de datos. Si la lectura falla se
         // reintenta (sin ellos los favoritos y lo visto solo se reconocen por aid y las reglas del usuario no se aplican).
         AppScope.launch(Dispatchers.IO) {
@@ -102,35 +103,35 @@ class App : Application(), Configuration.Provider {
                     // al arrancar si «Recorrido automático» está activado.
                     // Con las reglas del usuario de ahora: lo que se unió o separó antes de una corrección queda bien sin esperar.
                     // Reagrupar y recorrer el catálogo es lo más pesado del arranque y no hace falta para ver Inicio: después.
-                    delay(LAZY_START_DELAY_MS)
+                    delay(LAZY_START_DELAY)
                     // Reagrupar puede llevar decenas de segundos de CPU: a prioridad de fondo, para no frenar la pantalla.
                     runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "reagrupar el catálogo si hace falta") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
                     runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "comprobar si el catálogo está al día") { app.kaizen.source.CatalogBuilder.ensureFresh() } }.onFailure(::logError)
                     // Emparejar con AniList (apagado de fábrica): arranca si el usuario lo activó. Su primera pasada son ~30 s de CPU y memoria (26.000 fichas: el
                     // GC no paraba y «Últimos vistos» tardaba en salir), así que espera a que la app lleve un rato abierta.
-                    delay(ANILIST_START_DELAY_MS)
+                    delay(ANILIST_START_DELAY)
                     app.kaizen.commons.DebugLog.timed("Arranque", "encender el emparejado") { app.kaizen.source.AnilistSyncRunner.apply() }
                     return@launch
                 }
-                if (attempt < LEDGER_ATTEMPTS - 1) delay(LEDGER_RETRY_MS * (attempt + 1))
+                if (attempt < LEDGER_ATTEMPTS - 1) delay(LEDGER_RETRY * (attempt + 1))
             }
         }
         // Filas de la pantalla de inicio de Android TV (Continuar viendo y Capítulos recientes): no hacen falta para pintar Inicio.
         AppScope.launch {
-            delay(LAZY_START_DELAY_MS)
+            delay(LAZY_START_DELAY)
             // Sin `timed` aquí: keepInSync se queda escuchando para siempre y la cifra sería «hasta que se cancela»; mide solo el volcado inicial (dentro).
             runCatchingCoop { app.kaizen.tv.HomeChannels.keepInSync(this@App) }.onFailure(::logError)
         }
         // Fuentes por fichero: mira el repositorio de fuentes (como mucho cada 12 h); lo nuevo se usa en el siguiente arranque.
         AppScope.launch(Dispatchers.IO) {
             AnimeSources.all
-            delay(LAZY_START_DELAY_MS)
+            delay(LAZY_START_DELAY)
             SpecSources.refresh()
         }
         // El InitializationProvider de androidx.startup está quitado del manifiesto, así que el perfil de arranque
         // (assets/dexopt/baseline.prof) se instala a mano; ART lo compila en la próxima optimización en reposo.
         AppScope.launch {
-            delay(PROFILE_INSTALL_DELAY_MS)
+            delay(PROFILE_INSTALL_DELAY)
             runCatchingCoop { ProfileInstaller.writeProfile(this@App) }.onFailure(::logError)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -206,14 +207,14 @@ class App : Application(), Configuration.Provider {
 
     companion object {
         private const val LEFTOVERS_DONE = "leftovers_v1"
-        private const val PROFILE_INSTALL_DELAY_MS = 5_000L
+        private val PROFILE_INSTALL_DELAY = 5.seconds
 
-        /** Cuánto espera el trabajo de segundo plano que no hace falta para pintar Inicio. */
-        private const val LAZY_START_DELAY_MS = 8_000L
+        /** Cuánto espera el trabajo de segundo plano que no hace falta para pintar Inicio (también lo usa TVMain: una sola definición). */
+        internal val LAZY_START_DELAY = 8.seconds
         /** Espera extra del emparejado con AniList tras el resto del arranque diferido. */
-        private const val ANILIST_START_DELAY_MS = 60_000L
+        private val ANILIST_START_DELAY = 60.seconds
         private const val LEDGER_ATTEMPTS = 3
-        private const val LEDGER_RETRY_MS = 5_000L
+        private val LEDGER_RETRY = 5.seconds
         private const val IMAGE_MAX_REQUESTS = 24
         private const val IMAGE_MAX_PER_HOST = 8
         private val LEFTOVER_DATABASES = listOf("ee-db", "LibGlobalFetchLib.db")

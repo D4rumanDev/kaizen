@@ -129,7 +129,7 @@ class TVMain : TVBaseActivity(), TVServersFactory.ServersInterface {
         // Programar los trabajos periódicos y migrar estados no hace falta para ver Inicio: carga diferida.
         val appContext = applicationContext
         app.kaizen.commons.AppScope.launch {
-            kotlinx.coroutines.delay(LAZY_START_DELAY_MS)
+            kotlinx.coroutines.delay(app.kaizen.App.LAZY_START_DELAY)
             RecentsWork.schedule(appContext)
             BackupWork.schedule(appContext)
             StatusMigration.launch()
@@ -197,6 +197,5 @@ class TVMain : TVBaseActivity(), TVServersFactory.ServersInterface {
         /** Código del resultado del bypass de Cloudflare (al arrancar y desde Configuración). */
         const val BYPASS_REQUEST = 7425
         private const val EXIT_WINDOW_MS = 2_000L
-        private const val LAZY_START_DELAY_MS = 8_000L
     }
 }

@@ -46,9 +46,11 @@ import app.kaizen.commons.KaizenSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Cada cuánto se mira si el registro ha cambiado mientras el visor está abierto. */
-private const val REFRESH_MS = 2_000L
+private val REFRESH = 2.seconds
 
 private val TimeWidth = 80.dp
 private val LevelWidth = 90.dp
@@ -91,13 +93,13 @@ internal fun DebugLogDialog(onDismiss: () -> Unit) {
                 loaded = true
                 if (following && fresh.isNotEmpty()) runCatching { state.scrollToItem(fresh.lastIndex) }
                 if (firstLoad && fresh.isNotEmpty()) {
-                    delay(100)
+                    delay(100.milliseconds)
                     runCatching { last.requestFocus() }
                 }
             }
             session = AppErrors.sessionLine()
             withContext(Dispatchers.IO) { DebugLog.health() to DebugLog.healthLine() }.let { (h, text) -> health = h; healthText = text }
-            delay(REFRESH_MS)
+            delay(REFRESH)
         }
     }
 

@@ -14,6 +14,7 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Miniaturas de las filas de la pantalla de inicio. El launcher de la TV descarga por su cuenta la imagen de cada fila: si se le da una
@@ -25,7 +26,7 @@ object ChannelArt {
     private const val PREFS = "home_channel_art"
     private const val PARAM = "u"
     /** Cuánto se espera a bajar una miniatura que falta (con conexión) al publicar la fila. */
-    private const val FETCH_TIMEOUT_MS = 8_000L
+    private val FETCH_TIMEOUT = 8.seconds
 
     fun authority(context: Context) = "${context.packageName}.channelart"
 
@@ -71,7 +72,7 @@ object ChannelArt {
     private fun fetch(context: Context, url: String) {
         runCatching {
             runBlocking {
-                withTimeoutOrNull(FETCH_TIMEOUT_MS) { SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(url).build()) }
+                withTimeoutOrNull(FETCH_TIMEOUT) { SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(url).build()) }
             }
         }
     }
