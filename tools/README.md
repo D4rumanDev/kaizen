@@ -31,6 +31,7 @@ Carpeta unificada de utilidades, scripts de mantenimiento, herramientas de audit
    - [`audit-diff.js`](#audit-diffjs)
    - [`test-count.js`](#test-countjs)
    - [`vscode-java.js`](#vscode-javajs)
+   - [`vscode-extensions.ps1`](#vscode-extensionsps1)
    - [`make_brand.py`](#make_brandpy)
 9. [Conector ADB (`tools/adb-device/`)](#9-conector-adb-toolsadb-device)
 
@@ -308,6 +309,15 @@ Valida la configuración del JDK en Visual Studio Code:
 node tools/vscode-java.js [--fix]
 ```
 - Detecta rutas rotas de runtime de Java tras actualizaciones de Eclipse Adoptium y las repara automáticamente.
+
+### `vscode-extensions.ps1`
+Quita de este VS Code las extensiones que Kaizen no usa (`fwcd.kotlin`, el paquete de Java menos Gradle, Maven y `android-dev-ext`). Por defecto solo hace un ensayo:
+```powershell
+pwsh tools/vscode-extensions.ps1                    # ensayo: enseña qué quitaría
+pwsh tools/vscode-extensions.ps1 -Apply             # desinstala
+pwsh tools/vscode-extensions.ps1 -Apply -JavaServer # además redhat.java
+```
+- Nunca toca `anthropic.claude-code` ni `google.google-antigravity`. Es un ajuste de usuario de VS Code (no del repositorio) y se revierte con `code --install-extension <id>`.
 
 ### `make_brand.py`
 Genera el conjunto completo de iconos adaptativos, banners de Android TV (16:9) y recursos gráficos a partir de las imágenes maestras en `art/`:
