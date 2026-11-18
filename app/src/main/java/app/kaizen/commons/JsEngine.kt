@@ -14,6 +14,9 @@ import kotlin.time.Duration.Companion.seconds
 object JsEngine {
     private val TIMEOUT = 10.seconds
 
+    /** Cuánto vive un hilo de scripts parado antes de cerrarse. */
+    private val KEEP_ALIVE = 60.seconds
+
     /**
      * Tope duro: el observador de instrucciones no ve lo que Rhino hace por dentro (una expresión regular que retrocede sin fin,
      * un texto enorme), así que el script corre en otro hilo y quien llama deja de esperar pasado este tiempo. El hilo atascado
@@ -23,7 +26,7 @@ object JsEngine {
 
     // Como mucho 4 hilos a la vez: con 4 atascados las llamadas siguientes fallan al instante en vez de crear más hilos girando.
     private val executor = java.util.concurrent.ThreadPoolExecutor(
-        0, 4, 60, java.util.concurrent.TimeUnit.SECONDS, java.util.concurrent.SynchronousQueue()
+        0, 4, KEEP_ALIVE.inWholeSeconds, java.util.concurrent.TimeUnit.SECONDS, java.util.concurrent.SynchronousQueue()
     ) { runnable -> Thread(runnable, "kaizen-js").apply { isDaemon = true } }
 
     /** Lanzada cuando un script supera [TIMEOUT]; es un Error para que el propio script no pueda capturarla. */
@@ -60,7 +63,7 @@ object JsEngine {
             throw IllegalStateException("JavaScript: demasiados scripts bloqueados")
         }
         try {
-            return task.get(hardTimeout.inWholeMilliseconds, java.util.concurrent.TimeUnit.MILLISECONDS)
+            return task.get(hardTimeout)
         } catch (e: java.util.concurrent.TimeoutException) {
             throw IllegalStateException("JavaScript: más de ${hardTimeout.inWholeMilliseconds} ms (bloqueado)")
         } catch (e: java.util.concurrent.ExecutionException) {

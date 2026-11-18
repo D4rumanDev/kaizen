@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlin.time.Duration.Companion.seconds
 
 class YUServer(context: Context, baseLink: String) : Server(context, baseLink) {
 
@@ -21,7 +22,7 @@ class YUServer(context: Context, baseLink: String) : Server(context, baseLink) {
 
     override suspend fun videoServer(): VideoServer? {
         val yuLink = PatternUtil.extractLink(baseLink)
-        val videoLink = PatternUtil.getYUvideoLink(withContext(Dispatchers.Main) { Unpacker.getHtml(context, yuLink, 8000).html })
+        val videoLink = PatternUtil.getYUvideoLink(withContext(Dispatchers.Main) { Unpacker.getHtml(context, yuLink, 8.seconds).html })
         val client = OkHttpClient().newBuilder()
                 .connectionSpecs(listOf(ConnectionSpec.CLEARTEXT, ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                         .allEnabledTlsVersions()

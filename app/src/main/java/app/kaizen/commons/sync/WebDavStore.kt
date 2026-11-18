@@ -9,7 +9,11 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import java.io.IOException
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.connectTimeout
+import app.kaizen.commons.readTimeout
+import app.kaizen.commons.writeTimeout
+import app.kaizen.commons.callTimeout
 
 /**
  * [RemoteStore] sobre un servidor WebDAV (Nextcloud, Synology, un servidor propio…): lista con `PROPFIND`, lee con `GET` y escribe con `PUT`. [baseUrl] es una carpeta (`https`,
@@ -76,7 +80,7 @@ class WebDavStore(
         private val HREF = Regex("<(?:[A-Za-z0-9]+:)?href>([^<]+)</(?:[A-Za-z0-9]+:)?href>", RegexOption.IGNORE_CASE)
 
         private val DEFAULT_CLIENT: OkHttpClient by lazy {
-            OkHttpClient.Builder().connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(60, TimeUnit.SECONDS).followRedirects(false).build()
+            OkHttpClient.Builder().connectTimeout(20.seconds).readTimeout(60.seconds).writeTimeout(60.seconds).followRedirects(false).build()
         }
 
         /** Los nombres de fichero de una respuesta `PROPFIND` (la última parte de cada `href`, sin escapes `%XX`). */

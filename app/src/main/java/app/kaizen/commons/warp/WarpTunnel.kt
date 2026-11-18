@@ -30,6 +30,11 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.connectTimeout
+import app.kaizen.commons.readTimeout
+import app.kaizen.commons.writeTimeout
+import app.kaizen.commons.callTimeout
 
 /**
  * El túnel WARP (WireGuard de Cloudflare) **solo para el tráfico de Kaizen**: es una VPN de Android limitada a esta app
@@ -54,7 +59,7 @@ object WarpTunnel {
     @Volatile private var clearSince = 0L
 
     /** Un cliente HTTP con la validación TLS estricta del sistema siempre, aunque el usuario ponga «permisiva» en las fuentes: aquí se reciben las claves del túnel. */
-    private val strictClient by lazy { okhttp3.OkHttpClient.Builder().connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS).readTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build() }
+    private val strictClient by lazy { okhttp3.OkHttpClient.Builder().connectTimeout(10.seconds).readTimeout(15.seconds).build() }
 
     /** Una sola evaluación a la vez: subir o bajar el túnel y registrar la cuenta no se hacen en paralelo. */
     private val lock = kotlinx.coroutines.sync.Mutex()

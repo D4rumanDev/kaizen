@@ -14,6 +14,9 @@ import android.webkit.WebViewClient
 import androidx.annotation.Keep
 import app.kaizen.BuildConfig
 import app.kaizen.commons.TlsPolicy
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.postDelayed
 
 class WebJS(context: Context) {
     private val webView = WebView(context)
@@ -40,7 +43,7 @@ class WebJS(context: Context) {
     fun evalOnFinish(
         link: String,
         js: String,
-        delay: Long = 5000,
+        delay: Duration = 5.seconds,
         callback: (String?, String) -> Unit
     ) {
         this.callback = callback
@@ -67,7 +70,7 @@ class WebJS(context: Context) {
         link: String,
         onRequest: (String?) -> Boolean,
         userAgent: String,
-        timeout: Long,
+        timeout: Duration,
         executeOnFinish: String? = null,
         callback: (String?, Map<String, String>?) -> Unit
     ) {

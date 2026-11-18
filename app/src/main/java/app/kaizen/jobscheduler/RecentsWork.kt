@@ -29,7 +29,8 @@ import app.kaizen.database.CacheDB
 import app.kaizen.pojos.NotificationObj
 import app.kaizen.pojos.av1.RecentEpisode
 import app.kaizen.recents.RecentsNotReceiver
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.toJavaDuration
 
 class RecentsWork(val context: Context, workerParameters: WorkerParameters) :
     CoroutineWorker(context, workerParameters) {
@@ -170,14 +171,11 @@ class RecentsWork(val context: Context, workerParameters: WorkerParameters) :
             // pueden pedir al momento con el botón «Actualizar» de la pantalla de inicio. Se cambia en Configuración › Actualización y caché.
             val time = app.kaizen.commons.KaizenSettings.recentsEveryMinutes
             PeriodicWorkRequestBuilder<RecentsWork>(
-                time.coerceAtLeast(15).toLong(),
-                TimeUnit.MINUTES,
-                5,
-                TimeUnit.MINUTES
+                time.coerceAtLeast(15).minutes.toJavaDuration(),
+                5.minutes.toJavaDuration()
             ).apply {
-                setInitialDelay(15L, TimeUnit.MINUTES)
+                setInitialDelay(15.minutes.toJavaDuration())
                 //setConstraints(networkConnectedConstraints())
-                //setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 addTag(TAG)
             }.build().enqueueUnique(TAG, ExistingPeriodicWorkPolicy.UPDATE) // UPDATE: el trabajo ya programado cada 15 min pasa al nuevo intervalo
         }

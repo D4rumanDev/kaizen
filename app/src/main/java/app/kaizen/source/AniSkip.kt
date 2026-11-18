@@ -10,8 +10,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.connectTimeout
+import app.kaizen.commons.readTimeout
+import app.kaizen.commons.writeTimeout
+import app.kaizen.commons.callTimeout
 
 /**
  * Los tiempos reales del opening y del cierre de un capítulo, de la API pública de AniSkip (api.aniskip.com), por id de MyAnimeList y número de capítulo.
@@ -90,7 +94,7 @@ internal object AniSkip {
     private val misses = ConcurrentHashMap.newKeySet<String>()
 
     private val client: OkHttpClient by lazy {
-        AppHttpClient.streaming().newBuilder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).dns(FallbackDns).build()
+        AppHttpClient.streaming().newBuilder().connectTimeout(8.seconds).readTimeout(15.seconds).dns(FallbackDns).build()
     }
 
     /** Los tiempos del capítulo [episode] del anime [malId], o null si AniSkip no los tiene (o no responde: entonces no se recuerda y se vuelve a intentar). */

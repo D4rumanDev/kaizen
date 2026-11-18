@@ -102,6 +102,7 @@ import app.kaizen.tv.settings.SettingsPanel
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.layout.onSizeChanged
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Kaizen: pantalla del reproductor. El vídeo va en un [PlayerView] sin controles propios y encima, en Compose:
@@ -472,7 +473,7 @@ private fun ChaptersRow(controller: PlaybackController) {
         if (chapters.isEmpty() || !controller.chaptersOpen) return@LaunchedEffect
         listState.scrollToItem(currentIndex)
         withFrameNanos { }
-        runCatching { current.requestFocus() }.onFailure { delay(100); runCatching { current.requestFocus() } }
+        runCatching { current.requestFocus() }.onFailure { delay(100.milliseconds); runCatching { current.requestFocus() } }
     }
     // Claves estables (fuente, serie y número; sin repetir): al cambiar la lista el foco y el desplazamiento se quedan en el capítulo, no en la posición.
     val chapterKeys = remember(chapters) { app.kaizen.tv.ui.uniqueKeys(chapters.map { "${it.source}:${it.slug}:${it.number}" }) }

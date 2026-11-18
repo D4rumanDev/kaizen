@@ -18,9 +18,10 @@ import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.connectTimeout
+import app.kaizen.commons.readTimeout
 
 /**
  * Cliente HTTP común de las fuentes que se leen por scraping: User-Agent de navegador, tiempos acotados y turno por host
@@ -51,8 +52,8 @@ internal object SourceHttp {
     private fun heavyClient(): OkHttpClient = heavy ?: client(HEAVY_READ_TIMEOUT).also { heavy = it }
 
     private fun client(read: Duration): OkHttpClient = (clientOverride ?: AppHttpClient.streaming()).newBuilder()
-        .connectTimeout(CONNECT_TIMEOUT.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-        .readTimeout(read.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        .connectTimeout(CONNECT_TIMEOUT)
+        .readTimeout(read)
         .dns(FallbackDns)
         // El reto de Cloudflare lo intenta pasar un WebView oculto (sin Android, en las pruebas, no hay cliente real que lo necesite).
         .apply { if (clientOverride == null) addInterceptor(CloudflareInterceptor) }

@@ -19,6 +19,7 @@ import android.webkit.WebViewClient
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.postDelayed
 
 abstract class Server(val context: Context, val baseLink: String) : Comparable<Server> {
     @Volatile private var server: VideoServer? = null
@@ -115,7 +116,7 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
                         )
                     }
                 }
-                handler.postDelayed(runnable, 5000)
+                handler.postDelayed(runnable, 5.seconds)
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         handler.removeCallbacks(runnable)

@@ -13,10 +13,11 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.postDelayed
+import app.kaizen.commons.await
 
 /*
  * Basado en lib/cloudflare-interceptor de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito: el resultado se guarda en
@@ -79,7 +80,7 @@ internal object CloudflareInterceptor : Interceptor {
         val poll = object : Runnable {
             override fun run() {
                 val current = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()
-                if (current != null && current.contains("cf_clearance=")) { cookie.set(current); done.countDown() } else handler.postDelayed(this, POLL.inWholeMilliseconds)
+                if (current != null && current.contains("cf_clearance=")) { cookie.set(current); done.countDown() } else handler.postDelayed(this, POLL)
             }
         }
         handler.post {
@@ -92,10 +93,10 @@ internal object CloudflareInterceptor : Interceptor {
                     settings.userAgentString = agent
                     loadUrl(url)
                 }
-                handler.postDelayed(poll, POLL.inWholeMilliseconds)
+                handler.postDelayed(poll, POLL)
             }.onFailure { done.countDown() }
         }
-        runCatching { done.await(WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS) }
+        runCatching { done.await(WAIT) }
         handler.post { handler.removeCallbacks(poll); webView?.stopLoading(); webView?.destroy(); webView = null }
         val clearance = cookie.get()
         if (clearance == null) {

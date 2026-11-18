@@ -12,17 +12,17 @@ import org.json.JSONTokener
 import org.jsoup.HttpStatusException
 import org.jsoup.Jsoup
 import java.nio.charset.Charset
-import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLHandshakeException
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 object JsExtractor {
     private var client: OkHttpClient = createClient()
 
     private fun createClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(10.seconds)
+            .readTimeout(10.seconds)
             .retryOnConnectionFailure(true)
             .connectionSpecs(
                 listOf(

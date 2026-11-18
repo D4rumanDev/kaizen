@@ -26,6 +26,8 @@ import org.jsoup.HttpStatusException
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.IOException
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.DurationUnit
 
 val <T>LiveData<T>.distinct: LiveData<T>
     get() = this.distinctUntilChanged()
@@ -184,7 +186,7 @@ fun jsoupCookies(url: String?, followRedirects: Boolean = true): Connection =
         Jsoup.connect(url.orEmpty())
                 .cookies(BypassUtil.cookiesFor(url))
                 .userAgent(BypassUtil.userAgent)
-                .timeout(KaizenSettings.timeoutTime.toInt() * 1000)
+                .timeout(KaizenSettings.timeoutTime.seconds.toInt(DurationUnit.MILLISECONDS))
                 .followRedirects(followRedirects)
 
 private fun isIntentResolved(ctx: Context, intent: Intent): Boolean {

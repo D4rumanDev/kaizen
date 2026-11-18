@@ -44,6 +44,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration
+import app.kaizen.commons.postDelayed
 
 /**
  * Ventana con las fases de abrir un capítulo (Cloudflare, servidores, servidor, capítulo). Solo aparece pasados
@@ -95,7 +96,7 @@ class LoadProgress private constructor(
             backCallback.remove()
             val view = host ?: return@runOnUiThread
             val remove = Runnable { (view.parent as? ViewGroup)?.removeView(view) }
-            if (after > Duration.ZERO) handler.postDelayed(remove, after.inWholeMilliseconds) else remove.run()
+            if (after > Duration.ZERO) handler.postDelayed(remove, after) else remove.run()
         }
     }
 
@@ -116,7 +117,7 @@ class LoadProgress private constructor(
                 val view = ComposeView(activity)
                 progress.host = view
                 activity.onBackPressedDispatcher.addCallback(activity, progress.backCallback)
-                progress.handler.postDelayed(progress.arm, SHOW_DELAY.inWholeMilliseconds)
+                progress.handler.postDelayed(progress.arm, SHOW_DELAY)
                 view.setContent {
                     KaizenTheme {
                         if (progress.armed.value && !progress.suppressed.value) {

@@ -63,6 +63,7 @@ import app.kaizen.source.searchSeed
 import kotlinx.coroutines.delay
 import app.kaizen.R
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Diálogo para elegir otra serie del catálogo buscando por nombre; [onPick] recibe la elegida. */
 @Composable
@@ -108,7 +109,7 @@ internal fun SeriesPickerDialog(
     LaunchedEffect(text) {
         if (choices != null) return@LaunchedEffect
         // El texto con el que se abre se busca ya; al escribir, tras una pausa.
-        if (text != initialText) delay(300)
+        if (text != initialText) delay(300.milliseconds)
         live = emptyList()
         results = Catalog.searchEntries(text)
         if (text.isBlank()) return@LaunchedEffect

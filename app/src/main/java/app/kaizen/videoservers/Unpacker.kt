@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 object Unpacker {
     private val packedRegex2 =
@@ -35,7 +37,7 @@ object Unpacker {
         return UnpackResult(html.url, unpackHtml(html.html))
     }
 
-    suspend fun getHtml(context: Context, link: String, delay: Long = 5000): HTMLResult {
+    suspend fun getHtml(context: Context, link: String, delay: Duration = 5.seconds): HTMLResult {
         return withContext(Dispatchers.Main) {
             val evaluator = WebJS(context)
             suspendCoroutine { continuation ->
@@ -51,7 +53,7 @@ object Unpacker {
         }
     }
 
-    suspend fun listenResources(context: Context, link: String, onRequest: (String?) -> Boolean, userAgent: String = WebSettings.getDefaultUserAgent(context), timeout: Long = 10000, executeOnFinish: String? = null): String? {
+    suspend fun listenResources(context: Context, link: String, onRequest: (String?) -> Boolean, userAgent: String = WebSettings.getDefaultUserAgent(context), timeout: Duration = 10.seconds, executeOnFinish: String? = null): String? {
         return withContext(Dispatchers.Main) {
             val evaluator = WebJS(context)
             suspendCoroutine { continuation ->

@@ -74,6 +74,7 @@ import app.kaizen.commons.appString
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.milliseconds
+import app.kaizen.commons.postDelayed
 
 /**
  * Kaizen: lo que hace el reproductor, sin pantalla. Crea y suelta el ExoPlayer con el ciclo de vida de [TVPlayer],
@@ -176,7 +177,7 @@ class PlaybackController(private val activity: TVPlayer) {
                 debugText?.let { debugText = describeDebug() }
                 updateOpeningPrompt()
             }
-            handler.postDelayed(this, TICK.inWholeMilliseconds)
+            handler.postDelayed(this, TICK)
         }
     }
     /** Posición a la que se salta al soltar las flechas: mientras se mantienen no se pide un seek por repetición. */
@@ -197,8 +198,8 @@ class PlaybackController(private val activity: TVPlayer) {
         if (on) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
-            handler.postDelayed(releaseScreenTask, RELEASE_SCREEN.inWholeMilliseconds)
-            handler.postDelayed(idleExitTask, IDLE_EXIT.inWholeMilliseconds)
+            handler.postDelayed(releaseScreenTask, RELEASE_SCREEN)
+            handler.postDelayed(idleExitTask, IDLE_EXIT)
         }
     }
     private val resumeAfterFrameRate = Runnable { finishFrameRateSwitch(resume = true) }
@@ -211,7 +212,7 @@ class PlaybackController(private val activity: TVPlayer) {
                 return
             }
             overlay = PlayerOverlay.NextUp(remaining - 1)
-            handler.postDelayed(this, 1_000L)
+            handler.postDelayed(this, 1.seconds)
         }
     }
 
@@ -293,7 +294,7 @@ class PlaybackController(private val activity: TVPlayer) {
         player = exo
         keepAwake(false) // el primer onIsPlayingChanged(true) lo cancela
         handler.removeCallbacks(tickTask)
-        handler.postDelayed(tickTask, TICK.inWholeMilliseconds)
+        handler.postDelayed(tickTask, TICK)
         play()
     }
 
@@ -481,7 +482,7 @@ class PlaybackController(private val activity: TVPlayer) {
         frameRatePausePending = true
         requestedMode = mode
         displayManager?.registerDisplayListener(displayListener, handler)
-        handler.postDelayed(resumeAfterFrameRate, FRAME_RATE_SWITCH_TIMEOUT.inWholeMilliseconds)
+        handler.postDelayed(resumeAfterFrameRate, FRAME_RATE_SWITCH_TIMEOUT)
     }
 
     private fun onFrameRateMatchingChanged(enabled: Boolean) {
@@ -520,7 +521,7 @@ class PlaybackController(private val activity: TVPlayer) {
 
     private fun scheduleHide() {
         handler.removeCallbacks(hideControlsTask)
-        handler.postDelayed(hideControlsTask, KaizenSettings.controlsHideSeconds * 1000L)
+        handler.postDelayed(hideControlsTask, KaizenSettings.controlsHideSeconds.seconds)
     }
 
     fun togglePlay() {
@@ -542,7 +543,7 @@ class PlaybackController(private val activity: TVPlayer) {
         handler.removeCallbacks(applySeekTask)
         if (deferred) {
             pendingSeek = target
-            handler.postDelayed(applySeekTask, SEEK_SETTLE.inWholeMilliseconds)
+            handler.postDelayed(applySeekTask, SEEK_SETTLE)
         } else {
             pendingSeek = null
             current.seekTo(target)
@@ -624,7 +625,7 @@ class PlaybackController(private val activity: TVPlayer) {
     private fun showHint(text: String) {
         hint = text
         handler.removeCallbacks(clearHintTask)
-        handler.postDelayed(clearHintTask, SEEK_HINT.inWholeMilliseconds)
+        handler.postDelayed(clearHintTask, SEEK_HINT)
     }
 
     /** La última pulsación de flecha se usó para saltar: su suelta también se consume. */
@@ -730,7 +731,7 @@ class PlaybackController(private val activity: TVPlayer) {
             for (attempt in 0 until 30) {
                 duration = player?.duration?.takeIf { it > 0 } ?: 0L
                 if (duration > 0 || video?.eid != eid) break
-                delay(500)
+                delay(500.milliseconds)
             }
             if (video?.eid != eid) return@launch
             if (duration <= 0) return@launch unavailable("MAL $mal cap. $episode: el vídeo no dio su duración, tiempos sin usar")

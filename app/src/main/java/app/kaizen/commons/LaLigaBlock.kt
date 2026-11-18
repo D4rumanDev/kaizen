@@ -4,8 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.net.InetAddress
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * ¿Está el operador bloqueando ahora las IPs de una web por un partido de LaLiga? Los operadores bloquean por **IP** (no por DNS ni por nombre
@@ -44,7 +44,7 @@ object LaLigaBlock {
         cached?.takeIf { System.currentTimeMillis() - it.first < CACHE.inWholeMilliseconds }?.let { return@withContext it.second }
         runCatching {
             // Validación TLS estricta del sistema aunque el usuario haya puesto «permisiva» para las fuentes: es un servicio de un tercero.
-            val client = okhttp3.OkHttpClient.Builder().dns(RelayDns).callTimeout(8, TimeUnit.SECONDS).build()
+            val client = okhttp3.OkHttpClient.Builder().dns(RelayDns).callTimeout(8.seconds).build()
             client.newCall(Request.Builder().url(URL).build()).execute().use { response ->
                 if (!response.isSuccessful) return@use null
                 response.body?.source()?.let { source -> source.request(MAX_BYTES); source.buffer.readUtf8() }?.let(::parse)

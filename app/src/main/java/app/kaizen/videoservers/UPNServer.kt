@@ -2,6 +2,7 @@ package app.kaizen.videoservers
 
 import android.content.Context
 import app.kaizen.videoservers.VideoServer.Names.UPNServer
+import kotlin.time.Duration.Companion.seconds
 
 class UPNServer(context: Context, baseLink: String) : Server(context, baseLink) {
 
@@ -18,7 +19,7 @@ class UPNServer(context: Context, baseLink: String) : Server(context, baseLink) 
                 context,
                 "$baseLink&dl=1",
                 onRequest = { it != null && it.matches(regex) },
-                timeout = 15000,
+                timeout = 15.seconds,
                 executeOnFinish = "javascript:setInterval(function(){var el=document.getElementsByClassName('downloader-button')[0];if(el)el.click();},100);"
             )
         }

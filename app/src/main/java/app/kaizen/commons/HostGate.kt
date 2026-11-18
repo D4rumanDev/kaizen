@@ -9,7 +9,6 @@ import app.kaizen.tv.ui.KaizenToast
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.hours
@@ -168,7 +167,7 @@ object HostGate {
         if (NetworkState.isOffline) throw OfflineException(name)
         val host = hosts.getOrPut(name) { Host() }
         if (System.currentTimeMillis() < host.downUntil) throw HostDownException(name)
-        if (!host.lock.tryLock(MAX_WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS)) throw HostBusyException(name)
+        if (!host.lock.tryLock(MAX_WAIT)) throw HostBusyException(name)
         try {
             // Mientras esperaba turno, el servidor pudo quedar en pausa.
             if (System.currentTimeMillis() < host.downUntil) throw HostDownException(name)
@@ -290,7 +289,7 @@ object HostGate {
         if (NetworkState.isOffline) return CheckResult(false, null, 0, "sin conexión")
         val host = hosts.getOrPut(name) { Host() }
         val start = System.currentTimeMillis()
-        if (!host.lock.tryLock(MAX_WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS)) return CheckResult(false, null, 0, "ocupado")
+        if (!host.lock.tryLock(MAX_WAIT)) return CheckResult(false, null, 0, "ocupado")
         try {
             val response = app.kaizen.source.SourceHttp.execute(url, timeout = Tuning.patient(CHECK_TIMEOUT)) { ignoreHttpErrors(); maxBodySize(1) }
             val millis = System.currentTimeMillis() - start

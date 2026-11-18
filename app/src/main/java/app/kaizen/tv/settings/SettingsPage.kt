@@ -28,6 +28,7 @@ import app.kaizen.tv.ui.StatsPage
 import app.kaizen.tv.ui.TintedIcon
 import app.kaizen.tv.ui.theme.Background
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Una tarjeta de la rejilla de Configuración: abre un panel lateral, una pantalla propia o un diálogo. */
 private class Entry(val title: String, @androidx.annotation.DrawableRes val icon: Int, val onClick: () -> Unit)
@@ -79,7 +80,7 @@ internal fun SettingsPage() {
     LaunchedEffect(overlay) {
         if (overlay) hadOverlay = true
         else if (hadOverlay) {
-            delay(80)
+            delay(80.milliseconds)
             runCatching { requesters[lastOpened].requestFocus() }
         }
     }

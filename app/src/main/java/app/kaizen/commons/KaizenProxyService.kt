@@ -29,7 +29,7 @@ class KaizenProxyService : Service() {
             if (System.currentTimeMillis() - KaizenProxy.lastActivity > IDLE_STOP.inWholeMilliseconds) {
                 stopSelf()
             } else {
-                handler.postDelayed(this, CHECK_INTERVAL.inWholeMilliseconds)
+                handler.postDelayed(this, CHECK_INTERVAL)
             }
         }
     }
@@ -49,7 +49,7 @@ class KaizenProxyService : Service() {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
         handler.removeCallbacks(idleCheck)
-        handler.postDelayed(idleCheck, CHECK_INTERVAL.inWholeMilliseconds)
+        handler.postDelayed(idleCheck, CHECK_INTERVAL)
         return START_NOT_STICKY
     }
 

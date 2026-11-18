@@ -4,7 +4,7 @@ import app.kaizen.custom.TlsOnlySocketFactory
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Kaizen: cliente HTTP compartido de la app (antes NoSSLOkHttpClient, que creaba un cliente
@@ -16,8 +16,8 @@ object AppHttpClient {
     private val baseLazy = lazy {
         val socketFactory = TlsPolicy.sslContext.socketFactory
         OkHttpClient.Builder()
-            .connectTimeout(KaizenSettings.timeoutTime, TimeUnit.SECONDS)
-            .readTimeout(KaizenSettings.timeoutTime, TimeUnit.SECONDS)
+            .connectTimeout(KaizenSettings.timeoutTime.seconds)
+            .readTimeout(KaizenSettings.timeoutTime.seconds)
             .sslSocketFactory(if (isMIUI) TlsOnlySocketFactory(socketFactory) else socketFactory, TlsPolicy.trustManager)
             .hostnameVerifier(TlsPolicy.hostnameVerifier)
             // Una petición sin User-Agent propio sale con el de la app (ver UserAgent), no con el «okhttp/x.y» por defecto.

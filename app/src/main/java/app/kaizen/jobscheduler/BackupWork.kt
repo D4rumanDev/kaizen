@@ -16,7 +16,8 @@ import app.kaizen.commons.runCatchingCoop
 import app.kaizen.source.CatalogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.days
+import kotlin.time.toJavaDuration
 
 /**
  * Copia de seguridad automática: una al día de favoritos, historial y progreso, borrando las de más de
@@ -43,7 +44,7 @@ class BackupWork(context: Context, params: WorkerParameters) : CoroutineWorker(c
             val manager = WorkManager.getInstance(context)
             manager.enqueueUniquePeriodicWork(
                 PERIODIC, ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<BackupWork>(1, TimeUnit.DAYS).build()
+                PeriodicWorkRequestBuilder<BackupWork>(1.days.toJavaDuration()).build()
             )
             // La comprobación inmediata solo se encola si de verdad toca; leer la carpeta de copias va fuera del hilo principal.
             AppScope.launch(Dispatchers.IO) {

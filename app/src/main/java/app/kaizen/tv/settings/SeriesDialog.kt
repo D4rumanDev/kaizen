@@ -63,6 +63,7 @@ import app.kaizen.tv.ui.TitleField
 import app.kaizen.tv.ui.episodesLabel
 import app.kaizen.tv.ui.rememberAutoFocus
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Una ficha de una serie: (id de fuente, slug). */
 internal typealias Ficha = Pair<String, String>
@@ -129,7 +130,7 @@ internal fun JoinedTab(
 @Composable
 private fun JoinedView(joined: Catalog.Joined, separated: Set<Ficha>, onSeparate: (Ficha, List<Ficha>) -> Unit, onSeparateAll: () -> Unit, onBack: () -> Unit) {
     val focus = rememberAutoFocus()
-    LaunchedEffect(separated.size) { if (separated.isNotEmpty()) { delay(150); runCatching { focus.requestFocus() } } }
+    LaunchedEffect(separated.size) { if (separated.isNotEmpty()) { delay(150.milliseconds); runCatching { focus.requestFocus() } } }
     val fichas = joined.fichas.filterNot { it in separated }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Juntada con ${fichas.size} fichas", color = Color.White, fontSize = Text20, fontWeight = FontWeight.Bold)

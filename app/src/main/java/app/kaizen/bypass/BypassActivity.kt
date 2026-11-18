@@ -17,6 +17,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.postDelayed
 
 /** Carga la URL en un WebView y espera a que Cloudflare entregue la cookie `cf_clearance`. */
 class BypassActivity : Activity() {
@@ -58,7 +59,7 @@ class BypassActivity : Activity() {
                 pageLoaded = false
                 webView.reload()
             }
-            handler.postDelayed(this, POLL.inWholeMilliseconds)
+            handler.postDelayed(this, POLL)
         }
     }
 
@@ -99,7 +100,7 @@ class BypassActivity : Activity() {
         CookieManager.getInstance().setCookie(url, "$COOKIE_CLEARANCE=; Max-Age=0") {
             if (finished || isDestroyed) return@setCookie
             webView.loadUrl(url)
-            handler.postDelayed(poll, POLL.inWholeMilliseconds)
+            handler.postDelayed(poll, POLL)
         }
     }
 

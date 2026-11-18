@@ -3,6 +3,7 @@ package app.kaizen.videoservers
 import android.content.Context
 import android.webkit.WebSettings
 import app.kaizen.videoservers.VideoServer.Names.TRANSFERIT
+import kotlin.time.Duration.Companion.seconds
 
 class TransferIt(context: Context, baseLink: String) : Server(context, baseLink) {
 
@@ -21,7 +22,7 @@ class TransferIt(context: Context, baseLink: String) : Server(context, baseLink)
                 baseLink,
                 userAgent = ua,
                 onRequest = { it != null && it.contains("api.mega.co.nz") && it.contains("mp4") },
-                timeout = 15000,
+                timeout = 15.seconds,
                 executeOnFinish = "javascript:setInterval(function(){var el=document.getElementsByClassName('js-download')[0];if(el)el.click();},5000);"
             )
         }
