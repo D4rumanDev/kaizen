@@ -9,14 +9,17 @@ import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.DurationUnit
 
 /**
  * DNS de las fuentes: el de la red (el que dé el router o el servidor DNS de casa) y, solo si con él no se consigue conectar con
  * un servidor, las IP que da Quad9 (9.9.9.9, con bloqueo de malware y publicidad) por DNS sobre TLS
- * (puerto 853, certificado comprobado contra `dns.quad9.net`). [prefer] marca el servidor, y durante [PREFER_MS] se resuelve con
+ * (puerto 853, certificado comprobado contra `dns.quad9.net`). [prefer] marca el servidor, y durante [PREFER] se resuelve con
  * Quad9 sin volver a probar el DNS de la red (que da la misma IP inalcanzable); pasado ese tiempo se vuelve al de la red.
  * Las consultas a Quad9 salen solo de este relevo (y solo con nombres de servidores de fuentes): con la red bien no se manda
- * ninguna. Llamar [prefer] desde un hilo de fondo: puede esperar hasta [CONNECT_MS] + [READ_MS] por servidor de Quad9.
+ * ninguna. Llamar [prefer] desde un hilo de fondo: puede esperar hasta [CONNECT] + [READ] por servidor de Quad9.
  */
 object FallbackDns : Dns {
     /**
@@ -37,11 +40,11 @@ object FallbackDns : Dns {
     private val DOT_NAME get() = provider.dotName
     private val DOT_SERVERS get() = provider.servers
     private const val DOT_PORT = 853
-    private const val CONNECT_MS = 3_000
-    private const val READ_MS = 4_000
-    private const val PREFER_MS = 10 * 60_000L
-    private const val ANSWER_MS = 5 * 60_000L
-    private const val NO_ANSWER_MS = 30_000L
+    private val CONNECT = 3.seconds
+    private val READ = 4.seconds
+    private val PREFER = 10.minutes
+    private val ANSWER = 5.minutes
+    private val NO_ANSWER = 30.seconds
     private const val MAX_MESSAGE_BYTES = 4096
     private const val MAX_ADDRESSES = 8
     private const val TYPE_A = 1
@@ -105,7 +108,7 @@ object FallbackDns : Dns {
         if (addresses.isEmpty()) return false
         val network = runCatching { system.lookup(host) }.getOrDefault(emptyList())
         if (addresses.all { it in network }) return false
-        preferred[host] = clock() + PREFER_MS
+        preferred[host] = clock() + PREFER.inWholeMilliseconds
         return true
     }
 
@@ -131,10 +134,10 @@ object FallbackDns : Dns {
 
     private fun answerFor(host: String): List<InetAddress> {
         answers[host]?.let { (at, found) ->
-            if (clock() - at < (if (found.isEmpty()) NO_ANSWER_MS else ANSWER_MS)) return found
+            if (clock() - at < (if (found.isEmpty()) NO_ANSWER.inWholeMilliseconds else ANSWER.inWholeMilliseconds)) return found
         }
         val found = runCatching { resolver(host) }.getOrDefault(emptyList())
-        if (answers.size >= MAX_NAMES) { val now = clock(); answers.entries.removeAll { now - it.value.first >= ANSWER_MS }; preferred.entries.removeAll { now >= it.value } }
+        if (answers.size >= MAX_NAMES) { val now = clock(); answers.entries.removeAll { now - it.value.first >= ANSWER.inWholeMilliseconds }; preferred.entries.removeAll { now >= it.value } }
         if (answers.size >= MAX_NAMES) answers.clear()
         if (preferred.size >= MAX_NAMES) preferred.clear()
         answers[host] = clock() to found
@@ -155,13 +158,13 @@ object FallbackDns : Dns {
     /** Un mensaje DNS por una conexión TLS nueva (RFC 7858: cada mensaje lleva delante su longitud en dos bytes). */
     private fun exchange(address: InetAddress, query: ByteArray): ByteArray {
         Socket().use { raw ->
-            raw.connect(InetSocketAddress(address, DOT_PORT), CONNECT_MS)
-            raw.soTimeout = READ_MS
+            raw.connect(InetSocketAddress(address, DOT_PORT), CONNECT.toInt(DurationUnit.MILLISECONDS))
+            raw.soTimeout = READ.toInt(DurationUnit.MILLISECONDS)
             // Con el nombre de Quad9 en el SNI y la comprobación de nombre activada, un certificado que no sea el suyo se rechaza.
             val tls = (SSLSocketFactory.getDefault() as SSLSocketFactory).createSocket(raw, DOT_NAME, DOT_PORT, true) as SSLSocket
             tls.use {
                 tls.sslParameters = tls.sslParameters.also { it.endpointIdentificationAlgorithm = "HTTPS" }
-                tls.soTimeout = READ_MS
+                tls.soTimeout = READ.toInt(DurationUnit.MILLISECONDS)
                 tls.startHandshake()
                 val out = DataOutputStream(tls.outputStream)
                 out.writeShort(query.size)

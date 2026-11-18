@@ -11,6 +11,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.jsoup.Jsoup
 import java.io.IOException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * El texto en español de una ficha de Animeoteca (capa `es` de [AnimeFicha], ver `docs/wiki/architecture.md`). [sinopsis] es null si la
@@ -83,8 +85,8 @@ internal object AnimeotecaHttp : AnimeotecaApi {
     private const val MAX_BYTES = 2_000_000
 
     /** Un sitio pequeño: una petición por segundo como mucho. */
-    internal var spacingMs = 1_000L
-    internal var retryWaitMs = 5_000L
+    internal var spacing = 1.seconds
+    internal var retryWait = 5.seconds
     internal var baseUrl = URL
 
     private val gate = Mutex()
@@ -92,7 +94,7 @@ internal object AnimeotecaHttp : AnimeotecaApi {
 
     override suspend fun text(anilistId: Long): AnimeotecaText? = gate.withLock {
         repeat(MAX_RETRIES + 1) { attempt ->
-            val wait = last + spacingMs - System.currentTimeMillis()
+            val wait = last + spacing.inWholeMilliseconds - System.currentTimeMillis()
             if (wait > 0) delay(wait)
             // Si HostGate tiene a Animeoteca en pausa (bloqueo o caída seguidos) no se insiste: la cola para y vuelve más tarde.
             try { HostGate.allow(baseUrl) } catch (e: HostGate.HostDownException) { throw AnilistUnavailable("Animeoteca en pausa", e) }
@@ -105,7 +107,7 @@ internal object AnimeotecaHttp : AnimeotecaApi {
                 when {
                     code == 200 -> return AnimeotecaParser.parse(html)
                     code == 404 || code == 410 -> return null
-                    (code == 403 || code == 408 || code == 425 || code == 429 || code >= 500) && attempt < MAX_RETRIES -> delay(retryWaitMs)
+                    (code == 403 || code == 408 || code == 425 || code == 429 || code >= 500) && attempt < MAX_RETRIES -> delay(retryWait)
                     else -> throw AnilistUnavailable("Animeoteca respondió $code")
                 }
             } catch (e: IOException) {
@@ -113,7 +115,7 @@ internal object AnimeotecaHttp : AnimeotecaApi {
                 if (e is AnilistUnavailable) throw e
                 HostGate.reportFailure(baseUrl, e)
                 if (attempt == MAX_RETRIES) throw AnilistUnavailable("Sin conexión con Animeoteca", e)
-                delay(retryWaitMs)
+                delay(retryWait)
             }
         }
         throw AnilistUnavailable("Animeoteca no respondió")

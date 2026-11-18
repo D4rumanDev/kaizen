@@ -14,6 +14,9 @@ import okhttp3.Response
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /*
  * Basado en lib/cloudflare-interceptor de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito: el resultado se guarda en
@@ -22,13 +25,13 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Cuando una web responde con el reto de Cloudflare («Just a moment…»), lo deja resolver a un WebView oculto (el mismo motor que un navegador) y repite la petición con
- * las cookies que resulten. Si el reto no se supera en [WAIT_SECONDS] (p. ej. uno interactivo), devuelve la respuesta original y sigue valiendo la verificación manual
- * de [SourceChallenge]. Tras un fallo no se vuelve a intentar con esa web en [RETRY_AFTER_MS]: así ninguna petición espera medio minuto en vano.
+ * las cookies que resulten. Si el reto no se supera en [WAIT] (p. ej. uno interactivo), devuelve la respuesta original y sigue valiendo la verificación manual
+ * de [SourceChallenge]. Tras un fallo no se vuelve a intentar con esa web en [RETRY_AFTER]: así ninguna petición espera medio minuto en vano.
  */
 internal object CloudflareInterceptor : Interceptor {
-    private const val WAIT_SECONDS = 25L
-    private const val RETRY_AFTER_MS = 10 * 60_000L
-    private const val POLL_MS = 500L
+    private val WAIT = 25.seconds
+    private val RETRY_AFTER = 10.minutes
+    private val POLL = 500.milliseconds
 
     private val locks = ConcurrentHashMap<String, Any>()
     private val failedAt = ConcurrentHashMap<String, Long>()
@@ -42,7 +45,7 @@ internal object CloudflareInterceptor : Interceptor {
         // En el hilo principal no se puede esperar (y OkHttp no debería estar ahí): se deja pasar.
         if (Looper.myLooper() == Looper.getMainLooper()) return response
         val now = SystemClock.elapsedRealtime()
-        if (failedAt[host]?.let { now - it < RETRY_AFTER_MS } == true) return response
+        if (failedAt[host]?.let { now - it < RETRY_AFTER.inWholeMilliseconds } == true) return response
         // Un cerrojo por web: resolver una no retiene a las demás.
         synchronized(locks.getOrPut(host) { Any() }) {
             // Otra petición a la misma web acaba de resolverlo: basta repetir la nuestra con sus cookies.
@@ -76,7 +79,7 @@ internal object CloudflareInterceptor : Interceptor {
         val poll = object : Runnable {
             override fun run() {
                 val current = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()
-                if (current != null && current.contains("cf_clearance=")) { cookie.set(current); done.countDown() } else handler.postDelayed(this, POLL_MS)
+                if (current != null && current.contains("cf_clearance=")) { cookie.set(current); done.countDown() } else handler.postDelayed(this, POLL.inWholeMilliseconds)
             }
         }
         handler.post {
@@ -89,14 +92,14 @@ internal object CloudflareInterceptor : Interceptor {
                     settings.userAgentString = agent
                     loadUrl(url)
                 }
-                handler.postDelayed(poll, POLL_MS)
+                handler.postDelayed(poll, POLL.inWholeMilliseconds)
             }.onFailure { done.countDown() }
         }
-        runCatching { done.await(WAIT_SECONDS, TimeUnit.SECONDS) }
+        runCatching { done.await(WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS) }
         handler.post { handler.removeCallbacks(poll); webView?.stopLoading(); webView?.destroy(); webView = null }
         val clearance = cookie.get()
         if (clearance == null) {
-            DebugLog.info("Verificación", "$host: el reto de Cloudflare no se superó solo en ${WAIT_SECONDS}s")
+            DebugLog.info("Verificación", "$host: el reto de Cloudflare no se superó solo en ${WAIT.inWholeSeconds}s")
             return false
         }
         val saved = SourceChallenge.save(host, clearance, agent)

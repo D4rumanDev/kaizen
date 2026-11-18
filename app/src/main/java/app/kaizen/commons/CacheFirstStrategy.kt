@@ -7,19 +7,20 @@ import coil3.network.CacheStrategy
 import coil3.network.NetworkRequest
 import coil3.network.NetworkResponse
 import coil3.request.Options
+import kotlin.time.Duration.Companion.days
 
 /**
  * Imágenes (portadas y fotogramas de capítulo): si ya están en el disco y son recientes se usan sin preguntar a la web.
  * La estrategia por defecto de Coil obedece las cabeceras de caché de cada servidor: con un `no-cache` o un `max-age`
  * corto pide la imagen otra vez cada vez que se muestra, y si la web no contesta (caída de Cloudflare, fuente en pausa)
- * la imagen no sale aunque esté guardada. Pasados [MAX_AGE_MS] vuelve al comportamiento por defecto, para que una portada
+ * la imagen no sale aunque esté guardada. Pasados [MAX_AGE] vuelve al comportamiento por defecto, para que una portada
  * cambiada acabe actualizándose.
  */
 object CacheFirstStrategy : CacheStrategy {
-    const val MAX_AGE_MS = 90L * 24 * 60 * 60 * 1000
+    val MAX_AGE = 90.days
 
     /** Días de uso sin preguntar a la web; el ajuste «Caducidad de las portadas» lo cambia (ver [Tuning]). */
-    @Volatile internal var maxAgeMs = MAX_AGE_MS
+    @Volatile internal var maxAge = MAX_AGE
 
     /** Reloj (las pruebas lo adelantan). */
     @Volatile internal var clock: () -> Long = System::currentTimeMillis
@@ -32,7 +33,7 @@ object CacheFirstStrategy : CacheStrategy {
 
     /** La imagen guardada se reutiliza sin preguntar a la web. */
     internal fun isReusable(cached: NetworkResponse, seed: Any = cached.responseMillis): Boolean =
-        cached.code in 200..299 && isImage(cached) && (offline() || clock() - cached.responseMillis < Timings.spread(maxAgeMs, seed))
+        cached.code in 200..299 && isImage(cached) && (offline() || clock() - cached.responseMillis < Timings.spread(maxAge, seed).inWholeMilliseconds)
 
     /** Sin conexión una imagen guardada vale aunque haya caducado: pedirla otra vez no puede salir bien y la portada se quedaría vacía. Las pruebas lo cambian. */
     @Volatile internal var offline: () -> Boolean = { NetworkState.isOffline }

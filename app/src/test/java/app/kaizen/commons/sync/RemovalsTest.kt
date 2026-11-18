@@ -31,7 +31,7 @@ class RemovalsTest {
 
     @Test fun `las lapidas propias caducan, se retiran si se vuelve a poner y suman las nuevas`() {
         val now = 1_000_000_000_000L
-        val old = mapOf(fav to now - 1000, rec to now - 1000, "f/a:viejo" to now - Removals.MAX_AGE_MS - 1)
+        val old = mapOf(fav to now - 1000, rec to now - 1000, "f/a:viejo" to now - Removals.MAX_AGE.inWholeMilliseconds - 1)
         val next = Removals.nextRemoved(old, listOf("f/a:nuevo"), { if (it == rec) true else false }, now)
         assertEquals(setOf(fav, "f/a:nuevo"), next.keys)
         assertEquals(now, next["f/a:nuevo"])

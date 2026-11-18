@@ -1,5 +1,7 @@
 package app.kaizen.source
 
+import kotlin.time.Duration.Companion.days
+
 /** Una serie local por emparejar: su id, las fichas que tiene en las fuentes y lo urgente que es (favoritos y vistos primero). */
 internal class SeriesWork(val seriesId: Long, val fichas: List<Pair<String, String>>, val priority: Int, val years: List<Int?> = emptyList())
 
@@ -29,7 +31,7 @@ internal class SyncReport(
 /**
  * Empareja las series locales con AniList y descarga la ficha de cada anime emparejado (ver `docs/wiki/emparejado-anilist.md`).
  * No une ni separa series locales: solo escribe [AnimeFuente] y [AnimeFicha]. Se puede parar entre lotes ([canRun]) y reanudar: lo ya
- * decidido no se repite hasta pasado [RETRY_AFTER_MS], y lo escrito del usuario no se toca.
+ * decidido no se repite hasta pasado [RETRY_AFTER], y lo escrito del usuario no se toca.
  */
 internal class AnilistSync(
     private val api: AnilistApi,
@@ -83,7 +85,7 @@ internal class AnilistSync(
         val linked = rows.filterNotNull().filter { it.estado == AnimeFuente.APLICADO }
         if (linked.isNotEmpty() && linked.none { it.fecha == 0L }) return false
         // Una decisión del usuario cuenta siempre como reciente.
-        return rows.any { it == null || (it.origen == AnimeFuente.AUTO && now() - it.fecha > RETRY_AFTER_MS) }
+        return rows.any { it == null || (it.origen == AnimeFuente.AUTO && now() - it.fecha > RETRY_AFTER.inWholeMilliseconds) }
     }
 
     /** Lo que dio la web de la ficha de la serie; solo si la serie es una sola ficha (con varias, el dato de una no vale para las otras). */
@@ -207,7 +209,7 @@ internal class AnilistSync(
     private fun offset(titles: List<List<String>>, index: Int) = titles.take(index).sumOf { it.size }
 
     private suspend fun downloadFichas(report: SyncReport): SyncReport {
-        val fresh = fichas.freshIds(AnilistClient.FICHA_VERSION, now() - FICHA_TTL_MS).toSet()
+        val fresh = fichas.freshIds(AnilistClient.FICHA_VERSION, now() - FICHA_TTL.inWholeMilliseconds).toSet()
         val wanted = fuentes.appliedIds().filter { it !in fresh }
         var downloaded = 0
         for (ids in wanted.chunked(FICHAS_PER_REQUEST)) {
@@ -228,7 +230,7 @@ internal class AnilistSync(
         var failures = 0
         val important = priority()
         // Las que Animeoteca no tenía hace más de un mes se vuelven a pedir: puede que ya las tenga.
-        val wanted = fichas.idsWithoutEs() + fichas.idsToRetryEs(now() - ES_RETRY_MS)
+        val wanted = fichas.idsWithoutEs() + fichas.idsToRetryEs(now() - ES_RETRY.inWholeMilliseconds)
         for (id in wanted.sortedByDescending { important[it] ?: 0 }) {
             if (!canRun()) return report.copy(esDownloaded = done, stopped = "pausa")
             val text = try {
@@ -260,8 +262,8 @@ internal class AnilistSync(
         private const val MAX_CACHED = 4000
         private const val MAX_ALTERNATIVES = 2
         private const val MAX_FAILURES_IN_A_ROW = 5
-        const val RETRY_AFTER_MS = 30L * 24 * 60 * 60 * 1000
-        const val ES_RETRY_MS = 30L * 24 * 60 * 60 * 1000
-        const val FICHA_TTL_MS = 14L * 24 * 60 * 60 * 1000
+        val RETRY_AFTER = 30.days
+        val ES_RETRY = 30.days
+        val FICHA_TTL = 14.days
     }
 }

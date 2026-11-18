@@ -12,6 +12,7 @@ import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * ¿Hay Internet de verdad? Un estado único para toda la app, que se ve al instante en «Fuentes»:
@@ -32,7 +33,7 @@ object NetworkState {
 
     /** Webs distintas que deben fallar por red, y en cuánto tiempo, para dar por perdido Internet con la red sin validar. */
     internal const val HOSTS_TO_DECLARE = 2
-    internal const val EVIDENCE_WINDOW_MS = 2 * 60_000L
+    internal val EVIDENCE_WINDOW = 2.minutes
 
     private val _mode = MutableStateFlow(Mode.ONLINE)
     val mode: StateFlow<Mode> get() = _mode
@@ -111,7 +112,7 @@ object NetworkState {
     /** Calcula el modo de ahora; si salió de [Mode.NO_INTERNET] o entró en él, limpia las pausas falsas. */
     @Synchronized fun recompute() {
         val now = clock()
-        failures.entries.removeAll { now - it.value > EVIDENCE_WINDOW_MS }
+        failures.entries.removeAll { now - it.value > EVIDENCE_WINDOW.inWholeMilliseconds }
         val next = decide(manual(), runCatching { platform() }.getOrDefault(Platform.VALIDATED), failures.size)
         val previous = _mode.value
         if (next == previous) return

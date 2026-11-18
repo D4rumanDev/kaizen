@@ -37,6 +37,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import kotlin.time.Duration.Companion.milliseconds
 
 // ===== CacheFirstStrategyTest.kt =====
 class CacheFirstStrategyTest {
@@ -126,7 +127,7 @@ class CrashStreakTest {
     @Test
     fun `fallos separados por mas tiempo que la ventana no forman racha`() {
         crash(CrashStreak.LIMIT - 1)
-        now += CrashStreak.WINDOW_MS + 1
+        now += CrashStreak.WINDOW.inWholeMilliseconds + 1
         crash(1)
         assertEquals(1, streak.count)
         assertFalse(streak.consumeResetRequest())
@@ -501,7 +502,7 @@ class HostGateTest {
         repeat(2) { runCatching { HostGate.call("https://$host/") { throw IOException("timeout") } } }
         assertTrue(HostGate.downUntil(host) > 0)
         // Pasan más horas de las de caducidad desde que acabó la pausa: un fallo suelto ya no vuelve a pausar (empieza de nuevo y hacen falta dos).
-        HostGate.clock = { System.currentTimeMillis() + HostGate.STRIKE_DECAY_MS + 5 * 60_000L }
+        HostGate.clock = { System.currentTimeMillis() + HostGate.STRIKE_DECAY.inWholeMilliseconds + 5 * 60_000L }
         HostGate.reportFailure("https://$host/", IOException("timeout"))
         assertEquals(0L, HostGate.downUntil(host))
     }
@@ -525,8 +526,8 @@ class HostGateTest {
         fun pauseMs() = HostGate.downUntil(host) - System.currentTimeMillis()
 
         repeat(2) { fail() }
-        assertTrue(pauseMs() in (HostGate.PAUSES_MS[0] - 5_000)..HostGate.PAUSES_MS[0])
-        for (expected in HostGate.PAUSES_MS.drop(1) + HostGate.PAUSES_MS.last()) {
+        assertTrue(pauseMs() in (HostGate.PAUSES[0].inWholeMilliseconds - 5_000)..HostGate.PAUSES[0].inWholeMilliseconds)
+        for (expected in (HostGate.PAUSES.drop(1) + HostGate.PAUSES.last()).map { it.inWholeMilliseconds }) {
             HostGate.endPause(host)
             fail() // tras una pausa, un solo fallo vuelve a pausar
             assertTrue(pauseMs() in (expected - 5_000)..expected)
@@ -544,7 +545,7 @@ class HostGateTest {
         runCatching { HostGate.call("https://$host/") { throw IOException("timeout") } }
         assertEquals(0L, HostGate.downUntil(host))
         runCatching { HostGate.call("https://$host/") { throw IOException("timeout") } }
-        assertTrue(HostGate.downUntil(host) - System.currentTimeMillis() <= HostGate.PAUSES_MS[0])
+        assertTrue(HostGate.downUntil(host) - System.currentTimeMillis() <= HostGate.PAUSES[0].inWholeMilliseconds)
     }
 
     @Test
@@ -555,12 +556,12 @@ class HostGateTest {
         assertTrue(!HostGate.isDown(key))
         HostGate.reportServerFailure("Uqload", java.net.UnknownHostException("uqload.is"))
         assertTrue(HostGate.isDown(key))
-        assertTrue(HostGate.downUntil(key) - System.currentTimeMillis() <= HostGate.PAUSES_MS[0])
+        assertTrue(HostGate.downUntil(key) - System.currentTimeMillis() <= HostGate.PAUSES[0].inWholeMilliseconds)
         assertEquals(listOf("Uqload no responde: no se usará durante 2 minutos"), warnings)
         // Tras la pausa, un solo fallo la alarga (5 min); otra familia no se ve afectada.
         HostGate.endPause(key)
         HostGate.reportServerFailure("Uqload", java.net.UnknownHostException("uqload.vc"))
-        assertTrue(HostGate.downUntil(key) - System.currentTimeMillis() > HostGate.PAUSES_MS[0])
+        assertTrue(HostGate.downUntil(key) - System.currentTimeMillis() > HostGate.PAUSES[0].inWholeMilliseconds)
         assertTrue(!HostGate.isDown(HostGate.serverKey("MixDrop")))
         // Entregar un vídeo la devuelve a la lista y olvida las pausas.
         HostGate.reportServerUp("Uqload")
@@ -758,8 +759,8 @@ class JsEngineTest {
 
     @Test
     fun `un script que se atasca dentro de Rhino no bloquea a quien llama`() {
-        val previous = JsEngine.hardTimeoutMs
-        JsEngine.hardTimeoutMs = 1_500
+        val previous = JsEngine.hardTimeout
+        JsEngine.hardTimeout = 1_500.milliseconds
         try {
             val started = System.currentTimeMillis()
             // Deja un hilo girando hasta que acabe la JVM de pruebas (Rhino no se puede interrumpir).
@@ -769,7 +770,7 @@ class JsEngineTest {
             assertTrue(failure?.message?.contains("bloqueado") == true)
             assertTrue(System.currentTimeMillis() - started < 6_000)
         } finally {
-            JsEngine.hardTimeoutMs = previous
+            JsEngine.hardTimeout = previous
         }
     }
 }

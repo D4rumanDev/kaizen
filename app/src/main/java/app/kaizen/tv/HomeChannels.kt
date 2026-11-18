@@ -21,6 +21,7 @@ import app.kaizen.source.AnimeSources
 import app.kaizen.source.seriesKeyOf
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Filas de la pantalla de inicio de Android TV: «Continuar viendo» (Watch Next, capítulos empezados) y el canal «Capítulos recientes».
@@ -139,7 +140,7 @@ object HomeChannels {
         if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return
         // Los recientes los renueva RecentsWork; aquí solo una vez al arrancar.
         runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "filas de la pantalla de inicio") { syncRecents(context) } }.onFailure(::logError)
-        KaizenProgress.changes.debounce(2_000).collect {
+        KaizenProgress.changes.debounce(2.seconds).collect {
             runCatchingCoop { syncWatchNext(context) }.onFailure(::logError)
         }
     }

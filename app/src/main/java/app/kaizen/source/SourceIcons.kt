@@ -7,21 +7,23 @@ import app.kaizen.commons.runCatchingCoop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 /**
  * El logo de cada fuente, leído de su propia portada (los `<link rel="icon">` y `apple-touch-icon` que ella declara) en lugar de adivinar `/apple-touch-icon.png` y
- * `/favicon.ico`: evita las peticiones que dan 404 y los `.ico` que Android no lee. Se pide una vez por fuente (y se repite cada [REFRESH_MS]) y se guarda en
+ * `/favicon.ico`: evita las peticiones que dan 404 y los `.ico` que Android no lee. Se pide una vez por fuente (y se repite cada [REFRESH]) y se guarda en
  * `kaizen_source_icons` (caché: se puede vaciar sin perder nada); mientras no hay nada guardado «Fuentes» usa las rutas de siempre.
  */
 internal object SourceIcons {
     private const val FILE = "kaizen_source_icons"
-    private const val REFRESH_MS = 30L * 24 * 60 * 60 * 1000
+    private val REFRESH = 30.days
     private const val MAX_ICONS = 3
     private const val MAX_BYTES = 600_000
 
     /** Cuándo falló la última vez cada fuente (en memoria): una caída o un 403 no repite la petición cada vez que se abre «Fuentes». */
     private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private const val RETRY_MS = 6L * 60 * 60 * 1000
+    private val RETRY = 6.hours
     private val IP_LITERAL = Regex("""^(\d{1,3}(\.\d{1,3}){3}|\[.*\])$""")
 
     private val prefs get() = KaizenStore.prefs(FILE)
@@ -50,12 +52,12 @@ internal object SourceIcons {
     /** Los iconos guardados de [host] (puede estar vacío: aún no se pidió o la portada no declara ninguno). */
     fun saved(host: String): List<String> = prefs.getString(host, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
 
-    /** Pide la portada de [host] si hace más de [REFRESH_MS] que no se miró (o nunca) y guarda lo que declara; devuelve los iconos guardados. Se anota también cuando no hay ninguno, para no repetir la petición. */
+    /** Pide la portada de [host] si hace más de [REFRESH] que no se miró (o nunca) y guarda lo que declara; devuelve los iconos guardados. Se anota también cuando no hay ninguno, para no repetir la petición. */
     suspend fun refresh(host: String): List<String> = withContext(Dispatchers.IO) {
         val at = prefs.getLong("$host@at", 0L)
-        if (at != 0L && System.currentTimeMillis() - at < REFRESH_MS) return@withContext saved(host)
+        if (at != 0L && System.currentTimeMillis() - at < REFRESH.inWholeMilliseconds) return@withContext saved(host)
         // Una fuente en pausa o que falló hace poco no se vuelve a pedir ahora.
-        if (HostGate.isDown(host) || System.currentTimeMillis() - (failedAt[host] ?: 0L) < RETRY_MS) return@withContext saved(host)
+        if (HostGate.isDown(host) || System.currentTimeMillis() - (failedAt[host] ?: 0L) < RETRY.inWholeMilliseconds) return@withContext saved(host)
         val found = runCatchingCoop {
             val url = "https://$host/"
             val reply = HostGate.call(url) { SourceHttp.execute(url) { maxBodySize(MAX_BYTES); ignoreHttpErrors() } }

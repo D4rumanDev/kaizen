@@ -42,6 +42,9 @@ import app.kaizen.commons.background
 import app.kaizen.tv.ui.KaizenToast
 import app.kaizen.R
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 
 class TVServersFactory private constructor(
@@ -230,7 +233,7 @@ class TVServersFactory private constructor(
         if (!ended.compareAndSet(false, true)) return
         release(slot)
         // Un fallo deja ver unos instantes qué fase falló antes de cerrar la ventana.
-        progress.close(if (success) 0L else FAILURE_VISIBLE_MS)
+        progress.close(if (success) Duration.ZERO else FAILURE_VISIBLE)
         serversInterface.onFinish(started, success)
     }
 
@@ -294,7 +297,7 @@ class TVServersFactory private constructor(
         // Falló el recordado y no se habían consultado todas las fuentes: primero se completan.
         // También al volver a la lista tras usar el recordado (Atrás en calidades, Mega, navegador): la lista debe llevar todas las fuentes.
         if (pendingSources.isNotEmpty() && (attemptFailed || rememberedTried)) return loadRemainingSources()
-        // Los que fallaron antes o están en pausa no se comprueban (cada intento cuesta hasta CHECK_TIMEOUT_MS): van al final, con el aviso.
+        // Los que fallaron antes o están en pausa no se comprueban (cada intento cuesta hasta CHECK_TIMEOUT): van al final, con el aviso.
         servers.forEach(::track)
         val aside = servers.filter { it in brokenServers || isPaused(it) }
         aside.forEach(::setAside)
@@ -325,7 +328,7 @@ class TVServersFactory private constructor(
             // Solo se aparta de esta lista: un fallo puntual o un timeout no borra el servidor recordado.
             val total = list.size
             var tried = 0
-            val anyLeft = ServerResolver.dropBrokenLeading(list, app.kaizen.commons.Tuning.patient(CHECK_TIMEOUT_MS), onTrying = {
+            val anyLeft = ServerResolver.dropBrokenLeading(list, app.kaizen.commons.Tuning.patient(CHECK_TIMEOUT), onTrying = {
                 // Qué servidor se está probando ahora, para ver por qué tarda.
                 tried++
                 progress.begin(LoadStep.SERVER, "Conectando con ${serverLabels[it] ?: it.name} ($tried/$total)")
@@ -685,15 +688,15 @@ class TVServersFactory private constructor(
         /**
          * Solo una petición a la vez (como en UKIKU): una segunda pulsación mientras se buscan servidores no lanza
          * otra búsqueda contra los mismos servidores externos. Si una petición queda colgada (la pantalla se cerró
-         * sin terminar), deja de bloquear pasado [BUSY_TIMEOUT_MS].
+         * sin terminar), deja de bloquear pasado [BUSY_TIMEOUT].
          */
-        private const val BUSY_TIMEOUT_MS = 60_000L
+        private val BUSY_TIMEOUT = 60.seconds
 
         /** Tiempo máximo para comprobar un servidor antes de darlo por caído. */
-        private const val CHECK_TIMEOUT_MS = 10_000L
+        private val CHECK_TIMEOUT = 10.seconds
 
         /** Cuánto se deja ver la ventana de fases tras un fallo. */
-        private const val FAILURE_VISIBLE_MS = 1_500L
+        private val FAILURE_VISIBLE = 1500.milliseconds
 
         private class Busy(val slot: Any, val since: Long)
 
@@ -703,7 +706,7 @@ class TVServersFactory private constructor(
         private fun acquire(): Any? {
             val now = System.currentTimeMillis()
             val current = busy.get()
-            if (current != null && now - current.since <= BUSY_TIMEOUT_MS) return null
+            if (current != null && now - current.since <= BUSY_TIMEOUT.inWholeMilliseconds) return null
             val slot = Any()
             return slot.takeIf { busy.compareAndSet(current, Busy(it, now)) }
         }

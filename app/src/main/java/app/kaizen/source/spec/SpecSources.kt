@@ -9,6 +9,7 @@ import app.kaizen.source.ConfigurableSource
 import app.kaizen.commons.HostGate
 import app.kaizen.source.SourceHttp
 import java.io.File
+import kotlin.time.Duration.Companion.hours
 
 /**
  * Fuentes descritas por fichero: las que lleva la app en `assets/sources/` y las que se descargan del repositorio de
@@ -26,7 +27,7 @@ object SpecSources {
 
     private const val ASSETS = "sources"
     private const val CACHE_DIR = "sources-cache"
-    private const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000L
+    private val REFRESH_INTERVAL = 12.hours
     private const val MAX_FILE_BYTES = 512 * 1024
 
     private val context: Context get() = App.context
@@ -74,7 +75,7 @@ object SpecSources {
         // Se puede apagar en Configuración › Acerca de (ver RepoConfig); apagado, las fuentes de `assets/sources/` y la caché ya descargada siguen igual.
         if (!RepoConfig.enabled) return 0
         val now = System.currentTimeMillis()
-        if (!force && now - prefs.getLong("last_refresh", 0L) < REFRESH_INTERVAL_MS) return 0
+        if (!force && now - prefs.getLong("last_refresh", 0L) < REFRESH_INTERVAL.inWholeMilliseconds) return 0
         prefs.edit().putLong("last_refresh", now).apply()
         return runCatchingCoop { download() }.onFailure(::logError).getOrDefault(0)
     }

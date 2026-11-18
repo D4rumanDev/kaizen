@@ -2,6 +2,7 @@ package app.kaizen.tv.ui
 
 import android.os.SystemClock
 import androidx.compose.ui.focus.FocusRequester
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Foco de una rejilla de tarjetas: recuerda cuál tenía el foco para devolvérselo a la que la sustituye cuando desaparece
@@ -32,12 +33,12 @@ internal class GridFocus {
  * hace falta fiarse de que el aviso de foco se dispare antes o después de que la tarjeta se retire.
  */
 internal object CardMenuSignal {
-    private const val WINDOW_MS = 3_000L
+    private val WINDOW = 3.seconds
     @Volatile private var at = 0L
 
     fun arm() { at = SystemClock.elapsedRealtime() }
 
-    fun recent(): Boolean = at != 0L && SystemClock.elapsedRealtime() - at < WINDOW_MS
+    fun recent(): Boolean = at != 0L && SystemClock.elapsedRealtime() - at < WINDOW.inWholeMilliseconds
 }
 
 /**

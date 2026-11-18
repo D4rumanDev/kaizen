@@ -29,6 +29,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * El túnel WARP (WireGuard de Cloudflare) **solo para el tráfico de Kaizen**: es una VPN de Android limitada a esta app
@@ -59,7 +60,7 @@ object WarpTunnel {
     private val lock = kotlinx.coroutines.sync.Mutex()
     private var watcher: kotlinx.coroutines.Job? = null
 
-    /** Revisa el modo al abrir la app y cada [CHECK_MS]; llamarla otra vez no abre otro bucle. */
+    /** Revisa el modo al abrir la app y cada [CHECK]; llamarla otra vez no abre otro bucle. */
     @Synchronized fun watch() {
         if (watcher?.isActive == true) return
         watcher = app.kaizen.commons.AppScope.launch {
@@ -67,12 +68,12 @@ object WarpTunnel {
                 if (WarpMode.of(KaizenSettings.warpMode) != WarpMode.OFF || isUp()) {
                     app.kaizen.commons.runCatchingCoop { evaluate() }.onFailure { logError(it) }
                 }
-                kotlinx.coroutines.delay(CHECK_MS)
+                kotlinx.coroutines.delay(CHECK)
             }
         }
     }
 
-    private const val CHECK_MS = 5 * 60 * 1000L
+    private val CHECK = 5.minutes
 
     private fun prefs() = app.kaizen.commons.KaizenStore.prefs(FILE)
 

@@ -7,6 +7,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.time.Duration.Companion.days
 
 /** Lo que se enseña en «Estadísticas», calculado del historial. */
 data class UserStats(
@@ -41,8 +42,8 @@ data class UserStats(
                 series = history.map { seriesIdentity(it.name, it.source, it.slug) }.toSet().size,
                 favorites = favorites,
                 inProgress = inProgress,
-                lastWeek = history.count { now - it.date <= 7 * ApiCache.DAY },
-                lastMonth = history.count { now - it.date <= 30 * ApiCache.DAY },
+                lastWeek = history.count { now - it.date <= 7.days.inWholeMilliseconds },
+                lastMonth = history.count { now - it.date <= 30.days.inWholeMilliseconds },
                 bySource = history.groupingBy { it.source }.eachCount().toList().sortedByDescending { it.second },
                 firstWatchedAt = history.minOfOrNull { it.date },
                 topSeries = topSeries(history),
@@ -78,7 +79,7 @@ data class UserStats(
 
         /** (racha actual, mejor racha) en días naturales de [zone]. */
         private fun streaks(history: List<Record>, now: Long, zone: TimeZone): Pair<Int, Int> {
-            fun day(time: Long) = Math.floorDiv(time + zone.getOffset(time), ApiCache.DAY)
+            fun day(time: Long) = Math.floorDiv(time + zone.getOffset(time), 1.days.inWholeMilliseconds)
             val days = history.map { day(it.date) }.toSortedSet().toList()
             if (days.isEmpty()) return 0 to 0
             var best = 1

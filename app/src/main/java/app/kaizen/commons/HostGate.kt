@@ -11,23 +11,27 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 /**
  * Peticiones a las webs de las fuentes: una a la vez por servidor (las demás esperan su turno, en orden) y
- * cortocircuito cuando un servidor no responde: tras [FAILURES_TO_DOWN] fallos de red seguidos (en [FAILURE_WINDOW_MS]) se deja de
+ * cortocircuito cuando un servidor no responde: tras [FAILURES_TO_DOWN] fallos de red seguidos (en [FAILURE_WINDOW]) se deja de
  * consultar y se avisa con un mensaje. Para no parecer un ataque ni arriesgar que bloqueen la IP, cada pausa
- * seguida es más larga ([PAUSES_MS]: 2 min, 5 min, 10 min y luego 1 h) y, tras una pausa, basta un fallo para
+ * seguida es más larga ([PAUSES]: 2 min, 5 min, 10 min y luego 1 h) y, tras una pausa, basta un fallo para
  * volver a pausar. Todo vuelve a empezar cuando el servidor responde o el usuario lo comprueba y responde.
  * Las llamadas son bloqueantes: van en hilos de IO.
  */
 object HostGate {
     private const val FAILURES_TO_DOWN = 2
     /** Los fallos solo cuentan seguidos y dentro de esta ventana: uno suelto de hace rato no suma. */
-    private const val FAILURE_WINDOW_MS = 3 * 60_000L
+    private val FAILURE_WINDOW = 3.minutes
 
     /** Cuánto tiempo se muestra un fallo en «Fuentes» si el servidor no vuelve a responder ni a fallar. */
-    private const val FAILURE_SHOWN_MS = 60 * 60_000L
-    private const val MINUTE = 60_000L
+    private val FAILURE_SHOWN = 1.hours
     private const val SERVER_PREFIX = "servidor:"
 
     /**
@@ -35,15 +39,15 @@ object HostGate {
      * se empieza de nuevo por 2 min. Sin esto, los strikes solo se borraban con un éxito y un servidor que nunca llegaba a
      * comprobarse bien (o cuyas pruebas fallaban siempre por otra causa) se quedaba para siempre en pausas de 1 hora.
      */
-    internal const val STRIKE_DECAY_MS = 6 * 60 * MINUTE
+    internal val STRIKE_DECAY = 6.hours
     /** Duración de la 1.ª, 2.ª, 3.ª y siguientes pausas seguidas. */
-    internal val PAUSES_MS = listOf(2 * MINUTE, 5 * MINUTE, 10 * MINUTE, 60 * MINUTE)
+    internal val PAUSES = listOf(2.minutes, 5.minutes, 10.minutes, 60.minutes)
     /** Espera máxima por el turno: si el servidor sigue ocupado, la petición se abandona sin contar como fallo. */
-    private const val MAX_WAIT_S = 60L
-    private const val CHECK_TIMEOUT_MS = 10_000
+    private val MAX_WAIT = 60.seconds
+    private val CHECK_TIMEOUT = 10.seconds
 
     /** Timeout de las peticiones que van con el turno tomado: acota cuánto puede esperar la cola de un mismo servidor. */
-    const val REQUEST_TIMEOUT_MS = 12_000
+    val REQUEST_TIMEOUT = 12.seconds
 
     private class Host {
         val lock = ReentrantLock(true)
@@ -90,7 +94,7 @@ object HostGate {
         val now = System.currentTimeMillis()
         storage?.load()?.forEach { (name, saved) ->
             // Una pausa guardada que acabó hace mucho no se arrastra a esta sesión.
-            if (saved.second > 0 && saved.first > 0 && now - saved.first > STRIKE_DECAY_MS) storage?.save(name, 0L, 0)
+            if (saved.second > 0 && saved.first > 0 && now - saved.first > STRIKE_DECAY.inWholeMilliseconds) storage?.save(name, 0L, 0)
             else hosts[name] = Host().apply { downUntil = saved.first; strikes = saved.second }
         }
     }
@@ -149,7 +153,7 @@ object HostGate {
     fun recentFailure(host: String): Pair<Long, String>? {
         val state = hosts[host.removePrefix("www.")] ?: return null
         val error = state.lastError ?: return null
-        return (state.lastErrorAt to error).takeIf { clock() - it.first < FAILURE_SHOWN_MS }
+        return (state.lastErrorAt to error).takeIf { clock() - it.first < FAILURE_SHOWN.inWholeMilliseconds }
     }
 
     /** Sin conexión las pausas no cuentan (se ignoran, no se borran): la causa es la red, no la web, y «Fuentes» lo dice con su propio estado. */
@@ -164,7 +168,7 @@ object HostGate {
         if (NetworkState.isOffline) throw OfflineException(name)
         val host = hosts.getOrPut(name) { Host() }
         if (System.currentTimeMillis() < host.downUntil) throw HostDownException(name)
-        if (!host.lock.tryLock(MAX_WAIT_S, TimeUnit.SECONDS)) throw HostBusyException(name)
+        if (!host.lock.tryLock(MAX_WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS)) throw HostBusyException(name)
         try {
             // Mientras esperaba turno, el servidor pudo quedar en pausa.
             if (System.currentTimeMillis() < host.downUntil) throw HostDownException(name)
@@ -266,7 +270,7 @@ object HostGate {
                 host.lastError = e.message ?: e.javaClass.simpleName
                 host.lastErrorAt = now
                 _failureVersion.value++
-                if (now - host.lastFailure > FAILURE_WINDOW_MS) host.failures = 0
+                if (now - host.lastFailure > FAILURE_WINDOW.inWholeMilliseconds) host.failures = 0
                 host.lastFailure = now
                 host.failures += weightOf(e)
                 if (host.failures >= threshold) markDown(name, host) else null
@@ -286,9 +290,9 @@ object HostGate {
         if (NetworkState.isOffline) return CheckResult(false, null, 0, "sin conexión")
         val host = hosts.getOrPut(name) { Host() }
         val start = System.currentTimeMillis()
-        if (!host.lock.tryLock(MAX_WAIT_S, TimeUnit.SECONDS)) return CheckResult(false, null, 0, "ocupado")
+        if (!host.lock.tryLock(MAX_WAIT.inWholeMilliseconds, TimeUnit.MILLISECONDS)) return CheckResult(false, null, 0, "ocupado")
         try {
-            val response = app.kaizen.source.SourceHttp.execute(url, timeoutSeconds = Tuning.patient(CHECK_TIMEOUT_MS.toLong()) / 1000L) { ignoreHttpErrors(); maxBodySize(1) }
+            val response = app.kaizen.source.SourceHttp.execute(url, timeout = Tuning.patient(CHECK_TIMEOUT)) { ignoreHttpErrors(); maxBodySize(1) }
             val millis = System.currentTimeMillis() - start
             val alive = response.statusCode < 500 || response.statusCode == 503
             if (alive) markUp(name, host) else markDown(name, host)
@@ -309,7 +313,7 @@ object HostGate {
         if (NetworkState.isOffline) return CheckResult(false, null, 0, "sin conexión")
         val start = System.currentTimeMillis()
         return try {
-            val response = app.kaizen.source.SourceHttp.execute(url, timeoutSeconds = Tuning.patient(CHECK_TIMEOUT_MS.toLong()) / 1000L) { ignoreHttpErrors(); maxBodySize(1) }
+            val response = app.kaizen.source.SourceHttp.execute(url, timeout = Tuning.patient(CHECK_TIMEOUT)) { ignoreHttpErrors(); maxBodySize(1) }
             CheckResult(response.statusCode < 500 || response.statusCode == 503, response.statusCode, System.currentTimeMillis() - start, null)
         } catch (e: IOException) {
             CheckResult(false, null, System.currentTimeMillis() - start, e.javaClass.simpleName)
@@ -340,9 +344,9 @@ object HostGate {
         _down.value = emptySet()
     }
 
-    /** Olvida las pausas seguidas de [host] si la última acabó hace más de [STRIKE_DECAY_MS] (llamar con el cerrojo de [host]). */
+    /** Olvida las pausas seguidas de [host] si la última acabó hace más de [STRIKE_DECAY] (llamar con el cerrojo de [host]). */
     private fun decayStrikes(name: String, host: Host, now: Long) {
-        if (host.strikes > 0 && host.downUntil > 0 && now - host.downUntil > STRIKE_DECAY_MS) {
+        if (host.strikes > 0 && host.downUntil > 0 && now - host.downUntil > STRIKE_DECAY.inWholeMilliseconds) {
             host.strikes = 0
             host.downUntil = 0L
             storage?.save(name, 0L, 0)
@@ -350,12 +354,12 @@ object HostGate {
     }
 
     /** Pone [host] en pausa (cada vez más larga) y devuelve cuánto dura. */
-    private fun markDown(name: String, host: Host): Long {
+    private fun markDown(name: String, host: Host): Duration {
         val pause = synchronized(host) {
-            val pause = PAUSES_MS[host.strikes.coerceAtMost(PAUSES_MS.lastIndex)]
+            val pause = PAUSES[host.strikes.coerceAtMost(PAUSES.lastIndex)]
             host.strikes++
             host.failures = 0
-            host.downUntil = System.currentTimeMillis() + pause
+            host.downUntil = System.currentTimeMillis() + pause.inWholeMilliseconds
             storage?.save(name, host.downUntil, host.strikes)
             pause
         }
@@ -364,7 +368,7 @@ object HostGate {
         runCatching { AppErrors.record(app.kaizen.domain.ConnectionStats.Cause.PAUSED, AppErrors.Area.SOURCE, "${describe(pause)} de pausa", context = name) }
         // Al acabar la pausa la fuente vuelve sola: se avisa a quien escucha [down].
         AppScope.launch {
-            delay(pause + 50)
+            delay(pause + 50.milliseconds)
             publish()
         }
         return pause
@@ -383,7 +387,8 @@ object HostGate {
         if (publish) publish()
     }
 
-    private fun describe(ms: Long): String = if (ms >= 60 * MINUTE) "1 hora" else "${ms / MINUTE} minutos"
+    /** «2 minutos», «1 hora»: lo que se dice al usuario de una pausa (también la del bypass de Cloudflare). */
+    internal fun describe(duration: Duration): String = if (duration >= 1.hours) "1 hora" else "${duration.inWholeMinutes} minutos"
 
     private fun publish() {
         val now = System.currentTimeMillis()

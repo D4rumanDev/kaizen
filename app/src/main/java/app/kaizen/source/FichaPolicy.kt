@@ -1,6 +1,9 @@
 package app.kaizen.source
 
 import app.kaizen.pojos.av1.Series
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Cuándo vale la pena volver a pedir una ficha a la web de su fuente (ver `docs/wiki/architecture.md`). Una serie finalizada con todos
@@ -8,26 +11,23 @@ import app.kaizen.pojos.av1.Series
  * Con `enabled` en false («Datos de AniList en la ficha» apagado) todo se comporta como antes de la etapa C.
  */
 internal object FichaPolicy {
-    private const val MINUTE = 60_000L
-    private const val DAY = 24 * 60 * MINUTE
-
     /** Copia de una serie en emisión: cuánto se sirve sin volver a pedirla (ajustable: [app.kaizen.commons.Timings]). */
-    val AIRING_TTL: Long get() = app.kaizen.commons.Timings.fichaAiringMs()
+    val AIRING_TTL: Duration get() = app.kaizen.commons.Timings.fichaAiring()
 
     /** Pasado esto, al servir la copia de una serie en emisión se renueva en segundo plano (10 min, o menos si la copia caduca antes). */
-    val AIRING_REFRESH: Long get() = minOf(10 * MINUTE, AIRING_TTL)
+    val AIRING_REFRESH: Duration get() = minOf(10.minutes, AIRING_TTL)
 
     /** Serie finalizada y con todos sus capítulos, con AniList que lo confirma: la copia casi no caduca (ajustable). */
-    val SETTLED_TTL: Long get() = app.kaizen.commons.Timings.fichaSettledMs()
+    val SETTLED_TTL: Duration get() = app.kaizen.commons.Timings.fichaSettled()
 
     /** Finalizada solo según la fuente (sin AniList): su estado se detecta a veces mal, así que se mira más a menudo. */
-    const val UNLINKED_TTL = 7 * DAY
+    val UNLINKED_TTL = 7.days
 
     /** Finalizada, pero la fuente tiene menos capítulos de los que dice AniList: se vuelve a mirar como mucho una vez al día. */
-    const val INCOMPLETE_TTL = DAY
+    val INCOMPLETE_TTL = 1.days
 
     /** La ficha completada con las demás fuentes se guarda solo un tiempo: una fuente que falló ese día dejaría relaciones sin unir. */
-    const val COMPLETE_TTL = 7 * DAY
+    val COMPLETE_TTL = 7.days
 
     /** AniList manda sobre la fuente (que puede ir con retraso); sin dato de AniList, el estado de la fuente (`state` 2 = finalizada). */
     fun finished(series: Series, anilist: FichaData?): Boolean = when (anilist?.estado) {
@@ -44,7 +44,7 @@ internal object FichaPolicy {
     fun settled(series: Series, anilist: FichaData?, enabled: Boolean): Boolean = enabled && finished(series, anilist) && complete(series, anilist)
 
     /** Cuánto se sirve la copia sin volver a pedirla. */
-    fun ttl(series: Series, anilist: FichaData?, enabled: Boolean): Long = when {
+    fun ttl(series: Series, anilist: FichaData?, enabled: Boolean): Duration = when {
         !enabled -> AIRING_TTL
         settled(series, anilist, true) -> if (anilist == null) UNLINKED_TTL else SETTLED_TTL
         finished(series, anilist) -> INCOMPLETE_TTL
@@ -52,10 +52,10 @@ internal object FichaPolicy {
     }
 
     /** Edad de la copia a partir de la cual, al servirla, se renueva en segundo plano. */
-    fun refreshAfter(series: Series, anilist: FichaData?, enabled: Boolean): Long = when {
+    fun refreshAfter(series: Series, anilist: FichaData?, enabled: Boolean): Duration = when {
         !enabled -> AIRING_REFRESH
-        settled(series, anilist, true) -> Long.MAX_VALUE
-        finished(series, anilist) -> DAY
+        settled(series, anilist, true) -> Duration.INFINITE
+        finished(series, anilist) -> 1.days
         else -> AIRING_REFRESH
     }
 }

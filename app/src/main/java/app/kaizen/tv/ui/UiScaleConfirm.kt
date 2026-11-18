@@ -19,9 +19,10 @@ import app.kaizen.commons.KaizenSettings
 import kotlinx.coroutines.delay
 import app.kaizen.R
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * Tras cambiar el tamaño de la interfaz, pregunta si se mantiene. Sin respuesta en [KaizenSettings.UI_SCALE_CONFIRM_MS],
+ * Tras cambiar el tamaño de la interfaz, pregunta si se mantiene. Sin respuesta en [KaizenSettings.UI_SCALE_CONFIRM],
  * con Atrás o con «Volver», se restaura el tamaño anterior (también si la app se cierra antes: ver UiScale.wrap).
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -41,7 +42,7 @@ internal fun UiScaleConfirm(activity: ComponentActivity) {
 
     LaunchedEffect(Unit) {
         while (seconds > 0) {
-            delay(1_000L)
+            delay(1.seconds)
             seconds = secondsLeft()
         }
         revert()

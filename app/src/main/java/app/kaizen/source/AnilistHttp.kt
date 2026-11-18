@@ -14,6 +14,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** Fallo de red o de AniList que no es «sin resultado»: la cola para y vuelve a intentarlo más tarde. */
 internal class AnilistUnavailable(message: String, cause: Throwable? = null) : IOException(message, cause)
@@ -29,10 +31,10 @@ internal object AnilistHttp {
     internal val USER_AGENT: String get() = app.kaizen.commons.UserAgent.current()
 
     /** Entre dos peticiones: 30 por minuto (AniList anuncia 90, pero a veces lo baja a ~30). */
-    internal var spacingMs = 2_000L
+    internal var spacing = 2.seconds
     private const val MAX_RETRIES = 3
-    private const val MAX_WAIT_S = 90L
-    internal var RETRY_WAIT_MS = 5_000L
+    private val MAX_WAIT = 90.seconds
+    internal var retryWait = 5.seconds
 
     private val gate = Mutex()
     private var last = 0L
@@ -48,7 +50,7 @@ internal object AnilistHttp {
     /** Envía [body] (JSON GraphQL) y devuelve el cuerpo de la respuesta, o `{}` si AniList responde 400 a esa consulta. */
     suspend fun post(body: String): String = gate.withLock {
         repeat(MAX_RETRIES + 1) { attempt ->
-            val wait = last + spacingMs - System.currentTimeMillis()
+            val wait = last + spacing.inWholeMilliseconds - System.currentTimeMillis()
             if (wait > 0) delay(wait)
             // Si HostGate tiene a AniList en pausa (bloqueo o caída seguidos) no se insiste: la cola para y vuelve más tarde.
             try { HostGate.allow(endpoint) } catch (e: HostGate.HostDownException) { throw AnilistUnavailable("AniList en pausa", e) }
@@ -62,9 +64,9 @@ internal object AnilistHttp {
                 HostGate.report(endpoint, code)
                 when {
                     code == 200 -> return text
-                    code == 429 && attempt < MAX_RETRIES -> delay(((retryAfter ?: 30L).coerceAtMost(MAX_WAIT_S) + 1) * 1000L)
+                    code == 429 && attempt < MAX_RETRIES -> delay((retryAfter ?: 30L).seconds.coerceAtMost(MAX_WAIT) + 1.seconds)
                     code == 400 -> return "{}"
-                    (code == 403 || code == 408 || code == 425 || code >= 500) && attempt < MAX_RETRIES -> delay(RETRY_WAIT_MS)
+                    (code == 403 || code == 408 || code == 425 || code >= 500) && attempt < MAX_RETRIES -> delay(retryWait)
                     else -> throw AnilistUnavailable("AniList respondió $code")
                 }
             } catch (e: IOException) {
@@ -72,7 +74,7 @@ internal object AnilistHttp {
                 if (e is AnilistUnavailable) throw e
                 HostGate.reportFailure(endpoint, e)
                 if (attempt == MAX_RETRIES) throw AnilistUnavailable("Sin conexión con AniList", e)
-                delay(RETRY_WAIT_MS)
+                delay(retryWait)
             }
         }
         throw AnilistUnavailable("AniList no respondió")

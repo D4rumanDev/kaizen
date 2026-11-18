@@ -5,11 +5,13 @@ import androidx.core.content.edit
 import app.kaizen.App
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Cierres por fallo seguidos: si la app se cae [LIMIT] veces sin llegar a funcionar con normalidad, el siguiente arranque
  * restablece ajustes y caché (nunca favoritos, historial ni progreso), por si una configuración rota impide abrirla.
- * Funcionar con normalidad = llevar [HEALTHY_AFTER_MS] abierta; cerrar la app a mano no cuenta como fallo.
+ * Funcionar con normalidad = llevar [HEALTHY_AFTER] abierta; cerrar la app a mano no cuenta como fallo.
  */
 class CrashStreak(
     private val preferences: () -> SharedPreferences,
@@ -17,10 +19,10 @@ class CrashStreak(
 ) {
     companion object {
         const val LIMIT = 3
-        const val HEALTHY_AFTER_MS = 30_000L
+        val HEALTHY_AFTER = 30.seconds
 
         /** Dos fallos separados por más tiempo que esto no forman racha (cierres sueltos en días distintos). */
-        const val WINDOW_MS = 10L * 60_000
+        val WINDOW = 10.minutes
         private const val KEY_STREAK = "streak"
         private const val KEY_NOTICE = "notice"
         private const val KEY_LAST_CRASH = "last_crash"
@@ -32,7 +34,7 @@ class CrashStreak(
     /** Síncrono (`commit`): el proceso está muriendo y un `apply` podría no llegar a escribirse. */
     fun recordCrash() {
         val now = clock()
-        val consecutive = now - prefs.getLong(KEY_LAST_CRASH, 0L) <= WINDOW_MS
+        val consecutive = now - prefs.getLong(KEY_LAST_CRASH, 0L) <= WINDOW.inWholeMilliseconds
         prefs.edit(commit = true) {
             putInt(KEY_STREAK, if (consecutive) count + 1 else 1)
             putLong(KEY_LAST_CRASH, now)
@@ -76,7 +78,7 @@ object CrashGuard {
             AppScope.launch { runCatchingCoop { CacheCleaner.clearAll(App.context) }.onFailure(::logError) }
         }
         AppScope.launch {
-            delay(CrashStreak.HEALTHY_AFTER_MS)
+            delay(CrashStreak.HEALTHY_AFTER)
             streak.recordHealthy()
         }
     }

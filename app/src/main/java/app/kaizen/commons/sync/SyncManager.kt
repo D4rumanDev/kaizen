@@ -14,6 +14,7 @@ import app.kaizen.source.spec.RepoConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.days
 
 /**
  * Sincronización de los estados de este dispositivo con el servidor WebDAV elegido (ver [DeviceSync]): la lleva el botón «Sincronizar ahora» de Configuración › Sincronización y, si
@@ -54,7 +55,7 @@ object SyncManager {
     /** Una copia sin actualizar desde hace tanto se da por abandonada (otra tele que ya no existe): se funde una última vez y se borra del servidor. */
     private const val MIN_PLAUSIBLE = 1_577_836_800_000L // 1-ene-2020
 
-    private const val ABANDONED_MS = 180L * 24 * 60 * 60 * 1000
+    private val ABANDONED = 180.days
 
     /** El dispositivo de verdad: la base de datos de la app (ver [Removals.step]). */
     private object Device : Removals.Local<KaizenBackup.Data> {
@@ -68,7 +69,7 @@ object SyncManager {
     /**
      * Sincroniza ahora (una a la vez: la del botón y la diaria no se pisan). Falla (con el motivo) si no hay destino o el servidor no responde. Lee las copias de los demás, las
      * funde (añade lo que falta y quita lo que otro quitó a propósito, ver [Removals.step]) y sube la propia con las lápidas de lo que se quitó aquí. Las copias de dispositivos
-     * abandonados (más de [ABANDONED_MS] sin actualizar) se funden y se borran del servidor.
+     * abandonados (más de [ABANDONED] sin actualizar) se funden y se borran del servidor.
      */
     suspend fun now(): DeviceSync.Report = lock.withLock { withContext(Dispatchers.IO) {
         val state = Removals.load()
@@ -87,7 +88,7 @@ object SyncManager {
             },
             // Ni con un borrado masivo retenido, ni una copia con la fecha de un reloj roto (antes de 2020).
             canDelete = { outcome?.heldRemote != true },
-            isAbandoned = { bytes -> KaizenBackup.decode(String(bytes, Charsets.UTF_8))?.createdAt?.let { it > MIN_PLAUSIBLE && System.currentTimeMillis() - it > ABANDONED_MS } == true }
+            isAbandoned = { bytes -> KaizenBackup.decode(String(bytes, Charsets.UTF_8))?.createdAt?.let { it > MIN_PLAUSIBLE && System.currentTimeMillis() - it > ABANDONED.inWholeMilliseconds } == true }
         )
         val done = outcome
         val full = DeviceSync.Report(report.merged, report.skipped, report.uploadedBytes, done?.removedHere ?: 0, (done?.heldBack ?: false) || (done?.heldRemote ?: false), report.deleted)

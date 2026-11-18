@@ -5,18 +5,21 @@ import coil3.request.ErrorResult
 import coil3.request.ImageResult
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 
 /**
  * Imágenes que se sabe que no existen (404/410) o que no se pueden decodificar (un `favicon.ico`): se anota la dirección con la hora y no se
- * vuelve a pedir hasta pasado [ttlMs]. Sin esto, cada vez que se abría «Fuentes» se pedían otra vez los iconos que ya habían dado 404.
+ * vuelve a pedir hasta pasado [ttl]. Sin esto, cada vez que se abría «Fuentes» se pedían otra vez los iconos que ya habían dado 404.
  * Es solo la lógica (sin Android) para probarla; [ImageMisses] la guarda en disco.
  */
-class MissLedger(private val ttlMs: Long, private val max: Int, private val clock: () -> Long = System::currentTimeMillis) {
+class MissLedger(private val ttl: Duration, private val max: Int, private val clock: () -> Long = System::currentTimeMillis) {
     private val entries = ConcurrentHashMap<String, Long>()
 
     fun isMissing(url: String): Boolean {
         val at = entries[url] ?: return false
-        if (clock() - at < ttlMs) return true
+        if (clock() - at < ttl.inWholeMilliseconds) return true
         entries.remove(url, at)
         return false
     }
@@ -39,13 +42,13 @@ class MissLedger(private val ttlMs: Long, private val max: Int, private val cloc
 /** Las imágenes no disponibles, guardadas entre arranques (fichero de preferencias propio). */
 object ImageMisses {
     private const val FILE = "kaizen_image_misses"
-    private const val TTL_MS = 7L * 24 * 60 * 60 * 1000
+    private val TTL = 7.days
     private const val MAX = 500
-    private const val FLUSH_MS = 5_000L
+    private val FLUSH = 5.seconds
     private val flushScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val ledger by lazy {
-        MissLedger(TTL_MS, MAX).also { ledger ->
+        MissLedger(TTL, MAX).also { ledger ->
             runCatching {
                 app.kaizen.commons.KaizenStore.prefs(FILE).all
                     .mapNotNull { (key, value) -> (value as? Long)?.let { key to it } }.toMap().let(ledger::load)
@@ -75,7 +78,7 @@ object ImageMisses {
         // Un solo volcado a disco unos segundos después: con cientos de 404 a la vez no se escribe una vez por cada uno (un apply() por imagen ya causó un ANR en otro sitio).
         if (!flushScheduled.compareAndSet(false, true)) return
         AppScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            kotlinx.coroutines.delay(FLUSH_MS)
+            kotlinx.coroutines.delay(FLUSH)
             flushScheduled.set(false)
             runCatching {
                 val edit = app.kaizen.commons.KaizenStore.prefs(FILE).edit().clear()

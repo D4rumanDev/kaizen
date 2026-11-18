@@ -18,6 +18,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.time.Duration.Companion.seconds
 
 abstract class Server(val context: Context, val baseLink: String) : Comparable<Server> {
     @Volatile private var server: VideoServer? = null
@@ -137,7 +138,7 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
                 // Por SourceHttp (con turno, tiempos y 403/5xx como antes). Un nombre que el DNS de la red no resuelve (los CDN con subdominios
                 // aleatorios, como el de Voe, si AdGuard los filtra) hacía fallar el enlace y pausaba todo el servidor: ya no cuenta como fallo suyo.
                 val response = HostGate.call(option.url) {
-                    SourceHttp.execute(option.url, timeoutSeconds = VERIFY_TIMEOUT_S) {
+                    SourceHttp.execute(option.url, timeout = VERIFY_TIMEOUT) {
                         ignoreHttpErrors()
                         maxBodySize(1)
                         // Los enlaces de vídeo respetan el DNS de la red (AdGuard): si bloquea o no resuelve el CDN, el enlace falla.
@@ -189,7 +190,7 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
 
     companion object {
         const val TIMEOUT = 10000L
-        private const val VERIFY_TIMEOUT_S = 10L
+        private val VERIFY_TIMEOUT = 10.seconds
 
         /** Una dirección dentro de un mensaje de error: puede llevar tokens o parámetros, así que no va al registro. */
         private val URL_IN_TEXT = Regex("""https?://\S+""")

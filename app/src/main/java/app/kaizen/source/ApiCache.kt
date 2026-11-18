@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import java.lang.reflect.Type
 import app.kaizen.commons.logError
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
 
 /** Respuesta guardada (texto, normalmente JSON) con la fecha en que se pidió. */
 @Entity(tableName = "ApiCache")
@@ -64,11 +65,10 @@ interface ApiCacheDao {
  * hay copia, se devuelve la copia aunque esté caducada: mejor datos algo viejos que una pantalla vacía.
  */
 object ApiCache {
-    const val DAY = 24L * 60 * 60 * 1000
-    private val PURGE_MILLIS: Long get() = app.kaizen.commons.Timings.retentionMs()
+    private val PURGE: Duration get() = app.kaizen.commons.Timings.retention()
 
     /** Una ficha guardada se sirve como mucho hasta [FichaPolicy.SETTLED_TTL] (series finalizadas y completas); pasado eso no vale para nada. */
-    private val FICHE_PURGE_MILLIS: Long get() = FichaPolicy.SETTLED_TTL * 3 / 2
+    private val FICHE_PURGE: Duration get() = FichaPolicy.SETTLED_TTL * 3 / 2
 
     /** Subir al cambiar los campos de las clases guardadas (ver [clearIfNewFormat]). */
     private const val FORMAT_VERSION = 2
@@ -76,18 +76,18 @@ object ApiCache {
     private val gson = Gson()
 
     /** Texto de [key]: de la copia si es reciente, si no de [load] (que no se guarda si devuelve null o vacío). */
-    suspend fun text(key: String, plannedTtl: Long, load: suspend () -> String?): String? = withContext(Dispatchers.IO) {
+    suspend fun text(key: String, plannedTtl: Duration, load: suspend () -> String?): String? = withContext(Dispatchers.IO) {
         // Cada clave caduca en su punto del plazo (±dispersión): no todo lo guardado el mismo día vence el mismo día.
         val ttl = app.kaizen.commons.Timings.spread(plannedTtl, key)
         val dao = CacheDB.INSTANCE.apiCacheDao()
         clearIfNewFormat(dao)
         val cached = lookup(dao, key)
         val now = System.currentTimeMillis()
-        if (cached != null && now - cached.updatedAt < ttl) return@withContext cached.payload
+        if (cached != null && now - cached.updatedAt < ttl.inWholeMilliseconds) return@withContext cached.payload
         // Varias pantallas piden a la vez lo mismo (el arranque): solo una descarga y las demás esperan su resultado.
         flights.run(key) {
             // Quien llega justo después de que otra descarga terminara encuentra ya la copia.
-            lookup(dao, key)?.takeIf { System.currentTimeMillis() - it.updatedAt < ttl }?.let { return@run it.payload }
+            lookup(dao, key)?.takeIf { System.currentTimeMillis() - it.updatedAt < ttl.inWholeMilliseconds }?.let { return@run it.payload }
             val loaded: String? = try {
                 load()
             } catch (e: CancellationException) {
@@ -143,7 +143,7 @@ object ApiCache {
     }
 
     /** Objeto de [key] como JSON: se guarda la respuesta de [load] y se devuelve ya deserializada. */
-    suspend fun <T> obj(key: String, ttl: Long, type: Type, load: suspend () -> T?): T? {
+    suspend fun <T> obj(key: String, ttl: Duration, type: Type, load: suspend () -> T?): T? {
         val payload = text(key, ttl) { load()?.let { gson.toJson(it) } } ?: return null
         return try {
             gson.fromJson(payload, type)
@@ -171,13 +171,13 @@ object ApiCache {
         value to (System.currentTimeMillis() - entry.updatedAt)
     }
 
-    /** Borra las respuestas con más de [PURGE_MILLIS] para que la base de datos no crezca sin límite. */
+    /** Borra las respuestas con más de [PURGE] para que la base de datos no crezca sin límite. */
     suspend fun purgeOld() = withContext(Dispatchers.IO) {
-        CacheDB.INSTANCE.apiCacheDao().purgeOlderThan(System.currentTimeMillis() - PURGE_MILLIS)
+        CacheDB.INSTANCE.apiCacheDao().purgeOlderThan(System.currentTimeMillis() - PURGE.inWholeMilliseconds)
         CacheDB.INSTANCE.apiCacheDao().purgeEmpty()
         CacheDB.INSTANCE.apiCacheDao().purgeOldPages()
         CacheDB.INSTANCE.apiCacheDao().purgeOtherFicheVersions("fiche|${BuildConfig.VERSION_CODE}|%")
-        CacheDB.INSTANCE.apiCacheDao().purgeOldFiches(System.currentTimeMillis() - FICHE_PURGE_MILLIS)
+        CacheDB.INSTANCE.apiCacheDao().purgeOldFiches(System.currentTimeMillis() - FICHE_PURGE.inWholeMilliseconds)
         // La memoria es siempre un subconjunto de la base de datos: lo que se acaba de borrar no se sirve de ella.
         memory.clear()
     }

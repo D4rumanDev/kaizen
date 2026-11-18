@@ -36,13 +36,13 @@ class SourceStatusTest {
 
     @Test
     fun `una fuente lenta o con error HTTP lleva el aviso aunque responda`() {
-        assertEquals(SourcesHealth.PARTIAL, state(result = ok(SLOW_SOURCE_MS + 1)).health)
+        assertEquals(SourcesHealth.PARTIAL, state(result = ok(SLOW_SOURCE.inWholeMilliseconds + 1)).health)
         assertEquals("Lenta · 2000 ms", state(result = ok(2_000)).text)
         val http = state(result = ok(300, code = 503))
         assertEquals(SourcesHealth.PARTIAL, http.health)
         assertTrue("503" in http.text)
         // Justo en el límite todavía no es lenta.
-        assertEquals(SourcesHealth.OK, state(result = ok(SLOW_SOURCE_MS)).health)
+        assertEquals(SourcesHealth.OK, state(result = ok(SLOW_SOURCE.inWholeMilliseconds)).health)
     }
 
     @Test

@@ -16,6 +16,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Catálogo interno, lado de lectura: lista de todas las series de las fuentes activas (solo nombres y datos básicos)
@@ -96,11 +98,11 @@ object Catalog {
 
     // Episodios publicados por ficha ya consultados: el selector y la fila de series unidas los piden una y otra vez.
     private val episodeCache = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, Pair<Int, Long>>()
-    private const val EPISODE_CACHE_MS = 10 * 60_000L
+    private val EPISODE_CACHE = 10.minutes
     private val episodeGate = kotlinx.coroutines.sync.Semaphore(3)
     // Fichas que no respondieron: no se reintentan al momento (cada fila visible volvería a esperar el tiempo máximo).
     private val episodeFailures = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, Long>()
-    private const val EPISODE_RETRY_MS = 60_000L
+    private val EPISODE_RETRY = 1.minutes
 
     /** Si [sourceId] está marcada en Configuración: una web desactivada no se consulta para nada que no sea abrir a mano una ficha suya. */
     fun isActive(sourceId: String): Boolean = AnimeSources.selected.any { it.id == sourceId }
@@ -108,11 +110,11 @@ object Catalog {
     /** Cuántos episodios tiene publicados la ficha [slug] de [sourceId] (lo que lista su fuente); null si no responde a tiempo o si la fuente está desactivada (no se le pide nada). */
     suspend fun episodeCount(sourceId: String, slug: String): Int? {
         if (!isActive(sourceId)) return null
-        episodeCache[sourceId to slug]?.let { (count, at) -> if (System.currentTimeMillis() - at < EPISODE_CACHE_MS) return count }
-        episodeFailures[sourceId to slug]?.let { if (System.currentTimeMillis() - it < EPISODE_RETRY_MS) return null }
+        episodeCache[sourceId to slug]?.let { (count, at) -> if (System.currentTimeMillis() - at < EPISODE_CACHE.inWholeMilliseconds) return count }
+        episodeFailures[sourceId to slug]?.let { if (System.currentTimeMillis() - it < EPISODE_RETRY.inWholeMilliseconds) return null }
         val source = AnimeSources.of(sourceId)
         val count = episodeGate.withPermit {
-            withTimeoutOrNull(EPISODES_TIMEOUT_MS) {
+            withTimeoutOrNull(EPISODES_TIMEOUT) {
                 runCatchingCoop { SourceCache.episodes(source, slug) }.getOrNull()
             }
         }
@@ -128,11 +130,11 @@ object Catalog {
     /** Los datos de la ficha [slug] de [sourceId] (una petición, con el mismo ritmo y límite que [episodeCount]); null si no responde a tiempo. */
     suspend fun facts(sourceId: String, slug: String): SourceFacts? {
         if (!isActive(sourceId)) return null
-        factsCache[sourceId to slug]?.let { (facts, at) -> if (System.currentTimeMillis() - at < EPISODE_CACHE_MS) return facts }
-        episodeFailures[sourceId to slug]?.let { if (System.currentTimeMillis() - it < EPISODE_RETRY_MS) return null }
+        factsCache[sourceId to slug]?.let { (facts, at) -> if (System.currentTimeMillis() - at < EPISODE_CACHE.inWholeMilliseconds) return facts }
+        episodeFailures[sourceId to slug]?.let { if (System.currentTimeMillis() - it < EPISODE_RETRY.inWholeMilliseconds) return null }
         val source = AnimeSources.of(sourceId)
         val series = episodeGate.withPermit {
-            withTimeoutOrNull(EPISODES_TIMEOUT_MS) {
+            withTimeoutOrNull(EPISODES_TIMEOUT) {
                 runCatchingCoop { source.anime(source.animeUrl(slug))?.also { SourceCache.noteFiche(it) } }.getOrNull()
             }
         }
@@ -165,7 +167,7 @@ object Catalog {
         dao.entriesOf(listOf(key)).firstOrNull()?.let { pickOf(it, dao.links(key)) }
     }
 
-    private const val EPISODES_TIMEOUT_MS = 8_000L
+    private val EPISODES_TIMEOUT = 8.seconds
 
     /** Una ficha de una serie unida, para mostrarla en la ficha de otra: de qué fuente es, su slug y la serie a la que pertenece. */
     class JoinedFicha(
@@ -203,7 +205,7 @@ object Catalog {
      * Fichas que las fuentes activas devuelven al buscar [text] directamente, sin pasar por el catálogo: sirve para unir una serie
      * que el catálogo aún no tiene (un estreno) o cuyo nombre no contiene el texto. Si el catálogo conoce la ficha, la [Pick] lleva
      * su clave; si no, la clave va vacía y se identifica por [Pick.sourceId] y [Pick.slug]. Una fuente que tarda más de
-     * [LIVE_TIMEOUT_MS] o falla no aporta.
+     * [LIVE_TIMEOUT] o falla no aporta.
      */
     suspend fun searchLive(text: String): List<Pick> = coroutineScope {
         val query = SearchQuery(text = text.trim())
@@ -214,7 +216,7 @@ object Catalog {
         val fetch = if (several) SearchQuery(text = longestWord(query.text).ifEmpty { query.text }) else query
         AnimeSources.enabled.map { source ->
             async {
-                withTimeoutOrNull(LIVE_TIMEOUT_MS) {
+                withTimeoutOrNull(LIVE_TIMEOUT) {
                     runCatchingCoop { SearchEngine.applyLocal(fetch, source, source.search(fetch, null).items) }.getOrNull()
                 }.orEmpty().filter { !several || nameMatches(it.name, query.text) }.map { item -> source to item }
             }
@@ -225,7 +227,7 @@ object Catalog {
         }
     }
 
-    private const val LIVE_TIMEOUT_MS = 8_000L
+    private val LIVE_TIMEOUT = 8.seconds
     private const val LIVE_MAX = 30
     private const val SEARCH_LIMIT = 100
 

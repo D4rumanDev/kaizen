@@ -12,6 +12,7 @@ import app.kaizen.domain.IncidentSummary
 import app.kaizen.domain.summarize
 import coil3.annotation.ExperimentalCoilApi
 import java.io.IOException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * **El gestor único de errores de la app.** Todo fallo entra por aquí ([report] con la excepción o [record] con la causa ya conocida) y sale igual:
@@ -43,7 +44,7 @@ object AppErrors {
 
     /** Tope de fallos guardados de la sesión y ventana en que un mismo fallo repetido no vuelve a escribirse en el registro (sí cuenta). */
     private const val MAX_REPORTS = 300
-    private const val QUIET_MS = 30_000L
+    private val QUIET = 30.seconds
     private const val DETAIL_MAX = 160
 
     // ------------------------------------------------------------------------------------------------ Clasificar
@@ -148,7 +149,7 @@ object AppErrors {
         val now = clock()
         val cut = redact(detail).replace(Regex("\\s+"), " ").take(DETAIL_MAX)
         val repeated = synchronized(lock) {
-            val again = reports.any { it.area == area && it.context == context && it.incident.cause == cause && now - it.incident.at < QUIET_MS }
+            val again = reports.any { it.area == area && it.context == context && it.incident.cause == cause && now - it.incident.at < QUIET.inWholeMilliseconds }
             reports.addLast(Report(area, context, Incident(cause, cut, now)))
             while (reports.size > MAX_REPORTS) reports.removeFirst()
             again

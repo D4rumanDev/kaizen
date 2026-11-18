@@ -15,20 +15,21 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.kaizen.R
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Kaizen: servicio en primer plano mientras se usa el proxy, para que Android no mate la app
  * (y corte el vídeo) cuando el reproductor externo está delante. Se para solo tras
- * [IDLE_STOP_MS] sin peticiones.
+ * [IDLE_STOP] sin peticiones.
  */
 class KaizenProxyService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val idleCheck = object : Runnable {
         override fun run() {
-            if (System.currentTimeMillis() - KaizenProxy.lastActivity > IDLE_STOP_MS) {
+            if (System.currentTimeMillis() - KaizenProxy.lastActivity > IDLE_STOP.inWholeMilliseconds) {
                 stopSelf()
             } else {
-                handler.postDelayed(this, CHECK_INTERVAL_MS)
+                handler.postDelayed(this, CHECK_INTERVAL.inWholeMilliseconds)
             }
         }
     }
@@ -48,7 +49,7 @@ class KaizenProxyService : Service() {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0)
         handler.removeCallbacks(idleCheck)
-        handler.postDelayed(idleCheck, CHECK_INTERVAL_MS)
+        handler.postDelayed(idleCheck, CHECK_INTERVAL.inWholeMilliseconds)
         return START_NOT_STICKY
     }
 
@@ -60,8 +61,8 @@ class KaizenProxyService : Service() {
     companion object {
         private const val CHANNEL = "kaizen_proxy"
         private const val NOTIFICATION_ID = 7420
-        private const val IDLE_STOP_MS = 30 * 60 * 1000L
-        private const val CHECK_INTERVAL_MS = 60 * 1000L
+        private val IDLE_STOP = 30.minutes
+        private val CHECK_INTERVAL = 1.minutes
 
         fun start(context: Context) {
             try {

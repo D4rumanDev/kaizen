@@ -15,6 +15,8 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /** Carga la URL en un WebView y espera a que Cloudflare entregue la cookie `cf_clearance`. */
 class BypassActivity : Activity() {
@@ -43,7 +45,7 @@ class BypassActivity : Activity() {
                 return
             }
             // Tope duro: sin él, una Cloudflare que no contesta deja el bypass colgado y sin aviso.
-            if (SystemClock.elapsedRealtime() - startedAt > DEADLINE_MS) {
+            if (SystemClock.elapsedRealtime() - startedAt > DEADLINE.inWholeMilliseconds) {
                 finishWith(null)
                 return
             }
@@ -56,7 +58,7 @@ class BypassActivity : Activity() {
                 pageLoaded = false
                 webView.reload()
             }
-            handler.postDelayed(this, POLL_MS)
+            handler.postDelayed(this, POLL.inWholeMilliseconds)
         }
     }
 
@@ -97,7 +99,7 @@ class BypassActivity : Activity() {
         CookieManager.getInstance().setCookie(url, "$COOKIE_CLEARANCE=; Max-Age=0") {
             if (finished || isDestroyed) return@setCookie
             webView.loadUrl(url)
-            handler.postDelayed(poll, POLL_MS)
+            handler.postDelayed(poll, POLL.inWholeMilliseconds)
         }
     }
 
@@ -147,8 +149,8 @@ class BypassActivity : Activity() {
         const val RESULT_USER_AGENT = "user_agent"
         private const val COOKIE_CLEARANCE = "cf_clearance"
         private val CHALLENGE_TITLES = listOf("just a moment", "un momento", "attention required")
-        private const val POLL_MS = 500L
+        private val POLL = 500.milliseconds
         private const val TICKS_PER_TRY = 40
-        private const val DEADLINE_MS = 45_000L
+        private val DEADLINE = 45.seconds
     }
 }

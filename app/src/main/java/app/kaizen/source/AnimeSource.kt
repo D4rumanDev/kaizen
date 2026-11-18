@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.commons.runCatchingCoop
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 
 /**
  * Kaizen: origen de datos de la app (catálogo, fichas, recientes y horario). Cada plataforma
@@ -201,7 +203,7 @@ object AnimeSources {
             RecentsArchive.hasNewerThan(cached.series.source, cached.series.slug, cached.series.chapters.maxOfOrNull { it.number } ?: 0.0)
         }?.let { cached ->
             // Una serie finalizada y completa no se renueva; una finalizada incompleta, como mucho una vez al día (ver FichaPolicy).
-            if (cached.age >= cached.refreshAfter) refreshFiche(url)
+            if (cached.age >= cached.refreshAfter.inWholeMilliseconds) refreshFiche(url)
             return cached.series
         }
         val primary = forUrl(url)
@@ -257,8 +259,8 @@ object AnimeSources {
         get() = default
 
     // Tiempo máximo por fuente: corto si la ficha ya tiene capítulos (solo faltan nota y relaciones).
-    private const val OTHER_SOURCE_TIMEOUT_MS = 8_000L
-    private const val OTHER_SOURCE_EXTRAS_TIMEOUT_MS = 3_000L
+    private val OTHER_SOURCE_TIMEOUT = 8.seconds
+    private val OTHER_SOURCE_EXTRAS_TIMEOUT = 3.seconds
 
     /**
      * Ficha completa a partir de la de la fuente abierta y de la misma serie en las demás fuentes activas, pidiendo
@@ -268,7 +270,7 @@ object AnimeSources {
      *  - relaciones: las de todas, sin repetir serie (las de la ficha base primero).
      */
     suspend fun complete(anime: Series): Series {
-        val timeout = if (anime.chapters.isEmpty()) OTHER_SOURCE_TIMEOUT_MS else OTHER_SOURCE_EXTRAS_TIMEOUT_MS
+        val timeout = if (anime.chapters.isEmpty()) OTHER_SOURCE_TIMEOUT else OTHER_SOURCE_EXTRAS_TIMEOUT
         val others = sameSeriesIn(enabled.filter { it.id != anime.source }, anime, timeout)
         val base = if (anime.chapters.isEmpty()) others.firstOrNull { it.chapters.isNotEmpty() } ?: anime else anime
         val all = listOf(anime) + others
@@ -283,10 +285,10 @@ object AnimeSources {
     }
 
     /** Ficha de la serie de [anime] en cada una de [sources] que la tiene según el catálogo; una fuente lenta no espera más de [timeoutMs]. */
-    private suspend fun sameSeriesIn(sources: List<AnimeSource>, anime: Series, timeoutMs: Long): List<Series> = coroutineScope {
+    private suspend fun sameSeriesIn(sources: List<AnimeSource>, anime: Series, timeout: Duration): List<Series> = coroutineScope {
         sources.map { source ->
             async {
-                withTimeoutOrNull(timeoutMs) {
+                withTimeoutOrNull(timeout) {
                     runCatchingCoop {
                         Catalog.slugIn(source, anime.source, anime.slug)?.let { source.anime(source.animeUrl(it)) }
                     }.getOrNull()

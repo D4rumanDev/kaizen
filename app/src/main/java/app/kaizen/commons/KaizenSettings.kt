@@ -9,12 +9,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
+import kotlin.time.Duration.Companion.seconds
 
 /** Kaizen: ajustes propios (panel «Herramientas» del menú lateral). */
 object KaizenSettings {
     val OPENING_OPTIONS = listOf(0, 60, 85, 90, 100)
     val SPEED_OPTIONS = listOf(0.75f, 1f, 1.25f, 1.5f)
-    const val UI_SCALE_CONFIRM_MS = 15_000L
+    val UI_SCALE_CONFIRM = 15.seconds
     val UI_SCALE_OPTIONS = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f)
     val SPACING_OPTIONS = listOf(0.5f, 0.75f, 1f, 1.5f, 2f, 3f)
     val CARD_SCALE_OPTIONS = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.5f)
@@ -280,11 +281,11 @@ object KaizenSettings {
     /** Hora (ms) hasta la que hay que confirmar el tamaño nuevo; 0 = nada que confirmar. */
     var uiScaleConfirmBy: Long by longPref("kaizen_ui_scale_confirm_by", 0L)
 
-    /** Pone [scale] a prueba: si no se confirma antes de [UI_SCALE_CONFIRM_MS], se vuelve al tamaño anterior. */
+    /** Pone [scale] a prueba: si no se confirma antes de [UI_SCALE_CONFIRM], se vuelve al tamaño anterior. */
     fun trialUiScale(scale: Float) {
         if (uiScalePrevious == 0f) uiScalePrevious = effectiveUiScale
         uiScale = scale
-        uiScaleConfirmBy = System.currentTimeMillis() + UI_SCALE_CONFIRM_MS
+        uiScaleConfirmBy = System.currentTimeMillis() + UI_SCALE_CONFIRM.inWholeMilliseconds
     }
 
     fun confirmUiScale() {

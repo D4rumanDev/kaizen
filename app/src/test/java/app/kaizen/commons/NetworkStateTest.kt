@@ -79,7 +79,7 @@ class NetworkStateTest {
     fun `las pruebas caducan con la ventana`() {
         platform = Platform.UNVALIDATED
         NetworkState.noteFailure("a.example", ConnectException())
-        now += NetworkState.EVIDENCE_WINDOW_MS + 1
+        now += NetworkState.EVIDENCE_WINDOW.inWholeMilliseconds + 1
         NetworkState.noteFailure("b.example", ConnectException())
         assertEquals(Mode.ONLINE, NetworkState.mode.value)
     }
@@ -119,7 +119,7 @@ class NetworkStateTest {
 
     @Test
     fun `una portada guardada caducada vale sin conexion`() {
-        val old = NetworkState.clock() - CacheFirstStrategy.MAX_AGE_MS * 2
+        val old = NetworkState.clock() - CacheFirstStrategy.MAX_AGE.inWholeMilliseconds * 2
         CacheFirstStrategy.clock = { NetworkState.clock() }
         try {
             CacheFirstStrategy.offline = { false }

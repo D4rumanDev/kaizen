@@ -28,6 +28,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.days
 
 /**
  * El gusto del usuario: géneros de sus favoritos y de lo que más ha visto, y las precuelas y secuelas de esas series.
@@ -40,10 +41,10 @@ object TasteRepository {
     private const val FAVORITE_WEIGHT = 3.0
     private const val CHAPTERS_PER_EXTRA_WEIGHT = 12.0
     private const val MAX_EXTRA_WEIGHT = 2.0
-    private const val TTL_MS = 30 * ApiCache.DAY
+    private val TTL = 30.days
 
     /** Una serie cuya ficha falló no se vuelve a pedir en un día (si no, se reintentaría tras cada capítulo visto). */
-    private const val RETRY_AFTER_FAILURE_MS = ApiCache.DAY
+    private val RETRY_AFTER_FAILURE = 1.days
     private const val MAX_PARALLEL_FETCHES = 4
 
     /**
@@ -136,7 +137,7 @@ object TasteRepository {
     private fun failureKey(key: String) = "fail|$key"
 
     private fun failedRecently(key: String): Boolean =
-        System.currentTimeMillis() - prefs.getLong(failureKey(key), 0L) < RETRY_AFTER_FAILURE_MS
+        System.currentTimeMillis() - prefs.getLong(failureKey(key), 0L) < RETRY_AFTER_FAILURE.inWholeMilliseconds
 
     /** Olvida lo aprendido de las fichas (lo usa «Vaciar la caché»); el perfil se rehace en la próxima consulta. */
     fun clear() {
@@ -146,6 +147,6 @@ object TasteRepository {
 
     private fun stored(key: String): StoredTaste? {
         val (stamp, taste) = prefs.getString(key, null)?.let(StoredTaste::decode) ?: return null
-        return taste.takeIf { System.currentTimeMillis() - stamp <= TTL_MS }
+        return taste.takeIf { System.currentTimeMillis() - stamp <= TTL.inWholeMilliseconds }
     }
 }

@@ -16,20 +16,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Pone en marcha [AnilistSync] dentro de la app: solo si «Emparejar con AniList» está activado en Configuración › Catálogo, con red y
- * mientras no se reproduce nada. Al acabar duerme [IDLE_MS] y mira si hay algo nuevo (series nuevas, decisiones de hace más de 30 días,
- * fichas caducadas). Si AniList no responde, espera [RETRY_MS] y sigue donde lo dejó.
+ * mientras no se reproduce nada. Al acabar duerme [IDLE] y mira si hay algo nuevo (series nuevas, decisiones de hace más de 30 días,
+ * fichas caducadas). Si AniList no responde, espera [RETRY] y sigue donde lo dejó.
  */
 internal object AnilistSyncRunner {
     private const val ANILIST_EVIDENCE_VERSION = 1
     private const val ANILIST_FORMAT_SEARCH_VERSION = 1
-    private const val IDLE_MS = 12L * 60 * 60 * 1000
-    private const val RETRY_MS = 30L * 60 * 1000
-    private const val PAUSE_MS = 30_000L
+    private val IDLE = 12.hours
+    private val RETRY = 30.minutes
+    private val PAUSE = 30.seconds
     /** Cada cuánto, como mucho, se revisan los enlaces que no se parecen a su ficha cuando no hay ninguna migración pendiente (el emparejado se reinicia varias veces al día con el relleno). */
-    private const val CLEAN_EVERY_MS = 6L * 60 * 60 * 1000
+    private val CLEAN_EVERY = 6.hours
     private const val LOG_EVERY = 50
     private var lastLogged = 0
 
@@ -102,7 +105,7 @@ internal object AnilistSyncRunner {
                     DebugLog.info("AniList", "Criterio de emparejado v${AnilistMatcher.VERSION}: se vuelve a emparejar todo lo automático")
                 }
             }
-            if (migrating || System.currentTimeMillis() - KaizenSettings.anilistLastClean >= CLEAN_EVERY_MS) { DebugLog.timed("Arranque", "limpieza de enlaces del emparejado") { cleanInconsistent() }; KaizenSettings.anilistLastClean = System.currentTimeMillis() }
+            if (migrating || System.currentTimeMillis() - KaizenSettings.anilistLastClean >= CLEAN_EVERY.inWholeMilliseconds) { DebugLog.timed("Arranque", "limpieza de enlaces del emparejado") { cleanInconsistent() }; KaizenSettings.anilistLastClean = System.currentTimeMillis() }
             loop()
         }
     }
@@ -127,7 +130,7 @@ internal object AnilistSyncRunner {
         if (fillJob?.isActive == true) return
         fillJob = AppScope.launch(Dispatchers.IO) {
             while (KaizenSettings.fillFichas && KaizenSettings.anilistSync) {
-                delay(FichaFill.MIN_INTERVAL_MS)
+                delay(FichaFill.MIN_INTERVAL)
                 if (playing || !Network.isConnected) continue
                 val now = System.currentTimeMillis()
                 val n = FichaFill.allowance(now, KaizenSettings.fillLastAt, KaizenSettings.fillDay, KaizenSettings.fillCount, KaizenSettings.fillBatch, KaizenSettings.fillDaily)
@@ -208,9 +211,9 @@ internal object AnilistSyncRunner {
             if (report != null && report.applied > 0) runCatching { CatalogBuilder.regroup() }.onFailure { logError(it) }
             delay(
                 when (report?.stopped) {
-                    null -> if (report == null) RETRY_MS else IDLE_MS
-                    "pausa" -> PAUSE_MS
-                    else -> RETRY_MS
+                    null -> if (report == null) RETRY else IDLE
+                    "pausa" -> PAUSE
+                    else -> RETRY
                 }
             )
         }

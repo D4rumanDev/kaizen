@@ -2,12 +2,13 @@ package app.kaizen.tv.ui
 
 import app.kaizen.commons.HostGate
 import app.kaizen.commons.NetworkState
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Estado de una fuente tal como lo pinta su tarjeta de «Fuentes»: piloto y texto. */
 internal data class SourceState(val health: SourcesHealth, val text: String)
 
 /** Por encima de esto una fuente que responde se marca como lenta (con el piloto de aviso). */
-internal const val SLOW_SOURCE_MS = 1_500L
+internal val SLOW_SOURCE = 1500.milliseconds
 
 /**
  * Qué dice la tarjeta de una fuente. El piloto y el texto salen del mismo dato (antes el piloto solo miraba las pausas y los fallos,
@@ -33,7 +34,7 @@ internal fun sourceState(
     laLiga -> SourceState(SourcesHealth.DOWN, "Bloqueo de LaLiga (E23) · se pasa al acabar el partido")
     pausedUntil > 0 -> SourceState(SourcesHealth.DOWN, "En pausa hasta ${clock(pausedUntil)}")
     result?.ok == true && (result.code ?: 0) >= 400 -> SourceState(SourcesHealth.PARTIAL, "Responde con error HTTP ${result.code} · ${result.millis} ms")
-    result?.ok == true && result.millis > SLOW_SOURCE_MS -> SourceState(SourcesHealth.PARTIAL, "Lenta · ${result.millis} ms")
+    result?.ok == true && result.millis > SLOW_SOURCE.inWholeMilliseconds -> SourceState(SourcesHealth.PARTIAL, "Lenta · ${result.millis} ms")
     result?.ok == true -> SourceState(SourcesHealth.OK, "Responde · ${result.millis} ms")
     result != null -> SourceState(SourcesHealth.DOWN, "No responde${result.error?.let { " ($it)" } ?: ""}")
     // Fallo reciente sin pausa: no responde del todo bien, aunque aún se use.

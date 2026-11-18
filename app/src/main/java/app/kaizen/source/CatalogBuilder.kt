@@ -26,6 +26,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Catálogo interno, lado de construcción: lo genera recorriendo cada fuente, como mucho una vez cada 14 días o cuando
@@ -140,7 +144,7 @@ object CatalogBuilder {
     private suspend fun syncWithRepository() {
         val empty = catalogDao.count() == 0
         val now = System.currentTimeMillis()
-        if (!empty && now - KaizenSettings.catalogSeedCheckedAt < ApiCache.DAY) return
+        if (!empty && now - KaizenSettings.catalogSeedCheckedAt < 1.days.inWholeMilliseconds) return
         if (!empty) KaizenSettings.catalogSeedCheckedAt = now
         val data = CatalogSeed.download(RepoConfig.baseUrl + CatalogSeed.FILE)
         val signature = CatalogSeed.download(RepoConfig.baseUrl + CatalogSeed.SIGNATURE)
@@ -211,13 +215,13 @@ internal class CatalogBuildCore(
     private val saveSeedLinks: (List<AnimeFuente>) -> Unit = {}
 ) {
     companion object {
-        const val SNAPSHOT_EVERY_MS = 7L * 86_400_000          // una fotografía a la semana
-        const val SNAPSHOT_KEEP_BIGGER_MS = 60L * 86_400_000   // una fotografía mayor no se sustituye por una menor hasta pasados 60 días
-        const val PAGE_DELAY_MS = 300L                  // pausa entre páginas: no saturar al servidor
-        const val RETRY_PAGE_MS = 2_000L               // primera espera tras un fallo de página (se duplica)
+        val SNAPSHOT_EVERY = 7.days          // una fotografía a la semana
+        val SNAPSHOT_KEEP_BIGGER = 60.days   // una fotografía mayor no se sustituye por una menor hasta pasados 60 días
+        val PAGE_DELAY = 300.milliseconds                  // pausa entre páginas: no saturar al servidor
+        val RETRY_PAGE = 2.seconds               // primera espera tras un fallo de página (se duplica)
         const val PAGE_ATTEMPTS = 6                     // intentos por página antes de dar la fuente por caída
         const val MAX_PAGES = 2000                      // tope por fuente (protege de listas que no terminan)
-        const val RETRY_DELAY_MS = 10L * 60_000         // espera antes de reintentar una fuente caída
+        val RETRY_DELAY = 10.minutes         // espera antes de reintentar una fuente caída
         const val MAX_PARALLEL_WALKS = 2                // fuentes que se recorren a la vez
         const val MAX_RETRIES = 3                       // reintentos seguidos en una sesión
     }
@@ -351,7 +355,7 @@ internal class CatalogBuildCore(
         if (running.get() || dao.count() == 0) return
         val now = clock()
         val lastAt = store.createdAt()
-        if (lastAt != null && now - lastAt < SNAPSHOT_EVERY_MS) return
+        if (lastAt != null && now - lastAt < SNAPSHOT_EVERY.inWholeMilliseconds) return
         val old = store.read()
         val states = all().associate { it.id to this.states[it.id] }.filterValues { it != SourceState.NEVER }.mapValues { it.value.encode() }
         // Las lecturas del catálogo en una transacción: una escritura a la vez no deja una fotografía a medias. El libro está en otra base:
@@ -367,7 +371,7 @@ internal class CatalogBuildCore(
             entries.map { it.toSnap() }, links.map { it.toSnap() },
             ids.allMap().map { SnapMap(it.sourceId, it.slug, it.seriesId) }, null, states
         )
-        if (old != null && fresh.entries.orEmpty().size < old.entries.orEmpty().size * 0.8 && now - old.createdAt < SNAPSHOT_KEEP_BIGGER_MS) return
+        if (old != null && fresh.entries.orEmpty().size < old.entries.orEmpty().size * 0.8 && now - old.createdAt < SNAPSHOT_KEEP_BIGGER.inWholeMilliseconds) return
         store.write(fresh)
         DebugLog.info("Catálogo", "Fotografía guardada: ${fresh.entries.orEmpty().size} series")
     }
@@ -563,7 +567,7 @@ internal class CatalogBuildCore(
         if (retries.get() >= MAX_RETRIES || !retryScheduled.compareAndSet(false, true)) return
         retries.incrementAndGet()
         scope.launch {
-            delay(RETRY_DELAY_MS)
+            delay(RETRY_DELAY)
             retryScheduled.set(false)
             runCatchingCoop { retry() }.onFailure(onError)
         }
@@ -571,7 +575,7 @@ internal class CatalogBuildCore(
 
     /** Una página del recorrido. Si el servidor limita el ritmo (429) o falla, espera cada vez más antes de rendirse. */
     private suspend fun pageWithRetry(source: AnimeSource, cursor: String?, query: SearchQuery = SearchQuery()): CatalogPage {
-        var wait = RETRY_PAGE_MS
+        var wait = RETRY_PAGE
         repeat(PAGE_ATTEMPTS - 1) {
             runCatchingCoop { return source.search(query, cursor) }
             delay(wait)
@@ -598,7 +602,7 @@ internal class CatalogBuildCore(
             items += page.items
             cursor = page.next
             pages++
-            delay(PAGE_DELAY_MS)
+            delay(PAGE_DELAY)
         } while (cursor != null && pages < MAX_PAGES)
         return items
     }

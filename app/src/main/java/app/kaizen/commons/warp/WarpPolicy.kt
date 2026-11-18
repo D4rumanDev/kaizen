@@ -1,6 +1,7 @@
 package app.kaizen.commons.warp
 
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.minutes
 
 /** Cuándo se usa el túnel WARP (Configuración › Servidores y red › Túnel WARP). Apagado de fábrica. */
 enum class WarpMode(val label: String) {
@@ -18,7 +19,7 @@ enum class WarpAction { START, STOP, NONE }
 /** La decisión de subir o bajar el túnel, sin Android para probarla. */
 object WarpPolicy {
     /** Con el bloqueo ya levantado el túnel se mantiene este tiempo: los partidos se alargan y el bloqueo va y viene. */
-    const val KEEP_AFTER_CLEAR_MS = 15 * 60 * 1000L
+    val KEEP_AFTER_CLEAR = 15.minutes
 
     /**
      * [blocked]: alguna fuente activa resuelve ahora a una IP bloqueada. [up]: el túnel está subido. [clearSince]: desde cuándo no hay
@@ -29,7 +30,7 @@ object WarpPolicy {
         WarpMode.ALWAYS -> if (up) WarpAction.NONE else WarpAction.START
         WarpMode.ON_BLOCK -> when {
             blocked -> if (up) WarpAction.NONE else WarpAction.START
-            up && clearSince > 0 && now - clearSince >= KEEP_AFTER_CLEAR_MS -> WarpAction.STOP
+            up && clearSince > 0 && now - clearSince >= KEEP_AFTER_CLEAR.inWholeMilliseconds -> WarpAction.STOP
             else -> WarpAction.NONE
         }
     }

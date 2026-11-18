@@ -21,6 +21,7 @@ import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderManager
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Kaizen: datos para el panel de depuración y la ventana de información del capítulo.
@@ -144,14 +145,14 @@ class PlaybackDebugInfo : AnalyticsListener {
 
     /**
      * La historia de [video] en las estadísticas de conexión. Leerla toca las preferencias en disco y el panel se redibuja cada segundo en el hilo principal: se lee
-     * en segundo plano como mucho cada [HISTORY_TTL_MS] y mientras tanto se devuelve la última (vacía la primera vez; en un segundo ya está).
+     * en segundo plano como mucho cada [HISTORY_TTL] y mientras tanto se devuelve la última (vacía la primera vez; en un segundo ya está).
      */
     private fun history(video: Video?): Pair<ConnectionStats.Total?, ConnectionStats.Total?> {
         val current = cachedHistory
         val serverName = video?.serverName.orEmpty()
         val linkName = video?.linkSource.orEmpty()
         // Caduca por tiempo y también si el vídeo es otro (otro servidor o fuente): no se enseña la historia de uno bajo el nombre de otro.
-        val stale = current == null || current.serverName != serverName || current.linkName != linkName || now() - current.at > HISTORY_TTL_MS
+        val stale = current == null || current.serverName != serverName || current.linkName != linkName || now() - current.at > HISTORY_TTL.inWholeMilliseconds
         if (!refreshingHistory && stale) {
             refreshingHistory = true
             AppScope.launch {
@@ -284,7 +285,7 @@ class PlaybackDebugInfo : AnalyticsListener {
     }
 
     companion object {
-        private const val HISTORY_TTL_MS = 10_000L
+        private val HISTORY_TTL = 10.seconds
         private const val MAX_EVENTS = 60
         private const val SHOWN_EVENTS = 10
         private const val BIG_DROP = 10

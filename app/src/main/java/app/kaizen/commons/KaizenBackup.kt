@@ -17,6 +17,8 @@ import app.kaizen.tv.ui.KaizenToast
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.days
 
 /**
  * Kaizen: copia local de los **estados** del usuario (favoritos, historial, progreso, estados de las series y reglas de unión; los ajustes, aparte en [SettingsBackup]) en un JSON dentro de la carpeta de la app
@@ -33,7 +35,7 @@ object KaizenBackup {
     private const val MAX_GROUP_SIZE = 30
 
     /** Con la última copia de hace menos de esto no toca otra: deja margen a que el trabajo diario llegue algo antes de 24 h. */
-    private const val DUE_AFTER_MS = 20L * 60 * 60 * 1000 // 20 horas
+    private val DUE_AFTER = 20.hours // 20 horas
 
     @Keep
     data class Data(
@@ -110,7 +112,7 @@ object KaizenBackup {
         val byRecent = files.sortedByDescending { it.lastModified() }
         val kept = setOfNotNull(best(files), best(since(files, acceptedAt)))
         // Nunca la más reciente ni las protegidas; fuera las de más de keepDays días y las que pasan de maxFiles (copias manuales repetidas).
-        return byRecent.drop(1).filterIndexed { index, file -> file !in kept && (index + 1 >= maxFiles || now - file.lastModified() > keepDays * ApiCache.DAY) }
+        return byRecent.drop(1).filterIndexed { index, file -> file !in kept && (index + 1 >= maxFiles || now - file.lastModified() > keepDays.days.inWholeMilliseconds) }
     }
 
     /** Aviso si los datos actuales son menos de la mitad de los de la mejor copia; null si todo cuadra. */
@@ -163,7 +165,7 @@ object KaizenBackup {
         if (latestModified == null) return true
         val age = now - latestModified
         // Una fecha en el futuro (reloj que se adelantó) no puede bloquear las copias: cuenta como que toca.
-        return age < 0 || age >= DUE_AFTER_MS
+        return age < 0 || age >= DUE_AFTER.inWholeMilliseconds
     }
 
     /** La copia del día, solo si hace falta (la usa el trabajo diario y el arranque, por si Android lo retrasó). null = no tocaba. */

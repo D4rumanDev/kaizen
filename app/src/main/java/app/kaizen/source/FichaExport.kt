@@ -10,6 +10,7 @@ import java.io.InputStreamReader
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import kotlin.time.Duration.Companion.hours
 
 /** Lectura por tramos de [AnimeFicha] para exportarla sin cargar la tabla entera en memoria (cada fila lleva su JSON comprimido). */
 @Dao
@@ -42,7 +43,7 @@ internal object FichaExport {
     const val FORMAT = "kaizen-fichas-anilist"
     const val VERSION = 1
     private const val PAGE = 200
-    private const val STALE_PART_MS = 60L * 60 * 1000
+    private val STALE_PART = 1.hours
 
     class Result(val file: File, val rows: Int)
 
@@ -59,7 +60,7 @@ internal object FichaExport {
     fun export(dir: File, name: String, at: Long, expected: Int, page: (after: Long, limit: Int) -> List<AnimeFicha>): Result {
         dir.mkdirs()
         // Un temporal de una exportación que murió a medias (más de una hora): no es una copia válida, así que se limpia. Solo estos; las copias completas no se tocan.
-        dir.listFiles { f -> f.name.startsWith(PREFIX) && f.name.endsWith(".part") && at - f.lastModified() > STALE_PART_MS }.orEmpty().forEach { it.delete() }
+        dir.listFiles { f -> f.name.startsWith(PREFIX) && f.name.endsWith(".part") && at - f.lastModified() > STALE_PART.inWholeMilliseconds }.orEmpty().forEach { it.delete() }
         val target = File(dir, name)
         require(!target.exists()) { "ya existe ${target.name}" }
         val part = File(dir, "$name.part")

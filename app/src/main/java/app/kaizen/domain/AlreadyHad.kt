@@ -17,6 +17,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Las series que no hace falta recomendar: se reconocen por el título normalizado, por el slug (sin «-latino», porque el mismo
@@ -38,14 +40,14 @@ class Had(private val titles: Set<String>, private val slugs: Set<String>, priva
  * o en el historial.
  *
  * Saber qué series están enteras cuesta pedir sus episodios, así que se calcula en segundo plano: quien pregunta espera como mucho
- * [WAIT_MS] y, si no llega, recibe las favoritas más lo último que se supo; la siguiente consulta ya lo tiene.
+ * [WAIT] y, si no llega, recibe las favoritas más lo último que se supo; la siguiente consulta ya lo tiene.
  */
 object AlreadyHad {
-    private const val FRESH_MS = 30 * 60_000L
+    private val FRESH = 30.minutes
 
     /** Tras un cálculo incompleto (alguna fuente no respondió) se vuelve a intentar antes. */
-    private const val RETRY_MS = 2 * 60_000L
-    private const val WAIT_MS = 2_500L
+    private val RETRY = 2.minutes
+    private val WAIT = 2500.milliseconds
 
     /** Las series del historial que se comprueban, las más recientes. */
     private const val MAX_CHECKED = 40
@@ -68,7 +70,7 @@ object AlreadyHad {
         }
         val job = lock.withLock {
             val age = System.currentTimeMillis() - finishedAt
-            val stale = signature != finishedSignature || age > (if (finishedComplete) FRESH_MS else RETRY_MS)
+            val stale = signature != finishedSignature || age > (if (finishedComplete) FRESH.inWholeMilliseconds else RETRY.inWholeMilliseconds)
             if (stale && refresh?.isActive != true) refresh = AppScope.async {
                 runCatchingCoop { recompute(signature) }.onFailure { error ->
                     // Un fallo cuenta como cálculo incompleto: se reintenta a los 2 min en vez de en cada consulta.
@@ -78,7 +80,7 @@ object AlreadyHad {
             }
             refresh
         }
-        job?.let { withTimeoutOrNull(WAIT_MS) { it.await() } }
+        job?.let { withTimeoutOrNull(WAIT) { it.await() } }
         // Una serie con estado (viendo, completada, pendiente...) ya está en la lista del usuario: no se recomienda.
         val withStatus = SeriesStatuses.all.value
         return lock.withLock {

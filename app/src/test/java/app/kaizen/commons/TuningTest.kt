@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import kotlin.time.Duration.Companion.seconds
 
 /** Los ajustes de medida: los módulos los reciben por parámetro o variable, con el valor de fábrica por defecto (se prueban sin Android). */
 class TuningTest {
@@ -25,7 +26,7 @@ class TuningTest {
 
     @Test
     fun `la paciencia de fabrica no cambia los tiempos`() {
-        assertEquals(10_000L, Tuning.patient(10_000L))
+        assertEquals(10.seconds, Tuning.patient(10.seconds))
     }
 
     @Test

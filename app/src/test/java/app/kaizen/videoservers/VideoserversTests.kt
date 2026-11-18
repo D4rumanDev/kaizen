@@ -10,6 +10,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 
 // ===== JkPlayerServerTest.kt =====
 /** Fragmentos reales de las páginas `jkplayer/um` (Desu) y `jkplayer/umv` (Magi), 2026-10-11. */
@@ -61,11 +64,11 @@ class OkruUnescapeTest {
 
 // ===== ServerResolverTest.kt =====
 class ServerResolverTest {
-    private fun run(items: List<String>, works: Set<String>, timeoutMs: Long = 1_000, canCheck: (String) -> Boolean = { true }): Triple<Boolean, List<String>, List<String>> {
+    private fun run(items: List<String>, works: Set<String>, timeout: Duration = 1.seconds, canCheck: (String) -> Boolean = { true }): Triple<Boolean, List<String>, List<String>> {
         val list = items.toMutableList()
         val dropped = mutableListOf<String>()
         val found = runBlocking {
-            ServerResolver.dropBrokenLeading(list, timeoutMs, canCheck, { dropped += it }) { it in works }
+            ServerResolver.dropBrokenLeading(list, timeout, canCheck, { dropped += it }) { it in works }
         }
         return Triple(found, list, dropped)
     }
@@ -105,7 +108,7 @@ class ServerResolverTest {
     fun timeoutDropsTheHead() {
         val list = mutableListOf("slow", "fast")
         val found = runBlocking {
-            ServerResolver.dropBrokenLeading(list, 50) { if (it == "slow") { delay(2_000); true } else true }
+            ServerResolver.dropBrokenLeading(list, 50.milliseconds) { if (it == "slow") { delay(2_000); true } else true }
         }
         assertTrue(found)
         assertEquals(listOf("fast"), list)

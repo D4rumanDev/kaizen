@@ -1,6 +1,8 @@
 package app.kaizen.commons
 
 import app.kaizen.domain.ConnectionStats
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration
 
 /**
  * Reparte los ajustes de medida de [KaizenSettings] (tiempos, tamaños, días) a los módulos que no leen preferencias
@@ -11,14 +13,14 @@ object Tuning {
     @Volatile var patience = 1f
         private set
 
-    /** Tiempo base [baseMs] ajustado por la paciencia. */
-    fun patient(baseMs: Long): Long = (baseMs * patience).toLong()
+    /** Tiempo base [base] ajustado por la paciencia. */
+    fun patient(base: Duration): Duration = base * patience.toDouble()
 
     fun apply() {
         patience = KaizenSettings.patience.takeIf { it in KaizenSettings.PATIENCE_OPTIONS } ?: 1f
         FallbackDns.provider = FallbackDns.Provider.of(KaizenSettings.dnsProvider)
         KaizenProgress.minResumeMs = KaizenSettings.resumeAfterSeconds.coerceAtLeast(0) * 1_000L
-        CacheFirstStrategy.maxAgeMs = KaizenSettings.coverDays.coerceAtLeast(1) * DAY_MS
+        CacheFirstStrategy.maxAge = KaizenSettings.coverDays.coerceAtLeast(1).days
         DebugLog.maxBytes = KaizenSettings.logKb.coerceAtLeast(64) * 1024
         ConnectionStats.keepDays = KaizenSettings.statsDays.coerceAtLeast(7)
     }
@@ -29,5 +31,4 @@ object Tuning {
     /** Las gráficas no pueden abarcar más días de los que se guardan. */
     fun chartDays(): Int = KaizenSettings.chartDays.coerceIn(1, ConnectionStats.keepDays)
 
-    private const val DAY_MS = 24L * 60 * 60 * 1000
 }

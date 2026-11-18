@@ -5,11 +5,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Las imágenes que no existen no se vuelven a pedir en una semana, y el visor del registro enseña cada anotación entera. */
 class MissLedgerTest {
     private var now = 1_000L
-    private val ledger = MissLedger(ttlMs = 100L, max = 3) { now }
+    private val ledger = MissLedger(ttl = 100.milliseconds, max = 3) { now }
 
     @Test
     fun `una imagen anotada no se vuelve a pedir hasta que caduca`() {
@@ -43,7 +44,7 @@ class MissLedgerTest {
     @Test
     fun `lo guardado se recupera`() {
         ledger.mark("a")
-        val other = MissLedger(100L, 3) { now }
+        val other = MissLedger(100.milliseconds, 3) { now }
         other.load(ledger.snapshot())
         assertTrue(other.isMissing("a"))
     }

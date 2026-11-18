@@ -4,6 +4,7 @@ import androidx.annotation.Keep
 import app.kaizen.App
 import com.google.gson.Gson
 import java.io.File
+import kotlin.time.Duration.Companion.days
 
 /**
  * Lo que se **quita** también viaja entre dispositivos (un favorito, un capítulo visto que se desmarca). La regla es la de las «lápidas»: cada dispositivo compara lo que tiene con
@@ -16,8 +17,7 @@ import java.io.File
  * siguen siendo solo-añadir.
  */
 object Removals {
-    const val MAX_AGE_MS = 90L * 24 * 60 * 60 * 1000
-    private const val DAY_MS = 24L * 60 * 60 * 1000
+    val MAX_AGE = 90.days
     const val MAX_ENTRIES = 50_000
     private const val MAX_KEY = 450
     private const val MIN_FOR_SHARE = 10
@@ -46,7 +46,7 @@ object Removals {
 
     /** Las lápidas propias que quedan: las de antes salvo las viejas y las que se han vuelto a poner, más las nuevas con la fecha de [now]. */
     fun nextRemoved(old: Map<String, Long>, newlyDeleted: Collection<String>, present: (String) -> Boolean?, now: Long): Map<String, Long> =
-        old.filter { (key, at) -> now - at <= MAX_AGE_MS && present(key) != true } + newlyDeleted.associateWith { now }
+        old.filter { (key, at) -> now - at <= MAX_AGE.inWholeMilliseconds && present(key) != true } + newlyDeleted.associateWith { now }
 
     /** ¿Es [count] de [total] un borrado masivo (más de la mitad, con al menos 10 cosas)? */
     fun massive(count: Int, total: Int): Boolean = total >= MIN_FOR_SHARE && count > total * MAX_SHARE
@@ -67,7 +67,7 @@ object Removals {
 
     /** Una clave limpia de una copia ajena: solo claves bien formadas, con fecha, y con tope. */
     fun sanitize(raw: Map<String, Long?>?, now: Long = System.currentTimeMillis()): Map<String, Long> =
-        raw.orEmpty().entries.asSequence().filter { (key, at) -> at != null && at > 0 && at <= now + DAY_MS && parse(key) != null }.take(MAX_ENTRIES).associate { it.key to it.value!! }
+        raw.orEmpty().entries.asSequence().filter { (key, at) -> at != null && at > 0 && at <= now + 1.days.inWholeMilliseconds && parse(key) != null }.take(MAX_ENTRIES).associate { it.key to it.value!! }
 
     /** Identifica una lápida ya aplicada (clave y fecha). */
     fun seenId(key: String, at: Long) = "$key@$at"
@@ -104,7 +104,7 @@ object Removals {
         val blocked = blocked(incoming.map(removedOf) + removed, local::canon)
         incoming.forEach { item -> local.merge(item) { key -> stale(key, createdAt(item), blocked, local::canon) } }
         val seen = state.seen.toHashSet()
-        val fresh = incoming.flatMap { removedOf(it).entries }.filter { now - it.value <= MAX_AGE_MS && seenId(it.key, it.value) !in seen }
+        val fresh = incoming.flatMap { removedOf(it).entries }.filter { now - it.value <= MAX_AGE.inWholeMilliseconds && seenId(it.key, it.value) !in seen }
         val baseCanon = state.base.orEmpty().mapNotNull(local::canon).toSet()
         val after = local.presence()
         val toRemove = fresh.map { it.key }.distinct().filter { after.isPresent(it) == true && local.canon(it) in baseCanon }
@@ -112,7 +112,7 @@ object Removals {
         val removedHere = if (heldRemote) 0 else local.remove(toRemove)
         // Si se retuvo por masivo no se anotan como vistas, para que no se den por hechas.
         val applied = if (heldRemote) emptyList() else fresh
-        val keep = (seen + applied.map { seenId(it.key, it.value) }).filter { id -> now - (id.substringAfterLast('@').toLongOrNull() ?: 0L) <= MAX_AGE_MS }
+        val keep = (seen + applied.map { seenId(it.key, it.value) }).filter { id -> now - (id.substringAfterLast('@').toLongOrNull() ?: 0L) <= MAX_AGE.inWholeMilliseconds }
         return Outcome(removed, State(local.presence().keys.toList(), removed, keep), removedHere, heldBack, heldRemote)
     }
 

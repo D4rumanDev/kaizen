@@ -218,7 +218,7 @@ class PlaybackPhaseTest {
     fun `un salto dentro del bufer caduca y la siguiente carga ya cuenta`() {
         val seeking = PlaybackPhase.READY.onSeek()
         assertEquals(PlaybackPhase.SEEKING, seeking.expireSeek(1_000))
-        val expired = seeking.expireSeek(PlaybackPhase.SEEK_WINDOW_MS + 1)
+        val expired = seeking.expireSeek(PlaybackPhase.SEEK_WINDOW.inWholeMilliseconds + 1)
         assertEquals(PlaybackPhase.READY, expired)
         assertEquals(PlaybackPhase.REBUFFER, expired.onPlayerState(buffering))
     }
@@ -281,7 +281,7 @@ class PlaybackSessionTest {
         assertEquals(0, s.rebuffers)
         s = state(s, Player.STATE_READY, 5_600)
         s = s.on(SessionEvent.Seek(20_000))
-        s = state(s, Player.STATE_BUFFERING, 20_000 + PlaybackPhase.SEEK_WINDOW_MS + 1)
+        s = state(s, Player.STATE_BUFFERING, 20_000 + PlaybackPhase.SEEK_WINDOW.inWholeMilliseconds + 1)
         assertEquals(1, s.rebuffers)
     }
 

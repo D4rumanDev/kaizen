@@ -1,6 +1,7 @@
 package app.kaizen.videoservers
 
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
 
 /**
  * Resolución de servidores por salud: aparta de la cabeza de una lista los candidatos que no funcionan hasta dar con
@@ -15,7 +16,7 @@ object ServerResolver {
      */
     suspend fun <T> dropBrokenLeading(
         candidates: MutableList<T>,
-        timeoutMs: Long,
+        timeout: Duration,
         canCheck: (T) -> Boolean = { true },
         onDropped: (T) -> Unit = {},
         onTrying: (T) -> Unit = {},
@@ -25,7 +26,7 @@ object ServerResolver {
             val first = candidates.first()
             if (!canCheck(first)) return true
             onTrying(first)
-            if (withTimeoutOrNull(timeoutMs) { works(first) } == true) return true
+            if (withTimeoutOrNull(timeout) { works(first) } == true) return true
             candidates.removeAt(0)
             onDropped(first)
         }
@@ -33,8 +34,8 @@ object ServerResolver {
     }
 
     /** [dropBrokenLeading] para servidores: funciona si el extractor da al menos una opción de vídeo verificada. */
-    suspend fun dropBrokenLeading(servers: MutableList<Server>, timeoutMs: Long, onTrying: (Server) -> Unit = {}, onDropped: (Server) -> Unit = {}): Boolean =
-        dropBrokenLeading(servers, timeoutMs, canCheck = { it !is WebServer }, onDropped = onDropped, onTrying = onTrying) {
+    suspend fun dropBrokenLeading(servers: MutableList<Server>, timeout: Duration, onTrying: (Server) -> Unit = {}, onDropped: (Server) -> Unit = {}): Boolean =
+        dropBrokenLeading(servers, timeout, canCheck = { it !is WebServer }, onDropped = onDropped, onTrying = onTrying) {
             it.verified()?.options?.isNotEmpty() == true
         }
 }

@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
+import kotlin.time.Duration.Companion.days
 
 /**
  * **Catálogo unificado descargable**, para que una instalación limpia no recorra las fuentes (cientos de peticiones) para tener el catálogo. Se publica junto a las fuentes por
@@ -44,7 +45,7 @@ internal object CatalogSeed {
     private const val MAX_ANILIST_ID = 100_000_000L
     private val NAME = Regex("[a-z0-9]{2,20}")
     private val SLUG = Regex("[A-Za-z0-9._~-]{1,400}")
-    private const val MAX_FUTURE_MS = 86_400_000L
+    private val MAX_FUTURE = 1.days
 
     @Keep
     class SeedFile(
@@ -89,7 +90,7 @@ internal object CatalogSeed {
         if (data.size > MAX_COMPRESSED || !SpecBundle.verify(publicKey, data, signature)) return null
         val file = runCatching { Gson().fromJson(String(unzip(data) ?: return null, Charsets.UTF_8), SeedFile::class.java) }.getOrNull() ?: return null
         if (file.version != VERSION) return null
-        val createdAt = file.createdAt?.takeIf { it > 0 && it <= now + MAX_FUTURE_MS } ?: return null
+        val createdAt = file.createdAt?.takeIf { it > 0 && it <= now + MAX_FUTURE.inWholeMilliseconds } ?: return null
         val series = file.series?.takeIf { it.isNotEmpty() && it.size <= MAX_SERIES } ?: return null
         val entries = series.map { s ->
             val name = s.name?.takeIf { it.isNotBlank() && it.length <= 300 && it.none { c -> c.isISOControl() || Character.getType(c) == Character.FORMAT.toInt() } } ?: return null

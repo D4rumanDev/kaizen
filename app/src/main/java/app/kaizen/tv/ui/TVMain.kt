@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 import app.kaizen.R
 import app.kaizen.tv.settings.OpenRequest
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
 
 class TVMain : TVBaseActivity(), TVServersFactory.ServersInterface {
 
@@ -91,11 +92,11 @@ class TVMain : TVBaseActivity(), TVServersFactory.ServersInterface {
 
     /**
      * Atrás, como en SmartTube: en el contenido abre el menú; en el menú, la primera pulsación avisa y la segunda
-     * (antes de [EXIT_WINDOW_MS]) cierra la app con sus conexiones.
+     * (antes de [EXIT_WINDOW]) cierra la app con sus conexiones.
      */
     private fun onBackAtMenu() {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastBackAt < EXIT_WINDOW_MS) {
+        if (now - lastBackAt < EXIT_WINDOW.inWholeMilliseconds) {
             AppExit.exit(this)
         } else {
             lastBackAt = now
@@ -196,6 +197,6 @@ class TVMain : TVBaseActivity(), TVServersFactory.ServersInterface {
 
         /** Código del resultado del bypass de Cloudflare (al arrancar y desde Configuración). */
         const val BYPASS_REQUEST = 7425
-        private const val EXIT_WINDOW_MS = 2_000L
+        private val EXIT_WINDOW = 2.seconds
     }
 }

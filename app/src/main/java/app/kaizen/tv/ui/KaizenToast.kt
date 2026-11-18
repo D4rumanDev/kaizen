@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import xdroid.toaster.Toaster
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Notificaciones flotantes HUD (Toast) tipo pastilla unificadas para Android TV:
@@ -43,10 +44,10 @@ object KaizenToast {
     /** [at] es la hora (reloj monótono) en que se mostró: un aviso más viejo que su duración es un resto, no algo que enseñar. */
     data class Entry(val id: Long, val text: String, val longDuration: Boolean, val at: Long = android.os.SystemClock.elapsedRealtime()) {
         val durationMs: Long get() = if (longDuration) 3_500L else 2_200L
-        fun isStale(now: Long): Boolean = now - at > durationMs + STALE_MARGIN_MS
+        fun isStale(now: Long): Boolean = now - at > durationMs + STALE_MARGIN.inWholeMilliseconds
     }
 
-    private const val STALE_MARGIN_MS = 500L
+    private val STALE_MARGIN = 500.milliseconds
 
     private val _current = MutableStateFlow<Entry?>(null)
     val current = _current.asStateFlow()

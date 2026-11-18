@@ -43,6 +43,7 @@ import java.time.format.DateTimeFormatterBuilder
 import java.util.TimeZone
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Fuente por scraping descrita por un fichero ([SourceSpec]): el motor es de la app y los selectores, las plantillas de URL
@@ -352,7 +353,7 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
      * un fallo de red se propaga (si no, parecería el final del catálogo).
      */
     private suspend fun listing(url: String, json: Boolean = false): Listing {
-        synchronized(listings) { listings[url] }?.takeIf { System.currentTimeMillis() - it.first < LISTING_TTL_MS }?.let { return it.second }
+        synchronized(listings) { listings[url] }?.takeIf { System.currentTimeMillis() - it.first < LISTING_TTL.inWholeMilliseconds }?.let { return it.second }
         val cards: List<Card>
         val lastPage: Int
         if (json) {
@@ -395,7 +396,7 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
 
     /** Slugs de todas las series del listado de emisión (varias páginas); se guardan unos minutos. Un fallo no guarda un conjunto a medias. */
     private fun airingSlugs(): Set<String> {
-        airingCache?.takeIf { System.currentTimeMillis() - it.first < LISTING_TTL_MS }?.let { return it.second }
+        airingCache?.takeIf { System.currentTimeMillis() - it.first < LISTING_TTL.inWholeMilliseconds }?.let { return it.second }
         val template = spec.urls.airing ?: return emptySet()
         val slugs = LinkedHashSet<String>()
         for (page in 1..spec.airingPages) {
@@ -1011,7 +1012,7 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
 
         const val SKIP_PAGES = 6
         const val LISTING_CACHE = 6
-        const val LISTING_TTL_MS = 10 * 60_000L
+        val LISTING_TTL = 10.minutes
         val SLUG = Regex("[a-z0-9-]+")
         val DATE = Regex("""(\d{1,2}) ([a-z]{3})""")
 

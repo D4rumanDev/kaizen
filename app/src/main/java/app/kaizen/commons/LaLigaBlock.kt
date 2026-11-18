@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.net.InetAddress
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * ¿Está el operador bloqueando ahora las IPs de una web por un partido de LaLiga? Los operadores bloquean por **IP** (no por DNS ni por nombre
@@ -15,7 +16,7 @@ import java.util.concurrent.TimeUnit
  */
 object LaLigaBlock {
     private const val URL = "https://hayahora.futbol/estado/blocked-any.txt"
-    private const val CACHE_MS = 5 * 60 * 1000L
+    private val CACHE = 5.minutes
     private const val MAX_BYTES = 512 * 1024L
 
     @Volatile private var cached: Pair<Long, Set<String>>? = null
@@ -40,7 +41,7 @@ object LaLigaBlock {
     private suspend fun blockedIps(): Set<String>? = withContext(Dispatchers.IO) {
         // Con el aviso apagado no se consulta nada, salvo que el túnel esté en «solo con bloqueo»: ese modo necesita saberlo.
         if (!KaizenSettings.laLigaWarning && app.kaizen.commons.warp.WarpMode.of(KaizenSettings.warpMode) != app.kaizen.commons.warp.WarpMode.ON_BLOCK) return@withContext null
-        cached?.takeIf { System.currentTimeMillis() - it.first < CACHE_MS }?.let { return@withContext it.second }
+        cached?.takeIf { System.currentTimeMillis() - it.first < CACHE.inWholeMilliseconds }?.let { return@withContext it.second }
         runCatching {
             // Validación TLS estricta del sistema aunque el usuario haya puesto «permisiva» para las fuentes: es un servicio de un tercero.
             val client = okhttp3.OkHttpClient.Builder().dns(RelayDns).callTimeout(8, TimeUnit.SECONDS).build()

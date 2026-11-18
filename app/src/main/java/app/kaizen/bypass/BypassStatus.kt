@@ -8,7 +8,7 @@ import app.kaizen.tv.ui.KaizenToast
 /**
  * Estado del último bypass de Cloudflare: lo muestra «Fuentes» y aplica el mismo protocolo que [HostGate]. Tras
  * [FAILURES_TO_PAUSE] fallos seguidos el arranque deja de lanzar el bypass durante una pausa cada vez más larga
- * ([HostGate.PAUSES_MS]: 2 min, 5 min, 10 min y luego 1 h); tras una pausa basta un fallo para volver a pausar.
+ * ([HostGate.PAUSES]: 2 min, 5 min, 10 min y luego 1 h); tras una pausa basta un fallo para volver a pausar.
  * Todo vuelve a empezar cuando el bypass funciona. El botón de Configuración lo lanza siempre.
  */
 object BypassStatus {
@@ -71,12 +71,12 @@ object BypassStatus {
             failures++
             val threshold = if (strikes > 0) 1 else FAILURES_TO_PAUSE
             if (failures >= threshold) {
-                val pause = HostGate.PAUSES_MS[strikes.coerceAtMost(HostGate.PAUSES_MS.lastIndex)]
+                val pause = HostGate.PAUSES[strikes.coerceAtMost(HostGate.PAUSES.lastIndex)]
                 strikes++
                 failures = 0
-                storage?.save(now + pause, strikes)
-                _snapshot.value = Snapshot(state, now, millis, now + pause)
-                val lasts = if (pause >= 60 * 60_000L) "1 hora" else "${pause / 60_000L} minutos"
+                storage?.save(now + pause.inWholeMilliseconds, strikes)
+                _snapshot.value = Snapshot(state, now, millis, now + pause.inWholeMilliseconds)
+                val lasts = HostGate.describe(pause)
                 runCatching { app.kaizen.commons.AppErrors.record(app.kaizen.domain.ConnectionStats.Cause.CLOUDFLARE, app.kaizen.commons.AppErrors.Area.SOURCE, "Bypass en pausa $lasts (${state.name})", context = "Cloudflare") }
                 onPause("Cloudflare no responde: no se reintentará solo durante $lasts")
                 return

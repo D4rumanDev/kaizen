@@ -18,6 +18,7 @@ import app.kaizen.domain.AlreadyHad
 import app.kaizen.domain.Had
 import app.kaizen.domain.NotRecommended
 import app.kaizen.domain.SeriesStatuses
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Recomendados a tu medida: primero las precuelas y secuelas de tus series que aún no has visto y después series de
@@ -26,7 +27,7 @@ import app.kaizen.domain.SeriesStatuses
  */
 object Recommendations {
     /** Un género lento no retrasa toda la sección: pasado este tiempo se sigue sin él. */
-    private const val GENRE_TIMEOUT_MS = 25_000L
+    private val GENRE_TIMEOUT = 25.seconds
 
     /** Series que enseña la sección «Recomendados». */
     const val SECTION_SIZE = 15
@@ -71,7 +72,7 @@ object Recommendations {
                     // Sin minScore en la consulta: animeav1 y jkanime no traen nota en el listado y ese filtro las quitaría
                     // todas. Con SortBy.RATING el motor les pide la nota (en caché 15 días) y Taste.rank descarta las de menos de 3.
                     val query = SearchQuery(genre = genre.slug, sort = SortBy.RATING)
-                    genre.slug to (runCatchingCoop { withTimeoutOrNull(GENRE_TIMEOUT_MS) { SearchEngine.firstPages(query, GENRE_PAGES) } }.getOrNull() ?: emptyList())
+                    genre.slug to (runCatchingCoop { withTimeoutOrNull(GENRE_TIMEOUT) { SearchEngine.firstPages(query, GENRE_PAGES) } }.getOrNull() ?: emptyList())
                 }
             }.awaitAll().toMap()
         }

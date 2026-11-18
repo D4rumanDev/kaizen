@@ -8,6 +8,8 @@ import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.HttpStatusException
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.DurationUnit
 
 /**
  * Created by jordy on 17/03/2018.
@@ -18,14 +20,14 @@ class BypassUtil {
     companion object {
         /** El User-Agent de la app (ver [UserAgent]): el mismo para el bypass, las webs y los servidores. */
         val userAgent: String get() = UserAgent.current()
-        /** Hay un bypass en marcha; caduca solo a los [LOADING_MAX_MS] para que una guarda olvidada no bloquee los siguientes. */
+        /** Hay un bypass en marcha; caduca solo a los [LOADING_MAX] para que una guarda olvidada no bloquee los siguientes. */
         var isLoading: Boolean
-            get() = loadingSince != 0L && SystemClock.elapsedRealtime() - loadingSince < LOADING_MAX_MS
+            get() = loadingSince != 0L && SystemClock.elapsedRealtime() - loadingSince < LOADING_MAX.inWholeMilliseconds
             set(value) { loadingSince = if (value) SystemClock.elapsedRealtime() else 0L }
         @Volatile private var loadingSince = 0L
-        private const val LOADING_MAX_MS = 90_000L
+        private val LOADING_MAX = 90.seconds
         /** Sin esto, en TV (tiempo de espera 0 = sin límite) un Cloudflare que no contesta cuelga la comprobación para siempre. */
-        private const val CHECK_TIMEOUT_MS = 10_000
+        private val CHECK_TIMEOUT = 10.seconds
 
         private const val keyCfClearance = "cf_clearance"
         private const val keyCfDuid = "__cfduid"
@@ -61,7 +63,7 @@ class BypassUtil {
         fun isNeeded(url: String = testLink): Boolean {
             return try {
                 RequestCounter.note(url)
-                val response = jsoupCookies(url).timeout(CHECK_TIMEOUT_MS).execute()
+                val response = jsoupCookies(url).timeout(CHECK_TIMEOUT.toInt(DurationUnit.MILLISECONDS)).execute()
                 response.statusCode().let { it == 503 || it == 403 }.also { needed -> if (!needed) BypassStatus.notNeeded() }
             } catch (e: HttpStatusException) {
                 e.statusCode.let { it == 503 || it == 403 }

@@ -1,6 +1,7 @@
 package app.kaizen.tv.exoplayer
 
 import androidx.media3.common.Player
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Máquina de estados de la reproducción para el panel de depuración: en qué fase está el vídeo y por qué se detiene. Sustituye a las banderas
@@ -45,10 +46,10 @@ enum class PlaybackPhase(val label: String) {
     fun onSeek(): PlaybackPhase = if (this == START) START else SEEKING
 
     /**
-     * Un salto dentro de lo ya descargado no provoca ningún cambio de estado y no se vería terminar: pasados [SEEK_WINDOW_MS] sin cargar, el salto
+     * Un salto dentro de lo ya descargado no provoca ningún cambio de estado y no se vería terminar: pasados [SEEK_WINDOW] sin cargar, el salto
      * se da por resuelto y una carga posterior ya es una recarga de verdad.
      */
-    fun expireSeek(sinceSeekMs: Long): PlaybackPhase = if (this == SEEKING && sinceSeekMs > SEEK_WINDOW_MS) READY else this
+    fun expireSeek(sinceSeekMs: Long): PlaybackPhase = if (this == SEEKING && sinceSeekMs > SEEK_WINDOW.inWholeMilliseconds) READY else this
 
     /** Por qué está cargando en esta fase, en claro. */
     fun bufferingReason(bandwidth: String): String = when (this) {
@@ -58,6 +59,6 @@ enum class PlaybackPhase(val label: String) {
     }
 
     companion object {
-        const val SEEK_WINDOW_MS = 3_000L
+        val SEEK_WINDOW = 3.seconds
     }
 }

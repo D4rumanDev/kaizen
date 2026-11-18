@@ -19,6 +19,8 @@ import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Cliente HTTP común de las fuentes que se leen por scraping: User-Agent de navegador, tiempos acotados y turno por host
@@ -27,13 +29,13 @@ import java.util.concurrent.TimeUnit
  */
 internal object SourceHttp {
     /** Las webs sanas responden en menos de un segundo: pasados 12 s la pantalla ya no debe esperar a un servidor caído. */
-    private const val READ_TIMEOUT_S = HostGate.REQUEST_TIMEOUT_MS / 1000L
+    private val READ_TIMEOUT = HostGate.REQUEST_TIMEOUT
 
     /** Páginas del catálogo y de la API: pesan más y se piden en segundo plano. */
-    private const val HEAVY_READ_TIMEOUT_S = 30L
+    private val HEAVY_READ_TIMEOUT = 30.seconds
 
     /** Conectar es rápido o no se consigue: el relevo de DNS no puede esperar medio minuto. */
-    private const val CONNECT_TIMEOUT_S = 6L
+    private val CONNECT_TIMEOUT = 6.seconds
 
     /** Tope del cuerpo si la fuente no pide otro (Jsoup cortaba en 2 MB): un servidor roto no puede llenar la memoria de la tele. */
     private const val MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -45,12 +47,12 @@ internal object SourceHttp {
     @Volatile private var light: OkHttpClient? = null
     @Volatile private var heavy: OkHttpClient? = null
 
-    private fun lightClient(): OkHttpClient = light ?: client(READ_TIMEOUT_S).also { light = it }
-    private fun heavyClient(): OkHttpClient = heavy ?: client(HEAVY_READ_TIMEOUT_S).also { heavy = it }
+    private fun lightClient(): OkHttpClient = light ?: client(READ_TIMEOUT).also { light = it }
+    private fun heavyClient(): OkHttpClient = heavy ?: client(HEAVY_READ_TIMEOUT).also { heavy = it }
 
-    private fun client(readSeconds: Long): OkHttpClient = (clientOverride ?: AppHttpClient.streaming()).newBuilder()
-        .connectTimeout(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
-        .readTimeout(readSeconds, TimeUnit.SECONDS)
+    private fun client(read: Duration): OkHttpClient = (clientOverride ?: AppHttpClient.streaming()).newBuilder()
+        .connectTimeout(CONNECT_TIMEOUT.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        .readTimeout(read.inWholeMilliseconds, TimeUnit.MILLISECONDS)
         .dns(FallbackDns)
         // El reto de Cloudflare lo intenta pasar un WebView oculto (sin Android, en las pruebas, no hay cliente real que lo necesite).
         .apply { if (clientOverride == null) addInterceptor(CloudflareInterceptor) }
@@ -106,12 +108,12 @@ internal object SourceHttp {
 
     /**
      * Pide [url]. Un código HTTP de error lanza [HttpStatusException] (salvo con `ignoreHttpErrors`); un fallo de conexión se
-     * reintenta una vez con el DNS de relevo. [timeoutSeconds] sustituye el tiempo de lectura de la petición.
+     * reintenta una vez con el DNS de relevo. [timeout] sustituye el tiempo de lectura de la petición.
      */
-    fun execute(url: String, ajax: Boolean = false, heavy: Boolean = false, timeoutSeconds: Long? = null, configure: Options.() -> Unit = {}): Reply {
+    fun execute(url: String, ajax: Boolean = false, heavy: Boolean = false, timeout: Duration? = null, configure: Options.() -> Unit = {}): Reply {
         val options = Options().apply(configure)
         val base = when {
-            timeoutSeconds != null -> client(maxOf(1L, timeoutSeconds))
+            timeout != null -> client(maxOf(1.seconds, timeout))
             heavy -> heavyClient()
             else -> lightClient()
         }

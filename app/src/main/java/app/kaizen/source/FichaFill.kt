@@ -8,6 +8,10 @@ import app.kaizen.commons.Network
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Rellena `WebFicha` de las fichas que aún están **por revisar** con AniList (enlace `pendiente`) y de las que todavía no se ha abierto ninguna copia: es lo que dice cada
@@ -19,24 +23,23 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 internal object FichaFill {
     const val MAX_CONSECUTIVE_FAILURES = 3
-    const val PAUSE_MS = 1_500L
+    val PAUSE = 1500.milliseconds
     const val MAX_LIMIT = 200
 
-    /** En segundo plano: una tanda como mucho cada [MIN_INTERVAL_MS], de [BATCH] fichas y [DAILY_CAP] al día. */
+    /** En segundo plano: una tanda como mucho cada [MIN_INTERVAL], de [BATCH] fichas y [DAILY_CAP] al día. */
     const val BATCH = 20
-    const val MIN_INTERVAL_MS = 10L * 60 * 1000
+    val MIN_INTERVAL = 10.minutes
     const val DAILY_CAP = 300
-    private const val DAY_MS = 24L * 60 * 60 * 1000
 
-    /** Cuántas fichas abrir ahora en segundo plano: 0 si la última tanda fue hace menos de [MIN_INTERVAL_MS] o se llegó al tope del día. [day] y [doneToday] son del último día contado. */
+    /** Cuántas fichas abrir ahora en segundo plano: 0 si la última tanda fue hace menos de [MIN_INTERVAL] o se llegó al tope del día. [day] y [doneToday] son del último día contado. */
     fun allowance(now: Long, lastAt: Long, day: Long, doneToday: Int, batch: Int = BATCH, dailyCap: Int = DAILY_CAP): Int {
-        if (now - lastAt < MIN_INTERVAL_MS) return 0
-        val used = if (day == now / DAY_MS) doneToday else 0
+        if (now - lastAt < MIN_INTERVAL.inWholeMilliseconds) return 0
+        val used = if (day == now / 1.days.inWholeMilliseconds) doneToday else 0
         return (dailyCap - used).coerceIn(0, batch.coerceAtLeast(0))
     }
 
     /** Una ficha que falló no se reintenta hasta pasado este tiempo (una página muerta no debe gastar el tope de cada tanda). */
-    const val RETRY_AFTER_MS = 7L * 24 * 60 * 60 * 1000
+    val RETRY_AFTER = 7.days
     private const val MAX_FAILURES_KEPT = 2_000
 
     /** El fallo no es de la ficha sino del momento (sin red, servidor en pausa): no se anota como fallo ni cuenta para dejar la fuente; la fuente se deja para el resto de la tanda. */
@@ -52,13 +55,13 @@ internal object FichaFill {
         val p = line.split('|'); if (p.size == 3) p[2].toLongOrNull()?.let { (p[0] to p[1]) to it } else null
     }.toMap()
 
-    /** Los fallos de hace menos de [RETRY_AFTER_MS] más los [fresh] de ahora, como mucho [MAX_FAILURES_KEPT] (los más recientes). */
+    /** Los fallos de hace menos de [RETRY_AFTER] más los [fresh] de ahora, como mucho [MAX_FAILURES_KEPT] (los más recientes). */
     fun encodeFailures(old: Map<Pair<String, String>, Long>, fresh: Collection<Pair<String, String>>, now: Long): String =
-        (old.filter { now - it.value < RETRY_AFTER_MS } + fresh.associateWith { now }).entries.sortedByDescending { it.value }.take(MAX_FAILURES_KEPT)
+        (old.filter { now - it.value < RETRY_AFTER.inWholeMilliseconds } + fresh.associateWith { now }).entries.sortedByDescending { it.value }.take(MAX_FAILURES_KEPT)
             .joinToString("\n") { "${it.key.first}|${it.key.second}|${it.value}" }
 
     /** El número de día de [now] (el que se guarda junto a lo hecho en el día). */
-    fun dayOf(now: Long): Long = now / DAY_MS
+    fun dayOf(now: Long): Long = now / 1.days.inWholeMilliseconds
 
     /** Las fichas a abrir: sin enlace con AniList (por revisar con candidato o sin resultado), sin `WebFicha` ([has]) y, si se pide, solo de [source]; a turnos entre fuentes, como mucho [limit]. */
     fun plan(links: Collection<AnimeFuente>, has: (String, String) -> Boolean, limit: Int, source: String? = null, skip: (String, String) -> Boolean = { _, _ -> false }): List<Pair<String, String>> {
@@ -78,7 +81,7 @@ internal object FichaFill {
         val failed = parseFailures(KaizenSettings.fillFailed); val now = System.currentTimeMillis()
         // Solo las webs activas: una desactivada no se consulta (ni se pausa por no responder) por rellenar sus fichas.
         val active = AnimeSources.selected.map { it.id }.toSet()
-        return plan(UserDB.INSTANCE.animeFuenteDao().all().filter { it.fuente in active }, { f, s -> web.get(f, s) != null }, limit, source) { f, s -> failed[f to s]?.let { now - it < RETRY_AFTER_MS } == true }
+        return plan(UserDB.INSTANCE.animeFuenteDao().all().filter { it.fuente in active }, { f, s -> web.get(f, s) != null }, limit, source) { f, s -> failed[f to s]?.let { now - it < RETRY_AFTER.inWholeMilliseconds } == true }
     }
 
     /** Abre [todo] con las fuentes de verdad: una ficha cuenta solo si de verdad dejó su `WebFicha` (una copia local de la fuente no basta). */
@@ -117,7 +120,7 @@ internal object FichaFill {
     }
 
     /** Abre las fichas de [todo] con [open] (true si se guardó), con [pause] entre peticiones; [canRun] permite parar. */
-    suspend fun run(todo: List<Pair<String, String>>, open: suspend (String, String) -> Boolean, canRun: () -> Boolean = { true }, pause: suspend (Long) -> Unit = { delay(it) }): Report {
+    suspend fun run(todo: List<Pair<String, String>>, open: suspend (String, String) -> Boolean, canRun: () -> Boolean = { true }, pause: suspend (Duration) -> Unit = { delay(it) }): Report {
         val transient = HashMap<String, Int>()
         val ok = HashMap<String, Int>(); val failed = HashMap<String, Int>(); val streak = HashMap<String, Int>(); val stopped = HashSet<String>(); val failedPairs = ArrayList<Pair<String, String>>()
         for ((source, slug) in todo) {
@@ -129,7 +132,7 @@ internal object FichaFill {
                 failed.merge(source, 1, Int::plus); failedPairs += source to slug
                 if (streak.merge(source, 1, Int::plus)!! >= MAX_CONSECUTIVE_FAILURES) stopped += source
             }
-            pause(PAUSE_MS)
+            pause(PAUSE)
         }
         return Report(ok, failed, stopped, failedPairs, transient)
     }

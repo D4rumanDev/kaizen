@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Kaizen: datos de las secciones de la pantalla principal, uno por página (id de
@@ -111,13 +112,13 @@ class MainViewModel : ViewModel() {
 
     /** Activo mientras alguna página lo recoge (y 5 s más, para los cambios de página). Hasta la primera lectura sale el hueco de carga. */
     private fun Flow<List<Any>>.whileVisible() =
-        stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), listOf<Any>(LoadingCard))
+        stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT.inWholeMilliseconds), listOf<Any>(LoadingCard))
 
     /** Consultas de red: una vez por pantalla principal. */
     private fun once(load: suspend () -> List<Any>) =
         flow { emit(load()) }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard))
 
     private companion object {
-        const val STOP_TIMEOUT_MS = 5_000L
+        val STOP_TIMEOUT = 5.seconds
     }
 }

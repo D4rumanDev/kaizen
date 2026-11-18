@@ -71,6 +71,9 @@ import kotlinx.coroutines.withContext
 import app.kaizen.tv.ui.KaizenToast
 import app.kaizen.R
 import app.kaizen.commons.appString
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Kaizen: lo que hace el reproductor, sin pantalla. Crea y suelta el ExoPlayer con el ciclo de vida de [TVPlayer],
@@ -173,7 +176,7 @@ class PlaybackController(private val activity: TVPlayer) {
                 debugText?.let { debugText = describeDebug() }
                 updateOpeningPrompt()
             }
-            handler.postDelayed(this, TICK_MS)
+            handler.postDelayed(this, TICK.inWholeMilliseconds)
         }
     }
     /** Posición a la que se salta al soltar las flechas: mientras se mantienen no se pide un seek por repetición. */
@@ -194,8 +197,8 @@ class PlaybackController(private val activity: TVPlayer) {
         if (on) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
-            handler.postDelayed(releaseScreenTask, RELEASE_SCREEN_MS)
-            handler.postDelayed(idleExitTask, IDLE_EXIT_MS)
+            handler.postDelayed(releaseScreenTask, RELEASE_SCREEN.inWholeMilliseconds)
+            handler.postDelayed(idleExitTask, IDLE_EXIT.inWholeMilliseconds)
         }
     }
     private val resumeAfterFrameRate = Runnable { finishFrameRateSwitch(resume = true) }
@@ -212,7 +215,7 @@ class PlaybackController(private val activity: TVPlayer) {
         }
     }
 
-    // Se reanuda en cuanto la pantalla está en el modo pedido; FRAME_RATE_SWITCH_TIMEOUT_MS
+    // Se reanuda en cuanto la pantalla está en el modo pedido; FRAME_RATE_SWITCH_TIMEOUT
     // es solo la red de seguridad si la tele no avisa.
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayChanged(displayId: Int) {
@@ -290,7 +293,7 @@ class PlaybackController(private val activity: TVPlayer) {
         player = exo
         keepAwake(false) // el primer onIsPlayingChanged(true) lo cancela
         handler.removeCallbacks(tickTask)
-        handler.postDelayed(tickTask, TICK_MS)
+        handler.postDelayed(tickTask, TICK.inWholeMilliseconds)
         play()
     }
 
@@ -478,7 +481,7 @@ class PlaybackController(private val activity: TVPlayer) {
         frameRatePausePending = true
         requestedMode = mode
         displayManager?.registerDisplayListener(displayListener, handler)
-        handler.postDelayed(resumeAfterFrameRate, FRAME_RATE_SWITCH_TIMEOUT_MS)
+        handler.postDelayed(resumeAfterFrameRate, FRAME_RATE_SWITCH_TIMEOUT.inWholeMilliseconds)
     }
 
     private fun onFrameRateMatchingChanged(enabled: Boolean) {
@@ -539,7 +542,7 @@ class PlaybackController(private val activity: TVPlayer) {
         handler.removeCallbacks(applySeekTask)
         if (deferred) {
             pendingSeek = target
-            handler.postDelayed(applySeekTask, SEEK_SETTLE_MS)
+            handler.postDelayed(applySeekTask, SEEK_SETTLE.inWholeMilliseconds)
         } else {
             pendingSeek = null
             current.seekTo(target)
@@ -621,7 +624,7 @@ class PlaybackController(private val activity: TVPlayer) {
     private fun showHint(text: String) {
         hint = text
         handler.removeCallbacks(clearHintTask)
-        handler.postDelayed(clearHintTask, SEEK_HINT_MS)
+        handler.postDelayed(clearHintTask, SEEK_HINT.inWholeMilliseconds)
     }
 
     /** La última pulsación de flecha se usó para saltar: su suelta también se consume. */
@@ -697,7 +700,7 @@ class PlaybackController(private val activity: TVPlayer) {
         if (overlay is PlayerOverlay.Resume || KaizenSettings.openingSeconds <= 0 || !PlayerButton.SKIP_OPENING.isVisible) return
         if (openingPromptEid == current.eid || (player?.currentPosition ?: 0L) > OPENING_PROMPT_MAX_START_MS) return
         openingPromptEid = current.eid
-        openingPromptEnds = SystemClock.uptimeMillis() + OPENING_PROMPT_MS
+        openingPromptEnds = SystemClock.uptimeMillis() + OPENING_PROMPT.inWholeMilliseconds
         updateOpeningPrompt()
     }
 
@@ -863,7 +866,7 @@ class PlaybackController(private val activity: TVPlayer) {
                 if (anime != null && !list.isNullOrEmpty()) {
                     chapters = list
                     // Con la fila cerrada (precarga) se espera a que el vídeo haya arrancado: las portadas no compiten con su buffering.
-                    if (!chaptersOpen) delay(COVER_PROBE_DELAY_MS)
+                    if (!chaptersOpen) delay(COVER_PROBE_DELAY)
                     // Un extra: si falla no debe romper la fila.
                     sharpCover = try { sharpestCover(activity, anime) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
                 }
@@ -1113,18 +1116,18 @@ class PlaybackController(private val activity: TVPlayer) {
     }
 
     private companion object {
-        const val COVER_PROBE_DELAY_MS = 4_000L
+        val COVER_PROBE_DELAY = 4.seconds
         const val AUTO_NEXT_SECONDS = 10
         const val MEDIA_SESSION_ID = "kaizen"
-        const val RELEASE_SCREEN_MS = 30_000L
-        const val IDLE_EXIT_MS = 10 * 60_000L
-        const val SEEK_HINT_MS = 1_200L
-        const val SEEK_SETTLE_MS = 250L
-        const val OPENING_PROMPT_MS = 10_000L
+        val RELEASE_SCREEN = 30.seconds
+        val IDLE_EXIT = 10.minutes
+        val SEEK_HINT = 1200.milliseconds
+        val SEEK_SETTLE = 250.milliseconds
+        val OPENING_PROMPT = 10.seconds
         /** Si el cierre acaba a menos de esto del final del vídeo, saltarlo pasa al capítulo siguiente. */
         const val ENDING_NEXT_MARGIN_MS = 3_000L
         const val OPENING_PROMPT_MAX_START_MS = 15_000L
-        const val FRAME_RATE_SWITCH_TIMEOUT_MS = 3_000L
+        val FRAME_RATE_SWITCH_TIMEOUT = 3.seconds
         const val MIN_BAR_STEP_MS = 5_000L
 
         val OK_KEYS = setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)
@@ -1135,7 +1138,7 @@ class PlaybackController(private val activity: TVPlayer) {
             KeyEvent.KEYCODE_MEDIA_PREVIOUS
         )
 
-        const val TICK_MS = 500L
+        val TICK = 500.milliseconds
         const val TICKS_PER_SECOND = 2
         const val SAVE_EVERY_TICKS = 30
 

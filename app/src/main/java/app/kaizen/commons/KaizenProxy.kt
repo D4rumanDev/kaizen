@@ -9,6 +9,7 @@ import okhttp3.Response as UpstreamResponse
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
+import kotlin.time.Duration.Companion.hours
 
 /**
  * Kaizen: proxy HTTP local para reproductores externos.
@@ -18,13 +19,13 @@ import java.util.UUID
  * listas HLS, reescribe cada URL para que los segmentos también pasen por él.
  *
  * Cada sesión solo puede pedir los hosts de su vídeo (el original y los que aparezcan en sus
- * listas o redirecciones), y caduca tras [SESSION_TTL_MS] sin uso.
+ * listas o redirecciones), y caduca tras [SESSION_TTL] sin uso.
  */
 object KaizenProxy {
     private const val FIRST_PORT = 6992
     private const val LAST_PORT = 7010
     private const val MAX_SESSIONS = 16
-    const val SESSION_TTL_MS = 6 * 60 * 60 * 1000L
+    val SESSION_TTL = 6.hours
     private val PLAYLIST_MARKER = "#EXTM3U".toByteArray()
 
     private class Session(val headers: Map<String, String>, initialHost: String) {
@@ -75,7 +76,7 @@ object KaizenProxy {
     @Synchronized
     private fun evictExpired() {
         val now = System.currentTimeMillis()
-        sessions.entries.removeAll { now - it.value.lastUsed > SESSION_TTL_MS }
+        sessions.entries.removeAll { now - it.value.lastUsed > SESSION_TTL.inWholeMilliseconds }
         while (sessions.size >= MAX_SESSIONS) sessions.remove(sessions.keys.first())
     }
 

@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Cuántas peticiones HTTP hace la app a cada web por día, **solo para conocimiento interno** (¿saturamos el servidor de una fuente?). No es una
@@ -41,7 +42,7 @@ object RequestCounter {
     /** Si el código que se ejecuta ahora está marcado como de segundo plano ([Background]); para las pruebas. */
     internal fun inBackground(): Boolean = flag.get()
     private const val FILE = "kaizen_request_counts"
-    private const val FLUSH_MS = 60_000L
+    private val FLUSH = 60.seconds
     private val loaded = java.util.concurrent.atomic.AtomicBoolean(false)
     private val flushScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
     private fun day(): String = java.time.LocalDate.now().toString()
@@ -59,7 +60,7 @@ object RequestCounter {
         ledger.note(day(), url, flag.get())
         if (!flushScheduled.compareAndSet(false, true)) return
         CoroutineScope(Dispatchers.IO).launch {
-            delay(FLUSH_MS)
+            delay(FLUSH)
             flushScheduled.set(false)
             runCatching {
                 val edit = app.kaizen.commons.KaizenStore.prefs(FILE).edit().clear()

@@ -43,6 +43,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 
 /**
  * Ventana con las fases de abrir un capítulo (Cloudflare, servidores, servidor, capítulo). Solo aparece pasados
@@ -85,7 +86,7 @@ class LoadProgress private constructor(
     }
 
     /** Cierra la ventana, tras [afterMs] para dejar ver el último estado (un fallo). */
-    fun close(afterMs: Long = 0L) {
+    fun close(after: Duration = Duration.ZERO) {
         if (closed) return
         closed = true
         activity.runOnUiThread {
@@ -94,7 +95,7 @@ class LoadProgress private constructor(
             backCallback.remove()
             val view = host ?: return@runOnUiThread
             val remove = Runnable { (view.parent as? ViewGroup)?.removeView(view) }
-            if (afterMs > 0) handler.postDelayed(remove, afterMs) else remove.run()
+            if (after > Duration.ZERO) handler.postDelayed(remove, after.inWholeMilliseconds) else remove.run()
         }
     }
 

@@ -11,6 +11,8 @@ import app.kaizen.commons.runCatchingCoop
 import app.kaizen.pojos.av1.RecentEpisode
 import app.kaizen.pojos.av1.Series
 import java.lang.reflect.Type
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /** Nota guardada. [votes] = 0 si la fuente no tiene valoraciones: así no se vuelve a pedir. */
 @androidx.annotation.Keep
@@ -25,16 +27,13 @@ data class RatingValue(
  * [cachedFiche]); de ella además se guardan por separado la nota y el número de episodios ([noteFiche]).
  */
 object SourceCache {
-    private const val MINUTE = 60_000L
-    private const val DAY = ApiCache.DAY
-
     // Plazos por tipo de dato (un solo sitio).
-    private val PAGE_TTL: Long get() = Timings.pagesMs()           // listados, géneros, búsquedas
-    private val SCHEDULE_TTL: Long get() = Timings.scheduleMs()    // horario (estrenos y cambios de día)
+    private val PAGE_TTL: Duration get() = Timings.pages()           // listados, géneros, búsquedas
+    private val SCHEDULE_TTL: Duration get() = Timings.schedule()    // horario (estrenos y cambios de día)
     /** Recientes: lo guardado caduca a la mitad del intervalo de renovación (como mucho 30 min), para que cada pasada pida datos nuevos. */
-    private fun recentsTtl(): Long = runCatching { KaizenSettings.recentsEveryMinutes.coerceIn(15, 180) / 2 }.getOrDefault(30).coerceAtMost(30) * MINUTE
-    private val RATING_TTL: Long get() = Timings.ratingMs()        // notas
-    private val EPISODES_TTL: Long get() = Timings.episodesMs()    // episodios publicados: una serie en emisión suma uno cada semana
+    private fun recentsTtl(): Duration = runCatching { KaizenSettings.recentsEveryMinutes.coerceIn(15, 180) / 2 }.getOrDefault(30).coerceAtMost(30).minutes
+    private val RATING_TTL: Duration get() = Timings.rating()        // notas
+    private val EPISODES_TTL: Duration get() = Timings.episodes()    // episodios publicados: una serie en emisión suma uno cada semana
     internal const val MAX_VOTES = 10_000_000      // más votos que esto en una ficha no es creíble
 
     // RecentEpisode lleva objetos que apuntan a sí mismo (state): se guarda una copia plana de sus datos.
@@ -63,7 +62,7 @@ object SourceCache {
 
     /** Recientes de la fuente; con [force] (el botón «Actualizar») se piden aunque la copia sea reciente. */
     suspend fun recents(source: AnimeSource, force: Boolean = false): List<RecentEpisode> =
-        ApiCache.obj<List<StoredRecent>>("recents|${source.id}", if (force) 0L else recentsTtl(), recentsType) {
+        ApiCache.obj<List<StoredRecent>>("recents|${source.id}", if (force) Duration.ZERO else recentsTtl(), recentsType) {
             source.recents().takeIf { it.isNotEmpty() }
                 ?.map { StoredRecent(it.key, it.aid, it.eid, it.name, it.number, it.slug, it.source, it.released) }
         }.orEmpty().map { RecentEpisode(it.key, it.aid, it.eid, it.name, it.number, it.slug, it.source, it.released) }
@@ -93,19 +92,19 @@ object SourceCache {
      * copia hecha por otra versión podría no leerse bien (R8 renombra los campos que no llevan @SerializedName).
      */
     suspend fun cachedFiche(url: String): CachedFiche? {
-        val (series, age) = ApiCache.cached<Series>("fiche|${BuildConfig.VERSION_CODE}|$url", Series::class.java)?.takeIf { it.second in 0L until FichaPolicy.SETTLED_TTL * 3 / 2 } ?: return null
+        val (series, age) = ApiCache.cached<Series>("fiche|${BuildConfig.VERSION_CODE}|$url", Series::class.java)?.takeIf { it.second in 0L until (FichaPolicy.SETTLED_TTL * 3 / 2).inWholeMilliseconds } ?: return null
         // Una serie finalizada y completa se sirve de la copia durante semanas y no se renueva; el resto, como siempre.
         val on = KaizenSettings.anilistFicha
         val anilist = AnilistFicha.of(series.source, series.slug)
-        return if (age < app.kaizen.commons.Timings.spread(FichaPolicy.ttl(series, anilist, on), url)) CachedFiche(series, age, FichaPolicy.refreshAfter(series, anilist, on)) else null
+        return if (age < app.kaizen.commons.Timings.spread(FichaPolicy.ttl(series, anilist, on), url).inWholeMilliseconds) CachedFiche(series, age, FichaPolicy.refreshAfter(series, anilist, on)) else null
     }
 
     /** Una ficha guardada, su edad en ms y la edad a partir de la cual conviene renovarla en segundo plano ([FichaPolicy.refreshAfter]). */
-    class CachedFiche(val series: Series, val age: Long, val refreshAfter: Long)
+    class CachedFiche(val series: Series, val age: Long, val refreshAfter: Duration)
 
     /** La ficha ya completada con las demás fuentes (relaciones unidas), guardada solo para series finalizadas y completas. */
     suspend fun completeFiche(url: String): Series? =
-        ApiCache.cached<Series>("fiche|${BuildConfig.VERSION_CODE}|completa|$url", Series::class.java)?.takeIf { it.second in 0L until FichaPolicy.COMPLETE_TTL }?.first
+        ApiCache.cached<Series>("fiche|${BuildConfig.VERSION_CODE}|completa|$url", Series::class.java)?.takeIf { it.second in 0L until FichaPolicy.COMPLETE_TTL.inWholeMilliseconds }?.first
 
     suspend fun saveCompleteFiche(url: String, series: Series) {
         runCatchingCoop { ApiCache.put("fiche|${BuildConfig.VERSION_CODE}|completa|$url", series) }.onFailure(::logError)

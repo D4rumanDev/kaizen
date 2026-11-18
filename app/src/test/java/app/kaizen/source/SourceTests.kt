@@ -80,6 +80,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import kotlin.time.Duration.Companion.days
 
 // ===== AnilistCardsTest.kt =====
 class AnilistCardsTest {
@@ -624,8 +625,8 @@ class AnilistHttpTest {
         HostGate.reset()
         HostGate.onDown = {}
         HostGate.isNetworkUp = { true }
-        AnilistHttp.spacingMs = 0
-        AnilistHttp.RETRY_WAIT_MS = 0
+        AnilistHttp.spacing = kotlin.time.Duration.ZERO
+        AnilistHttp.retryWait = kotlin.time.Duration.ZERO
         AnilistHttp.clientOverride = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             calls++
             userAgent = chain.request().header("User-Agent")
@@ -1495,7 +1496,7 @@ class AnilistSyncTest {
         sync(api, work).runOnce()
         val first = api.searches.size
 
-        clock += AnilistSync.RETRY_AFTER_MS + 1
+        clock += AnilistSync.RETRY_AFTER.inWholeMilliseconds + 1
         sync(api, work).runOnce()
 
         assertTrue(api.searches.size > first)
@@ -2083,8 +2084,8 @@ class AnimeotecaHttpTest {
         HostGate.reset()
         HostGate.onDown = {}
         HostGate.isNetworkUp = { true }
-        AnimeotecaHttp.spacingMs = 0
-        AnimeotecaHttp.retryWaitMs = 0
+        AnimeotecaHttp.spacing = kotlin.time.Duration.ZERO
+        AnimeotecaHttp.retryWait = kotlin.time.Duration.ZERO
         AnilistHttp.clientOverride = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
             urls += chain.request().url.toString()
             userAgent = chain.request().header("User-Agent")
@@ -2291,7 +2292,7 @@ class AnimeotecaTest {
 @OptIn(ExperimentalCoroutinesApi::class)
 class CatalogBuildCoreTest {
 
-    private val day = ApiCache.DAY
+    private val day = 1.days.inWholeMilliseconds
 
     /** Catálogo en memoria: lo justo de [CatalogDao] para el recorrido. */
     private class FakeDao : CatalogDao {
@@ -3086,7 +3087,7 @@ class CatalogBuildCoreTest {
 
 // ===== CatalogSkipWalkTest.kt =====
 class CatalogSkipWalkTest {
-    private val day = ApiCache.DAY
+    private val day = 1.days.inWholeMilliseconds
     private val now = 100 * day
     private val state = SourceState(checkedAt = now - 8 * day, walkedAt = now - 8 * day, total = 5000)
 
@@ -4571,13 +4572,13 @@ class FichaFillTest {
     fun `una fuente que falla tres veces seguidas se deja y las demas siguen`() = runBlocking {
         val todo = listOf("a" to "1", "b" to "1", "a" to "2", "b" to "2", "a" to "3", "b" to "3", "a" to "4", "b" to "4")
         val opened = ArrayList<Pair<String, String>>()
-        val pauses = ArrayList<Long>()
+        val pauses = ArrayList<kotlin.time.Duration>()
         val report = FichaFill.run(todo, { s, slug -> opened += s to slug; s == "b" }, pause = { pauses += it })
         // «a» falla siempre: se intenta 3 veces y se deja; «b» abre todas.
         assertEquals(3, opened.count { it.first == "a" })
         assertEquals(4, opened.count { it.first == "b" })
         assertEquals(mapOf("b" to 4), report.ok); assertEquals(mapOf("a" to 3), report.failed); assertEquals(setOf("a"), report.stopped)
-        assertEquals(7, pauses.size); assertTrue(pauses.all { it == FichaFill.PAUSE_MS })
+        assertEquals(7, pauses.size); assertTrue(pauses.all { it == FichaFill.PAUSE })
         assertEquals("a ok=0 fallo=3 (dejada), b ok=4 fallo=0", report.toString())
     }
 
@@ -4600,7 +4601,7 @@ class FichaFillTest {
     @Test
     fun `no se pasa del ritmo ni del tope diario en segundo plano`() {
         val day = 20_000L * 24 * 60 * 60 * 1000
-        val min = FichaFill.MIN_INTERVAL_MS
+        val min = FichaFill.MIN_INTERVAL.inWholeMilliseconds
         // Una tanda reciente: nada. Pasado el intervalo: una tanda entera.
         assertEquals(0, FichaFill.allowance(day + min - 1, day, FichaFill.dayOf(day), 0))
         assertEquals(FichaFill.BATCH, FichaFill.allowance(day + min, day, FichaFill.dayOf(day), 0))
@@ -4613,8 +4614,8 @@ class FichaFillTest {
 
     @Test
     fun `una ficha que fallo no se reintenta hasta pasada una semana y los fallos viejos se olvidan`() {
-        val now = 10L * FichaFill.RETRY_AFTER_MS
-        val old = mapOf(("jkanime" to "a") to now - FichaFill.RETRY_AFTER_MS - 1, ("verani" to "x") to now - 1000L)
+        val now = 10L * FichaFill.RETRY_AFTER.inWholeMilliseconds
+        val old = mapOf(("jkanime" to "a") to now - FichaFill.RETRY_AFTER.inWholeMilliseconds - 1, ("verani" to "x") to now - 1000L)
         val text = FichaFill.encodeFailures(old, listOf("jkanime" to "b"), now)
         val back = FichaFill.parseFailures(text)
         // La de hace más de una semana se olvida; la reciente y la nueva se guardan.
@@ -4696,7 +4697,7 @@ class FichaPolicyTest {
         val s = series(state = 2, chapters = 12)
         assertTrue(FichaPolicy.settled(s, anilist("FINISHED", 12), true))
         assertEquals(FichaPolicy.SETTLED_TTL, FichaPolicy.ttl(s, anilist("FINISHED", 12), true))
-        assertEquals(Long.MAX_VALUE, FichaPolicy.refreshAfter(s, anilist("FINISHED", 12), true))
+        assertEquals(kotlin.time.Duration.INFINITE, FichaPolicy.refreshAfter(s, anilist("FINISHED", 12), true))
         // Sin dato de episodios de AniList basta con que tenga alguno.
         assertTrue(FichaPolicy.settled(s, anilist("FINISHED", null), true))
     }

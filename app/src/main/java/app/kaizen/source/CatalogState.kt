@@ -2,6 +2,7 @@ package app.kaizen.source
 
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import kotlin.time.Duration
 
 /**
  * Lo que se sabe de una fuente: cuándo se comprobó, cuándo se recorrió entera y cuántas series anunciaba entonces.
@@ -10,18 +11,18 @@ import androidx.core.content.edit
  */
 internal data class SourceState(val checkedAt: Long, val walkedAt: Long, val total: Int) {
     // Con la dispersión, cada web cae en su punto del plazo (semilla: su última fecha) y no todas se revisan el mismo día.
-    fun due(now: Long) = now - checkedAt >= app.kaizen.commons.Timings.spread(CHECK_EVERY, checkedAt)
+    fun due(now: Long) = now - checkedAt >= app.kaizen.commons.Timings.spread(CHECK_EVERY, checkedAt).inWholeMilliseconds
 
-    fun covers(announced: Int?, now: Long) = announced == total && now - walkedAt < app.kaizen.commons.Timings.spread(FULL_WALK_EVERY, walkedAt)
+    fun covers(announced: Int?, now: Long) = announced == total && now - walkedAt < app.kaizen.commons.Timings.spread(FULL_WALK_EVERY, walkedAt).inWholeMilliseconds
 
     fun encode() = "$checkedAt:$walkedAt:$total"
 
     companion object {
         /** Cada cuánto se vuelve a comprobar una fuente (si su total cambió, se recorre entera: cientos de peticiones). */
-        val CHECK_EVERY: Long get() = app.kaizen.commons.Timings.catalogCheckMs()
+        val CHECK_EVERY: Duration get() = app.kaizen.commons.Timings.catalogCheck()
 
         /** Aunque el total no cambie, se recorre entera cada tanto (bajas, notas, años). */
-        val FULL_WALK_EVERY: Long get() = app.kaizen.commons.Timings.catalogWalkMs()
+        val FULL_WALK_EVERY: Duration get() = app.kaizen.commons.Timings.catalogWalk()
 
         /** Fuente nunca recorrida (o con reglas de unión antiguas). */
         val NEVER = SourceState(0L, 0L, -1)
