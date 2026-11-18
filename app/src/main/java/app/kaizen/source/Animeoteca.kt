@@ -13,25 +13,28 @@ import org.jsoup.Jsoup
 import java.io.IOException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import app.kaizen.commons.AppErrors
+import app.kaizen.domain.ConnectionStats.Cause
 
 /**
  * El texto en español de una ficha de Animeoteca (capa `es` de [AnimeFicha], ver `docs/wiki/architecture.md`). [sinopsis] es null si la
  * página solo la trae cortada con «…»; sin sinopsis ni géneros la ficha de Animeoteca no aporta nada y se guarda como «sin datos».
  */
-class AnimeotecaText(val sinopsis: String?, val generos: List<String>) {
+class AnimeotecaText(val sinopsis: String?, val generos: List<String>, val fuente: String? = null) {
     val isEmpty: Boolean get() = sinopsis.isNullOrBlank() && generos.isEmpty()
 
     /** Lo que se guarda en `AnimeFicha.es`, con la fecha para saber cuándo se miró. */
     internal fun toJson(at: Long): String = JsonObject().also { o ->
         o.addProperty("t", at)
         sinopsis?.let { o.addProperty("sinopsis", it) }
+        fuente?.let { o.addProperty("fuente", it) }
         if (generos.isNotEmpty()) o.add("generos", com.google.gson.JsonArray().also { a -> generos.forEach(a::add) })
     }.toString()
 
     internal companion object {
         fun fromJson(text: String): AnimeotecaText? = runCatching {
             val o = JsonParser.parseString(text).asObjectOrNull() ?: return null
-            AnimeotecaText(o.string("sinopsis"), o.get("generos").asArrayOrEmpty().mapNotNull { it.takeIf { g -> g.isJsonPrimitive }?.asString })
+            AnimeotecaText(o.string("sinopsis"), o.get("generos").asArrayOrEmpty().mapNotNull { it.takeIf { g -> g.isJsonPrimitive }?.asString }, o.string("fuente"))
         }.getOrNull()
     }
 }
@@ -61,19 +64,54 @@ internal interface AnimeotecaApi {
 }
 
 /**
+ * Lo que sale de leer una página de Animeoteca. Distinguir [Empty] de [Unknown] es lo que impide que un cambio de diseño de su web se guarde, en silencio,
+ * como «sin datos» en todas las series.
+ */
+internal sealed interface AnimeotecaPage {
+    /** Hay sinopsis completa, géneros o ambos. */
+    class Text(val text: AnimeotecaText) : AnimeotecaPage
+
+    /** La página se entiende pero esa serie no tiene nada que aportar: tiene el apartado «Sinopsis» sin texto utilizable, o la serie no existe (su web contesta 200 con su portada genérica). */
+    data object Empty : AnimeotecaPage
+
+    /** No es una ficha que sepamos leer: su web cambió de diseño o es otra cosa (un desafío, un error). No se guarda como «sin datos». */
+    data object Unknown : AnimeotecaPage
+}
+
+/**
  * Lee la página pública `animeoteca.com/anime/{id}` (el id es el de AniList). Su `robots.txt` permite `/anime/` y veta `/api/`, así que solo
  * se lee la página, nunca su API. El estado «finalizado» y la nota los pinta su aplicación web con JavaScript y no vienen en la página:
  * de ahí solo se toman la sinopsis completa y los géneros.
  */
 internal object AnimeotecaParser {
-    fun parse(html: String): AnimeotecaText? {
+    /** La portada genérica que su web sirve, con un 200, cuando el id no existe: su `h1` es el nombre del sitio. */
+    private const val SITE_NAME = "Animeteca"
+
+    /** La línea de atribución que la página añade al final de la sinopsis: «(Fuente: VIZ Media)». */
+    private val SOURCE_LINE = Regex("""\s*\((?:Fuente|Source):\s*([^)]+)\)\s*$""", RegexOption.IGNORE_CASE)
+
+    private val HEADING = Regex("h[1-6]")
+
+    /** Compatibilidad: solo el texto, o null si no hay (sea porque no tiene o porque no se entiende la página). */
+    fun parse(html: String): AnimeotecaText? = (classify(html) as? AnimeotecaPage.Text)?.text
+
+    fun classify(html: String): AnimeotecaPage {
         val doc = Jsoup.parse(html)
-        val synopsis = doc.select("h2").firstOrNull { it.text().trim().equals("Sinopsis", ignoreCase = true) }
-            ?.nextElementSibling()?.takeIf { it.tagName() == "p" }?.text()?.trim()
-            // Cortada con «…» (la de las etiquetas meta): no es la sinopsis entera.
-            ?.takeIf { it.isNotBlank() && !it.endsWith("…") }
+        val heading = doc.select("h2").firstOrNull { it.text().trim().equals("Sinopsis", ignoreCase = true) }
+        // El primer párrafo con texto tras el encabezado y antes del siguiente encabezado; los de relleno que vienen después («En la ficha de Animeteca tienes…») no cuentan.
+        val raw = heading?.nextElementSiblings()?.takeWhile { !HEADING.matches(it.tagName()) }
+            ?.firstOrNull { it.tagName() == "p" && it.text().isNotBlank() }?.text()?.trim()
+        val source = raw?.let { SOURCE_LINE.find(it) }
+        val body = if (source != null) raw.substring(0, source.range.first).trim() else raw
+        // Cortada con «…» (la de las etiquetas meta o la que su base guardó a medias): no es la sinopsis entera.
+        val synopsis = body?.takeIf { it.isNotBlank() && !it.endsWith("…") }
         val genres = doc.select("a[href^=/genero/]").map { it.text().trim() }.filter { it.isNotEmpty() }.distinct()
-        return AnimeotecaText(synopsis, genres).takeUnless { it.isEmpty }
+        val text = AnimeotecaText(synopsis, genres, source?.groupValues?.get(1)?.trim()).takeUnless { it.isEmpty }
+        return when {
+            text != null -> AnimeotecaPage.Text(text)
+            heading != null || doc.selectFirst("h1")?.text()?.trim().equals(SITE_NAME, ignoreCase = true) -> AnimeotecaPage.Empty
+            else -> AnimeotecaPage.Unknown
+        }
     }
 }
 
@@ -105,7 +143,15 @@ internal object AnimeotecaHttp : AnimeotecaApi {
                 // Un 404 es que esa ficha no existe, no una caída: solo cuentan el bloqueo (403) y los 5xx.
                 HostGate.report(baseUrl, code)
                 when {
-                    code == 200 -> return AnimeotecaParser.parse(html)
+                    code == 200 -> return when (val page = AnimeotecaParser.classify(html)) {
+                        is AnimeotecaPage.Text -> page.text
+                        AnimeotecaPage.Empty -> null
+                        // No se guarda «sin datos»: la cola para tras varias seguidas y el fallo queda a la vista (E09) hasta que se arregle el lector.
+                        AnimeotecaPage.Unknown -> {
+                            runCatching { AppErrors.record(Cause.EXTRACTOR, AppErrors.Area.SOURCE, "La página de Animeoteca no tiene la estructura conocida (id $anilistId): ¿cambió su diseño?", context = "animeoteca.com") }
+                            throw AnilistUnavailable("Animeoteca: página no entendida")
+                        }
+                    }
                     code == 404 || code == 410 -> return null
                     (code == 403 || code == 408 || code == 425 || code == 429 || code >= 500) && attempt < MAX_RETRIES -> delay(retryWait)
                     else -> throw AnilistUnavailable("Animeoteca respondió $code")

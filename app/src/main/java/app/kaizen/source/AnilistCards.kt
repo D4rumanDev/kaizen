@@ -28,7 +28,8 @@ internal class CardInfo(val year: Int?, val episodes: Int?, val format: String?,
 
         fun of(data: FichaData, web: FichaData? = null): CardInfo = CardInfo(
             data.anio, data.episodios, data.formato, data.estado,
-            (data.es?.generos?.takeIf { it.isNotEmpty() } ?: web?.generos?.takeIf { it.isNotEmpty() } ?: data.generos.map(AnilistLabels::genre)).take(GENRES_MAX),
+            // Manda nuestra tabla (los géneros de AniList traducidos): un nombre propio por género y el mismo en toda la app. Los de Animeoteca o de la web solo valen si AniList no da ninguno.
+            (data.generos.takeIf { it.isNotEmpty() }?.map(AnilistLabels::genre) ?: data.es?.generos?.takeIf { it.isNotEmpty() } ?: web?.generos?.takeIf { it.isNotEmpty() } ?: emptyList()).take(GENRES_MAX),
             (data.es?.sinopsis?.takeIf { it.isNotBlank() } ?: web?.descripcionEs)?.let { AnilistLabels.plain(it).lines().joinToString(" ") }?.let { if (it.length > SYNOPSIS_MAX) it.take(SYNOPSIS_MAX).trimEnd() + "…" else it }?.takeIf { it.isNotBlank() }
         )
     }

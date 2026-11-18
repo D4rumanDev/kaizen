@@ -125,21 +125,26 @@ class AnilistCardsTest {
     }
 
     @Test
-    fun `con la capa en espanol el panel usa su sinopsis y sus generos y no los de AniList`() {
+    fun `con la capa en espanol el panel usa su sinopsis, y los generos salen de nuestra tabla y solo de ella si AniList no los da`() {
         val json = """{"id":5,"genres":["Action"],"description":"English text"}"""
         val es = AnimeotecaText("Una sinopsis en español.", listOf("Comedia", "Romance"))
         val info = AnilistCards.card(row(5), ficha(json, es = es))!!.info!!
         assertEquals("Una sinopsis en español.", info.synopsis)
-        assertEquals(listOf("Comedia", "Romance"), info.genres)
+        // Los géneros son los de AniList traducidos con nuestra tabla, no los que escribe Animeoteca.
+        assertEquals(listOf("Acción"), info.genres)
+        // Solo si AniList no da ninguno valen los de Animeoteca.
+        val noGenres = """{"id":5,"description":"English text"}"""
+        assertEquals(listOf("Comedia", "Romance"), AnilistCards.card(row(5), ficha(noGenres, es = es))!!.info!!.genres)
         // Una capa en español sin sinopsis (solo géneros) no deja la inglesa de AniList: sin sinopsis.
-        val onlyGenres = AnilistCards.card(row(5), ficha(json, es = AnimeotecaText(null, listOf("Drama"))))!!.info!!
+        val onlyGenres = AnilistCards.card(row(5), ficha(noGenres, es = AnimeotecaText(null, listOf("Drama"))))!!.info!!
         assertNull(onlyGenres.synopsis)
         assertEquals(listOf("Drama"), onlyGenres.genres)
         // Si la propia web da la sinopsis y los géneros en español, valen aunque Animeoteca no tenga nada.
         val web = FichaData(org.json.JSONObject("""{"genres":["Terror"],"description":{"es":"Sinopsis de la web.","en":"English"}}"""), "jkanime", "x")
         val fromWeb = AnilistCards.card(row(5), ficha(json), web)!!.info!!
         assertEquals("Sinopsis de la web.", fromWeb.synopsis)
-        assertEquals(listOf("Terror"), fromWeb.genres)
+        assertEquals(listOf("Acción"), fromWeb.genres)
+        assertEquals(listOf("Terror"), AnilistCards.card(row(5), ficha(noGenres), web)!!.info!!.genres)
         // Una web que solo la da en inglés tampoco cuenta.
         assertNull(AnilistCards.card(row(5), ficha(json), FichaData(org.json.JSONObject("""{"description":{"es":null,"en":"English"}}"""), "jkanime", "x"))!!.info!!.synopsis)
     }
@@ -2075,7 +2080,7 @@ class AnimeotecaHttpTest {
     private val codes = ArrayDeque<Int>()
     private val urls = mutableListOf<String>()
     private var userAgent: String? = null
-    private val page = javaClass.getResource("/animeoteca-101922.html")!!.readText()
+    private var page = javaClass.getResource("/animeoteca-101922.html")!!.readText()
 
     @Before
     fun setUp() {
@@ -2107,6 +2112,22 @@ class AnimeotecaHttpTest {
     }
 
     @Test
+    fun `una pagina que no se entiende no se guarda como sin datos y deja el error E09`() = runTest {
+        app.kaizen.commons.AppErrors.clear()
+        page = "<html><body><div id=root></div></body></html>"
+        assertTrue(runCatching { AnimeotecaHttp.text(7) }.exceptionOrNull() is AnilistUnavailable)
+        assertTrue(app.kaizen.commons.AppErrors.recent().any { it.incident.cause == app.kaizen.domain.ConnectionStats.Cause.EXTRACTOR && it.context == "animeoteca.com" })
+    }
+
+    @Test
+    fun `un id que no existe, que su web contesta con un 200 y su portada generica, es sin datos y no un error`() = runTest {
+        app.kaizen.commons.AppErrors.clear()
+        page = javaClass.getResource("/animeoteca-inexistente.html")!!.readText()
+        assertNull(AnimeotecaHttp.text(99999999))
+        assertTrue(app.kaizen.commons.AppErrors.recent().isEmpty())
+    }
+
+    @Test
     fun `un 404 es sin datos y una caida que no cede lanza sin marcar nada`() = runTest {
         codes += 404
         assertNull(AnimeotecaHttp.text(1))
@@ -2123,7 +2144,9 @@ class AnimeotecaTest {
     fun `lee la sinopsis entera y los generos de una pagina real`() {
         val text = AnimeotecaParser.parse(page("animeoteca-101922.html"))!!
         assertTrue(text.sinopsis!!.startsWith("Es el Periodo Taisho en Japón"))
-        assertTrue(text.sinopsis.endsWith("(Fuente: Crunchyroll)"))
+        // La atribución que la página pone al final no forma parte de la sinopsis: se guarda aparte.
+        assertFalse("(Fuente" in text.sinopsis)
+        assertEquals("Crunchyroll", text.fuente)
         assertFalse(text.sinopsis.endsWith("…"))
         assertEquals(listOf("Acción", "Aventura", "Drama", "Fantasía", "Sobrenatural"), text.generos)
     }
@@ -2134,6 +2157,49 @@ class AnimeotecaTest {
         val cut = AnimeotecaParser.parse("<h2>Sinopsis</h2><p>Empieza y se corta…</p><a href=\"/genero/accion\">Acción</a>")!!
         assertNull(cut.sinopsis)
         assertEquals(listOf("Acción"), cut.generos)
+    }
+
+    @Test
+    fun `Death Note, pagina real, da la sinopsis sin la fuente ni el relleno de la pagina y sus generos`() {
+        val text = AnimeotecaParser.parse(page("animeoteca-1535.html"))!!
+        assertTrue(text.sinopsis!!.startsWith("Light Yagami es un genio estudiante de secundaria"))
+        assertTrue("que cree que son malvadas" in text.sinopsis)
+        assertTrue(text.sinopsis.endsWith("incendiarán el mundo."))
+        assertFalse("En la ficha de Animeteca" in text.sinopsis)
+        assertEquals("VIZ Media", text.fuente)
+        assertEquals(listOf("Misterio", "Psicológico", "Sobrenatural", "Suspense"), text.generos)
+    }
+
+    @Test
+    fun `Fullmetal Alchemist, pagina real con la sinopsis cortada por su propia web, no la cuenta pero si sus generos`() {
+        val text = AnimeotecaParser.parse(page("animeoteca-5114.html"))!!
+        assertNull(text.sinopsis)
+        assertEquals(listOf("Acción", "Aventura", "Drama", "Fantasía"), text.generos)
+    }
+
+    @Test
+    fun `distingue una serie sin datos de una pagina que no se entiende`() {
+        assertTrue(AnimeotecaParser.classify(page("animeoteca-101922.html")) is AnimeotecaPage.Text)
+        // Un id que no existe: su web contesta 200 con la portada generica (h1 = el nombre del sitio).
+        assertEquals(AnimeotecaPage.Empty, AnimeotecaParser.classify(page("animeoteca-inexistente.html")))
+        assertEquals(AnimeotecaPage.Empty, AnimeotecaParser.classify("<h1>Algo (2020)</h1><h2>Sinopsis</h2><p></p>"))
+        assertEquals(AnimeotecaPage.Unknown, AnimeotecaParser.classify("<html><body><div id=root></div></body></html>"))
+        // Una ficha real a la que se le cambio el diseno (ya no hay apartado «Sinopsis» ni generos): no es «sin datos», es que no se lee.
+        assertEquals(AnimeotecaPage.Unknown, AnimeotecaParser.classify("<h1>Death Note (2006)</h1><section><p>Texto</p></section>"))
+    }
+
+    @Test
+    fun `el parrafo de la sinopsis se encuentra aunque haya algo en medio y no se toma uno de otro apartado`() {
+        assertEquals("Texto completo.", AnimeotecaParser.parse("<h2>Sinopsis</h2><div class=x>aviso</div><p>Texto completo.</p><p>Relleno</p>")!!.sinopsis)
+        val other = "<h2>Sinopsis</h2><h2>Otro apartado</h2><p>No es la sinopsis.</p>"
+        assertNull(AnimeotecaParser.parse(other))
+        assertEquals(AnimeotecaPage.Empty, AnimeotecaParser.classify(other))
+    }
+
+    @Test
+    fun `la fuente se guarda y vuelve, y sin fuente no aparece`() {
+        assertEquals("VIZ Media", AnimeotecaText.fromJson(AnimeotecaText("Hola", listOf("A"), "VIZ Media").toJson(5L))!!.fuente)
+        assertNull(AnimeotecaText.fromJson(AnimeotecaText("Hola", emptyList()).toJson(5L))!!.fuente)
     }
 
     @Test

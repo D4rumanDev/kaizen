@@ -14,6 +14,14 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-18 · Animeoteca: se mantiene el lector de la página y se endurece
+- Decisión: los PHP de Animeoteca (`anilist.php`, `translate.php`, `img.php`) no entran en la app; su web es una fuente de la que extraer, no una API a integrar. Comprobado con pruebas en la consola: `anilist.php` es un proxy de AniList (mismo cuerpo `query`/`variables` y mismos ids, pero responde `{"Media":…}` sin `data`, en inglés y con HTML), y `translate.php` es un envoltorio de Google Translate (`{"text"}` → `{"text","engine":"google"}`). Su página trae una traducción parecida pero no idéntica (en Death Note: «que cree» frente a «que él cree»). Scripts de prueba en `tools/animeoteca-*.console.js`.
+- Su web contesta **200** con la portada genérica (`h1` = «Animeteca») cuando el id no existe, no un 404.
+- `AnimeotecaParser.classify` distingue `Text`, `Empty` (la serie no tiene nada, o no existe) y `Unknown` (no se entiende la página). Un `Unknown` ya no se guarda como «sin datos»: lanza `AnilistUnavailable`, anota E09 y la cola para tras varios seguidos, así un cambio de su diseño no vacía las sinopsis en silencio.
+- El párrafo de la sinopsis es el primero con texto tras el encabezado y antes del siguiente encabezado (el `<p>` de relleno de después no cuenta). La línea «(Fuente: …)» ya no forma parte de la sinopsis: se guarda aparte en `fuente`. Las sinopsis que la propia página trae cortadas con «…» se siguen descartando (ejemplo real: Fullmetal Alchemist: Brotherhood).
+- Géneros de la tarjeta: manda nuestra tabla (`AnilistLabels`); los de Animeoteca o de la web solo valen si AniList no da ninguno.
+- Pruebas con tres páginas reales nuevas en `app/src/test/resources` (`animeoteca-1535`, `-5114`, `-inexistente`).
+
 ## 2026-11-18 · Plazos a `Duration` (hecho)
 - Decisión: los plazos propios pasan de `Long` en ms con sufijo `_MS` a `kotlin.time.Duration` (el nombre ya no lleva la unidad: `LAZY_START_DELAY = 8.seconds`). Se quedan en `Long` los instantes (`currentTimeMillis`), las posiciones, márgenes y medidas del reproductor (Media3, AniSkip, `PlaybackSession`), los ajustes guardados en preferencias y los `tween` de Compose (`Int`). La conversión a ms o `TimeUnit` solo está en `commons/TimeBoundaries.kt`.
 - Fase 1: plazos privados de un solo fichero (12 ficheros). Fase 2: plazos compartidos, `Timings` (`*Ms()` pasa a `*()`), `Tuning.patient`, `CacheFirstStrategy.maxAge`, `FichaPolicy`, `ApiCache`, `SourceCache`, `HostGate.PAUSES` y `HostGate.describe` (unificado con el bypass), `JsEngine`, `MissLedger`, `SourceHttp`, `ServerResolver`. El día estaba definido en 5 sitios y queda `1.days`. Fase 3: fronteras (`Handler.postDelayed`, timeouts de OkHttp, `Lock.tryLock`, `CountDownLatch.await`, `Future.get`) en `TimeBoundaries.kt`; WorkManager recibe `java.time.Duration` (minSdk 26); `WebJS`, `Unpacker` y los extractores.
