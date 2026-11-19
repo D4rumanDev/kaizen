@@ -116,6 +116,7 @@
     <string name="ui_reanudar_sin_preguntar">Reanudar sin preguntar</string>
     <string name="ui_recrear_bypass_de_cloudflare">Recrear bypass de Cloudflare</string>
     <string name="ui_reintentar">Reintentar</string>
+    <string name="ui_tarda_mas_de_lo_normal">Está tardando más de lo normal. Comprueba la conexión.</string>
     <string name="ui_reloj">Reloj</string>
     <string name="ui_reproducir">Reproducir</string>
     <string name="ui_reproductor">Reproductor</string>

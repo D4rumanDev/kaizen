@@ -10,7 +10,7 @@ Orientación rápida para quien llega al proyecto: puntos de entrada, paquetes, 
 | --- | --- | --- |
 | **Application** | `app/src/main/java/app/kaizen/App.kt` | Contexto global, bases de datos (Room), cliente HTTP único, CrashGuard y arranque de temporizadores. |
 | **Manifiesto TV** | `app/src/tv/AndroidManifest.xml` | Sustituye al de `main` en la variante TV (intent `LEANBACK_LAUNCHER`, banner 16:9 y recursos específicos de Leanback en `app/src/tv/res`). |
-| **Pantalla de TV** | `tv/TVBaseActivity.kt`, `tv/ui/TVMain.kt`, `tv/ui/screens/LandingScreen.kt`, `tv/ui/components/KaizenSidebar.kt`, `tv/ui/theme/` | Inicio, estantes de series, rejillas ordenadas, fichas, búsqueda y ajustes, 100% navegables con D-Pad / mando a distancia. |
+| **Pantalla de TV** | `tv/TVBaseActivity.kt`, `tv/ui/TVMain.kt`, `tv/ui/screens/LandingScreen.kt`, `tv/ui/components/KaizenSidebar.kt`, `tv/ui/theme/` | Inicio, estantes de series, rejillas ordenadas y paginadas (`tv/ui/ListPaging.kt`, una sola paginación para todas las listas; `tv/BestAiringCache.kt` guarda «Mejores en emisión» una semana), fichas, búsqueda y ajustes, 100% navegables con D-Pad / mando a distancia. |
 | **Reproductor** | `tv/exoplayer/` (`PlayerScreen`, `PlaybackController`) y `player/WebPlayerActivity.kt` | ExoPlayer (Media3) con soporte para refresco automático de pantalla (AFR), aceleración de salto y reproductor web de reserva. |
 | **Receptor ADB** | `control/AdbControlReceiver.kt` | Receptor de comandos remotos (`am broadcast` a `app.kaizen.action.*`): `BACKUP`, `STATUS`, `EXPORT_FICHAS`, `WALK`, `IMPORT`, `SPLIT`, `FICHA_GET`, `FILL_FICHAS`, `SETTINGS`, `SETTING_GET`, `SETTING_SET`, `ANILIST_AUTO`, `WARP`, `SOURCES`, `SOURCES_CHECK`, `ERRORS`, `BYPASS`, `CACHE_CLEAR`, `LOG_CLEAR`, `SETTINGS_RESET`, `LALIGA`, `IMAGE_MISSES`, `STORE` (requiere activar «Control por ADB» en Configuración › Depuración). |
 | **Verificación de webs** | `source/SourceChallenge.kt`, `tv/ui/VerifySourceDialog.kt` | Detección de Cloudflare/anti-bot (403 con `{"challenge":true}`). Se delega la resolución al usuario en WebView, preservando cookies y User-Agent para futuras peticiones. |
@@ -38,7 +38,7 @@ app/kaizen/
 ├── commons/       # Infraestructura común
 │   ├── sync/      # Sincronización multi-dispositivo WebDAV o SMB (SyncManager, SyncDb, lápidas Removals.step, RemoteStore)
 │   ├── Smb*.kt    # Copias de seguridad en una carpeta de red SMB (SmbBackup, SmbFolder con jcifs, SmbErrors, SmbDiscovery por mDNS; sync/SmbStore sincroniza por esa carpeta); asistente en tv/settings/SmbPickerDialog
-│   ├── SensitiveBlur.kt # Desenfoque de carátulas (modo parental «Contenido sensible»): Transformation de Coil3 que reduce y amplía, válida en Android 9
+│   ├── SensitiveBlur.kt # Desenfoque de carátulas (modo parental «Contenido sensible»): Transformation de Coil3: reduce a 96 px, tres desenfoques de caja y amplía; válida en Android 9
 │   ├── warp/      # Túnel WireGuard/WARP integrado exclusivo para Kaizen (WarpTunnel, WarpPolicy)
 │   ├── HTTP: AppHttpClient, Network, FallbackDns, HostGate, TlsPolicy, RequestCounter
 │   ├── Almacenamiento: KaizenStore (puerta única a SharedPreferences), KaizenSettings, Tuning, SecretStore

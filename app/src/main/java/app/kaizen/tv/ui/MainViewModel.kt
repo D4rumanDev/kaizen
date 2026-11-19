@@ -15,6 +15,8 @@ import app.kaizen.source.SeriesLedger
 import app.kaizen.source.seriesKeyOf
 import app.kaizen.source.SourceChallenge
 import app.kaizen.tv.TVRepository
+import app.kaizen.tv.LoadLimits
+import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.tv.anime.ContinueItem
 import app.kaizen.tv.ui.MainSections.BEST
 import app.kaizen.tv.ui.MainSections.FAVORITES
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration.Companion.seconds
 
@@ -61,6 +64,10 @@ class MainViewModel : ViewModel() {
 
     /** Pide «Mejores en emisión» a las webs. Con una petición en marcha no hace nada: cada pulsación cancelaría y repetiría la red. */
     fun refreshBest() { if (!bestRefreshingState.value) bestRefresh.value += 1 }
+
+    // «Recomendados»: cada pulsación de la tarjeta «Reintentar» (que sale si la carga pasa de [LoadLimits.DATA]) la pide otra vez.
+    private val staffRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private val retryStaff = RetryCard(app.kaizen.commons.appString(app.kaizen.R.string.ui_tarda_mas_de_lo_normal) + " " + app.kaizen.commons.appString(app.kaizen.R.string.ui_reintentar)) { staffRefresh.value += 1 }
 
     private val sections: Map<Int, StateFlow<List<Any>>> = mapOf(
         // La web solo da 20 recientes; se suman a los guardados (RecentsArchive).
@@ -90,9 +97,11 @@ class MainViewModel : ViewModel() {
             favorites.distinctBy { seriesKeyOf(it.source, it.slug) }
         }.flowOn(Dispatchers.Default).whileVisible(),
         // A tu medida (géneros de favoritos e historial, nota de 3 a 5); sin gusto conocido, la lista general del staff.
-        STAFF to once {
-            Recommendations.forHome()
-        },
+        STAFF to staffRefresh.transformLatest { _ ->
+            emit(listOf<Any>(LoadingCard))
+            // Pasado el plazo sale una tarjeta para reintentar y avisar: una lista vacía parecería «sin recomendaciones» y no se recuperaba hasta reiniciar la app.
+            emit(withTimeoutOrNull(LoadLimits.DATA) { Recommendations.forHome() } ?: listOf(retryStaff))
+        }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard)),
 
         // Guardado una semana (BestAiringCache): abrir la sección no pide nada a las webs mientras valga; «Actualizar» lo rehace.
         BEST to combine(enabled, bestRefresh) { _, tick -> tick }.mapLatest { tick ->
@@ -131,10 +140,6 @@ class MainViewModel : ViewModel() {
     /** Activo mientras alguna página lo recoge (y 5 s más, para los cambios de página). Hasta la primera lectura sale el hueco de carga. */
     private fun Flow<List<Any>>.whileVisible() =
         stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT.inWholeMilliseconds), listOf<Any>(LoadingCard))
-
-    /** Consultas de red: una vez por pantalla principal. */
-    private fun once(load: suspend () -> List<Any>) =
-        flow { emit(load()) }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard))
 
     private companion object {
         val STOP_TIMEOUT = 5.seconds

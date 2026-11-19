@@ -105,13 +105,13 @@ internal fun <T> RefocusFirstCard(paged: ListPage<T>, focus: GridFocus, section:
     }
 }
 
-/** «‹ Anterior · Página 2 de 5 · Siguiente ›». No sale con una sola página. */
+/** «‹ Anterior · Página 2 de 5 · Siguiente ›». No sale con una sola página. Con [knownTotal] en false (la lista sigue cargando) dice solo «Página 2». */
 @Composable
-internal fun PageBar(paged: ListPage<*>, modifier: Modifier = Modifier) {
+internal fun PageBar(paged: ListPage<*>, modifier: Modifier = Modifier, knownTotal: Boolean = true) {
     if (paged.pages <= 1) return
     Row(modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         KaizenButton("‹ Anterior", { paged.go(paged.page - 1) }, fontSize = Text14, enabled = paged.page > 0)
-        Text("Página ${paged.page + 1} de ${paged.pages}", color = Color.White, fontSize = Text14)
+        Text(if (knownTotal) "Página ${paged.page + 1} de ${paged.pages}" else "Página ${paged.page + 1}", color = Color.White, fontSize = Text14)
         KaizenButton("Siguiente ›", { paged.go(paged.page + 1) }, fontSize = Text14, enabled = paged.page < paged.pages - 1)
     }
 }

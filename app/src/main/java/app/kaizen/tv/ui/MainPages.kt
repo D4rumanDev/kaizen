@@ -3,6 +3,7 @@
 package app.kaizen.tv.ui
 
 import app.kaizen.tv.ui.rememberLoadable
+import app.kaizen.tv.LoadLimits
 import app.kaizen.tv.ui.components.*
 
 import app.kaizen.tv.ui.theme.*
@@ -340,32 +341,45 @@ internal fun PagedGrid(
     val sorting = sort.sort != ListSort.ORIGINAL || sort.filter >= 0 || sort.favoritesOnly
     val loaded = remember(items, items.itemCount, items.loadState.refresh) { (0 until items.itemCount).mapNotNull { items.peek(it) } }
     val sorted = rememberSorted(loaded, sort, statuses)
-    val sortedKeys = remember(sorted) { uniqueKeys(sorted.map { "${it.source}:${it.slug}" }) }
-    LaunchedEffect(items.itemCount, sorting) {
-        if (sorting && items.itemCount in 1 until SORT_MAX_ITEMS) items[items.itemCount - 1]
+    // Una página cada vez (del tamaño de «Recientes»), también en búsquedas y listados: lo cargado se parte y no se pinta de golpe.
+    // [items] va en la clave: al cambiar la consulta (otro texto, otro género) llega una lista nueva y se vuelve a la primera página.
+    val paged = rememberListPage(sorted, resetKey = listOf(sortResetKey(sort), items))
+    val shown = paged.items
+    val shownKeys = remember(shown) { uniqueKeys(shown.map { "${it.source}:${it.slug}" }) }
+    val endReached = items.loadState.append.endOfPaginationReached
+    // Un fallo al pedir más series no se reintenta solo: se avisa y se ofrece reintentar. Una carga que pasa de [LoadLimits.DATA] se avisa igual (límite común, ver LoadState.kt).
+    val appendFailed = items.loadState.append is LoadState.Error
+    // Cada «Reintentar» sube el contador: la clave cambia y el plazo vuelve a empezar aunque la carga siga en curso (sin esto el aviso no reaccionaba al pulsar).
+    var attempt by remember(items) { mutableStateOf(0) }
+    val stalled = rememberStalled(items.loadState.refresh is LoadState.Loading || items.loadState.append is LoadState.Loading, items to attempt)
+    val retryLoad = { attempt++; if (refresh is LoadState.Error || appendFailed) items.retry() else items.refresh() }
+    // Se pide lo que falta para la página en pantalla y una tarjeta más: así «Siguiente» sale solo si de verdad hay otra, y al llegar a ella se sigue pidiendo.
+    // Ordenando hace falta todo (hasta [SORT_MAX_ITEMS]) para que el orden valga para toda la lista.
+    val wanted = if (sorting) SORT_MAX_ITEMS else (paged.page + 1) * ListPages.size() + 1
+    LaunchedEffect(items.itemCount, wanted, endReached, appendFailed) {
+        if (items.itemCount in 1 until wanted && !endReached && !appendFailed) items[items.itemCount - 1]
     }
+    val focus = remember { GridFocus() }
+    LaunchedEffect(shownKeys) { focus.retain(listOf(shownKeys)) }
+    RefocusFirstCard(paged, focus, 0, shownKeys.firstOrNull())
     Box(Modifier.fillMaxSize()) {
-        CardGrid {
+        CardGrid(state = paged.gridState) {
             header?.invoke(this)
-                if (sorting) {
-                items(sorted.size, key = { sortedKeys[it] }, contentType = { "series" }) { index ->
-                    val series = sorted[index]
+            items(shown.size, key = { shownKeys[it] }, contentType = { "series" }) { index ->
+                val series = shown[index]
+                Box(Modifier.focusRequester(focus.requester(0, shownKeys[index]))) {
                     SeriesCard(series.aid, series.slug, series.imageUrl, series.name, series.score, series.source,
                         onClick = { onOpen(series) }, onLongClick = actions?.let { { it.menu(series) } })
                 }
-            } else items(items.itemCount, contentType = { "series" }) { index ->
-                val series = items[index] ?: return@items
-                SeriesCard(series.aid, series.slug, series.imageUrl, series.name, series.score, series.source,
-                    onClick = { onOpen(series) }, onLongClick = actions?.let { { it.menu(series) } })
             }
+            // Sin saber todavía cuántas hay en total (la lista sigue cargando) solo se dice la página.
+            fullWidth { PageBar(paged, knownTotal = endReached) }
+            // Falló o se atascó la carga de más series: sin esto el usuario se quedaba sin «Siguiente» ni mensaje.
+            if (!empty && (appendFailed || stalled)) fullWidth { LoadProblem(if (appendFailed) appString(R.string.ui_no_se_pudo_cargar) else appString(R.string.ui_tarda_mas_de_lo_normal), retryLoad) }
         }
         when {
-            refresh is LoadState.Error && empty -> {
-                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(appString(R.string.ui_no_se_pudo_cargar), color = Color.White, fontSize = Text17)
-                    KaizenButton(appString(R.string.ui_reintentar), onClick = { items.retry() })
-                }
-            }
+            (refresh is LoadState.Error || stalled) && empty ->
+                LoadProblem(if (stalled) appString(R.string.ui_tarda_mas_de_lo_normal) else appString(R.string.ui_no_se_pudo_cargar), retryLoad, Modifier.align(Alignment.Center))
             refresh is LoadState.NotLoading && empty -> CenterMessage(appString(R.string.ui_sin_resultados), illustration = true)
             refresh is LoadState.Loading && empty -> LoadingGrid()
         }
@@ -420,7 +434,7 @@ private val DAY_NAMES = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viern
 private fun EmissionPage(actions: CardActions) {
     var attempt by remember { mutableStateOf(0) }
     // Cargando, o fallan todas las fuentes: fila para reintentar (un horario vacío no es un error).
-    val calendar = rememberLoadable(attempt) { TVRepository.calendarMap() }
+    val calendar = rememberLoadable(attempt, timeout = LoadLimits.DATA) { TVRepository.calendarMap() }
     val days = when (calendar) {
         Loadable.Loading -> return LoadingGrid()
         is Loadable.Failed -> return CardGrid { fullWidth { SectionTitle(appString(R.string.ui_no_se_pudo_cargar_el_horario)) }

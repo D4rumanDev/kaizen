@@ -52,14 +52,12 @@ import app.kaizen.source.AnimeAv1
 import app.kaizen.source.AnimeSources
 import app.kaizen.source.Catalog
 import app.kaizen.source.SeriesLedger
-import app.kaizen.source.SourceCache
 import app.kaizen.source.coverCandidates
 import app.kaizen.source.userCover
 import app.kaizen.tv.cards.SCORE_LOADING
 import app.kaizen.tv.cards.SCORE_NONE
 import app.kaizen.tv.cards.formatScore
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue

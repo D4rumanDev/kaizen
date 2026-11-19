@@ -335,12 +335,6 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
         return items to json.optInt(api.totalPages, page)
     }
 
-    /** Notas (estrellas, votos) de las series que lista [url] en la API; vacío si falla: es un dato extra. */
-    private fun apiScores(url: String): Map<String, Pair<Double, Int>> = runCatchingCoop {
-        parseApiPage(JSONObject(SourceHttp.body(url)), 1).first
-            .mapNotNull { item -> item.score?.let { item.slug to (it to item.votes) } }.toMap()
-    }.getOrDefault(emptyMap())
-
     private class Listing(val cards: List<Card>, val lastPage: Int)
 
     private val listings = object : LinkedHashMap<String, Pair<Long, Listing>>(8, 0.75f, true) {
