@@ -4,13 +4,13 @@
  * seis pasos a mano, sin saltarse ninguna de las barreras de `tools/ship.js` (pruebas, escaneo de datos, SHA auditado, push sin force, verificación con ls-remote).
  *
  *   node tools/release.js prepare [--add ruta]... [--exclude ruta]... [--prev SHA_ANTERIOR]
- *   node tools/release.js ship --audited SHA -m "mensaje" [--tag v6.0.8] [--devices IP:5555,IP:5555] [--no-release] [--no-install] [--trailer "Co-Authored-By: …"]
+ *   node tools/release.js ship --audited SHA -m "mensaje" --tag vX.Y.Z [--notes "novedades"] [--title t] [--devices IP:5555,IP:5555] [--no-release] [--no-install] [--trailer "Co-Authored-By: …"]
  *
  * prepare  Ejecuta `ship.js check` (pruebas, compilación, escaneo de IPs/secretos) y genera el diff para el auditor (`audit-diff.js`, con delta si pasas --prev). Imprime el SHA y la ruta del
  *          diff: eso es lo que hay que dar al auditor independiente. **La auditoría no se automatiza a propósito**: la hace otra instancia que lee el diff, y sin su «APROBADO» no se sigue.
  * ship     Con el SHA aprobado: `ship.js publish` (commit, push sin force, ls-remote), luego el release y, por último, la instalación:
  *            1. release: comprueba que el APK está firmado con el MISMO certificado que el del release (si no, se detiene y no sube nada), lo sube con `--clobber` a la etiqueta `--tag`
- *               (v6.0.8 por defecto), sustituye en las notas el SHA-256 del APK por el nuevo y añade el commit, y verifica que el hash que GitHub guarda coincide con el del fichero local.
+ *               (obligatoria; si la etiqueta NO existe se crea una release NUEVA en el commit publicado con `--notes`, comprobando el certificado contra el de la última), o sustituye en las notas el SHA-256 del APK por el nuevo y añade el commit, y verifica que el hash que GitHub guarda coincide con el del fichero local.
  *               La etiqueta NO se mueve (mover una etiqueta es reescribir una referencia publicada): las notas dicen de qué commit sale el APK.
  *            2. instalación: en cada equipo de `--devices` (o, sin ello, el de `tools/adb-device/.env`): `adb install -r -f`, abre la app, espera 10 s y comprueba proceso, FATAL y ANR.
  * Las IPs de las teles no se guardan en el repositorio: se pasan con `--devices`. Cada fallo detiene el proceso con el paso que falló y lo que ya quedó hecho.
@@ -85,11 +85,35 @@ function apkCertificate() {
   return cert.toLowerCase();
 }
 
+/** La etiqueta no existe: crea una release NUEVA (etiqueta en el commit publicado). El certificado debe ser el de la última release; las notas las pones tú con --notes. */
+function createRelease(tag, commit, sha, cert, done) {
+  const notesText = opt('--notes');
+  if (!notesText) die(`la release ${tag} no existe y falta --notes "novedades" para crearla (nada se ha subido)`, done);
+  const latest = run('gh', ['release', 'list', '--limit', '1', '--json', 'tagName', '-q', '.[0].tagName']).stdout.trim();
+  const previous = latest ? JSON.parse(run('gh', ['release', 'view', latest, '--json', 'body']).stdout || '{"body":""}').body : '';
+  const certPrevious = (previous.match(/Certificado \(SHA-256\): ([0-9a-f]{64})/i) || [])[1];
+  if (!certPrevious) die(`las notas de la última release (${latest || 'ninguna'}) no traen el certificado: no puedo comprobar la firma, así que no se crea nada`, done);
+  if (certPrevious.toLowerCase() !== cert) die(`el APK está firmado con otro certificado (${cert.slice(0, 12)}…) que el de ${latest} (${certPrevious.slice(0, 12)}…): no se crea nada`, done);
+  const body = `${notesText} SHA-256 del APK: ${sha}. Certificado (SHA-256): ${cert}. Commit del APK: ${commit.slice(0, 9)}.`;
+  const notes = path.join(os.tmpdir(), `kaizen-release-notes-${process.pid}.txt`);
+  fs.writeFileSync(notes, body);
+  step(`release NUEVA ${tag} sobre ${commit.slice(0, 9)} (${(fs.statSync(APK).size / 1048576).toFixed(1)} MB, sha256 ${sha.slice(0, 12)}…)`);
+  const created = run('gh', ['release', 'create', tag, APK, '--target', commit, '--title', opt('--title', `Kaizen ${tag}`), '--notes-file', notes], { stdio: ['ignore', 'inherit', 'inherit'] });
+  fs.rmSync(notes, { force: true });
+  if (created.status !== 0) die('`gh release create` falló: comprueba con `gh release view` si quedó a medias antes de repetir', done);
+  done.push(`release nueva ${tag} creada con el APK`);
+  const after = JSON.parse(run('gh', ['release', 'view', tag, '--json', 'assets']).stdout || '{"assets":[]}');
+  const asset = after.assets.find((a) => a.name === 'app-tv.apk');
+  if (!asset || asset.digest !== `sha256:${sha}`) die(`GitHub guarda otro hash (${asset ? asset.digest : 'sin asset'}) que el local (sha256:${sha})`, done);
+  done.push('hash verificado en GitHub');
+}
+
 function release(tag, commit, done) {
   if (!fs.existsSync(APK)) die(`no existe ${path.relative(ROOT, APK)}: compila antes (el paso prepare ya lo hace)`, done);
   const sha = crypto.createHash('sha256').update(fs.readFileSync(APK)).digest('hex');
   const cert = apkCertificate();
   const view = run('gh', ['release', 'view', tag, '--json', 'body,assets']);
+  if (view.status !== 0 && /not found/i.test(view.stderr || '')) return createRelease(tag, commit, sha, cert, done);
   if (view.status !== 0) die(`no puedo leer el release ${tag} (¿gh sin sesión o etiqueta inexistente?): ${(view.stderr || '').trim()}`, done);
   const info = JSON.parse(view.stdout);
   const certInNotes = (info.body.match(/Certificado \(SHA-256\): ([0-9a-f]{64})/i) || [])[1];
@@ -138,8 +162,9 @@ function ship() {
   const message = opt('-m');
   if (!sha || !/^[0-9a-f]{64}$/.test(sha)) die('falta --audited con el SHA completo que aprobó el auditor (el que imprime `prepare`)');
   if (!message) die('falta -m "mensaje del commit"');
-  const tag = opt('--tag', 'v6.0.8');
-  if (!/^v?\d[\w.\-]*$/.test(tag)) die('--tag tiene un formato no válido (ejemplo: v6.0.8)');
+  const tag = opt('--tag');
+  if (!tag && !has('--no-release')) die('falta --tag (por ejemplo v6.1.0): si no existe se crea una release nueva con --notes; si existe se sustituye su APK');
+  if (tag && !/^v?\d[\w.\-]*$/.test(tag)) die('--tag tiene un formato no válido (ejemplo: v6.0.8)');
   const trailer = opt('--trailer', 'Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>');
   const devices = (opt('--devices', '') || '').split(',').map((d) => d.trim()).filter(Boolean);
   if (devices.some((d) => !/^[\w.\-]+:\d+$/.test(d))) die('--devices lleva IP:puerto separados por comas');
@@ -171,4 +196,4 @@ function ship() {
 
 if (cmd === 'prepare') prepare();
 else if (cmd === 'ship') ship();
-else die('uso: node tools/release.js prepare [--add f]... [--exclude f]... [--prev SHA]  |  ship --audited SHA -m "msg" [--tag v6.0.8] [--devices IP:5555,IP:5555] [--no-release] [--no-install]');
+else die('uso: node tools/release.js prepare [--add f]... [--exclude f]... [--prev SHA]  |  ship --audited SHA -m "msg" --tag vX.Y.Z [--notes "novedades"] [--title t] [--devices IP:5555,IP:5555] [--no-release] [--no-install]');
