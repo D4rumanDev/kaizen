@@ -9,4 +9,10 @@ import kotlin.time.Duration.Companion.seconds
  */
 internal object LoadLimits {
     val DATA: Duration = 25.seconds
+
+    /**
+     * Abrir la ficha de una serie: `openAnime` prueba la fuente de la serie y, si falla, las demás **una tras otra**, así que el plazo cubre la suma y no puede ser el de una sola carga.
+     * Más largo que [DATA] para no dejar sin ficha, en una tele lenta, series que antes salían (pasado el plazo la pantalla avisa y se cierra).
+     */
+    val OPEN_SERIES: Duration = 45.seconds
 }

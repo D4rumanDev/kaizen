@@ -2490,6 +2490,8 @@ class CatalogBuildCoreTest {
         var anilist: Map<Pair<String, String>, Long> = emptyMap()
         /** Las estrellas de AniList de cada anime con la ficha descargada: la única nota que guarda el catálogo. */
         var stars: Map<Long, Double> = emptyMap()
+        /** Si no es null, leer las notas de AniList lanza esto (disco o base no disponible). */
+        var starsError: Throwable? = null
         /** Los enlaces con AniList que el catálogo descargado dejó guardados. */
         val savedSeedLinks = mutableListOf<AnimeFuente>()
         val core: CatalogBuildCore = CatalogBuildCore(
@@ -2504,7 +2506,7 @@ class CatalogBuildCoreTest {
             scope = scope,
             retry = { retried++; if (chain) core.ensureFresh() },
             anilistLinks = { anilist },
-            anilistStars = { stars },
+            anilistStars = { starsError?.let { throw it }; stars },
             clock = { now },
             onError = { errors += it },
             snapshots = snapshots,
@@ -2919,6 +2921,24 @@ class CatalogBuildCoreTest {
         assertEquals(3.9, entry.score)
         assertEquals(2, entry.votes)
         assertEquals(2, h.dao.links.size)
+        assertTrue(h.dao.links.all { it.score == 3.9 })
+    }
+
+    @Test
+    fun `si no se pueden leer las notas de AniList rescore falla y no borra las que habia`() = runTest {
+        val av1 = FakeSource("av1", listOf("naruto"))
+        val h = harness(av1)
+        h.anilist = mapOf(("av1" to "naruto") to 1L)
+        h.core.ensureFresh()
+        h.stars = mapOf(1L to 3.9)
+        h.core.rescore()
+        assertEquals(3.9, h.dao.entries.values.single().score)
+
+        // La lectura falla: con mapas vacíos se habrían borrado todas las notas y la migración se habría dado por hecha. Debe fallar y dejar el catálogo como estaba.
+        h.starsError = IllegalStateException("base no disponible")
+        val failed = runCatching { h.core.rescore() }
+        assertTrue(failed.isFailure)
+        assertEquals(3.9, h.dao.entries.values.single().score)
         assertTrue(h.dao.links.all { it.score == 3.9 })
     }
 

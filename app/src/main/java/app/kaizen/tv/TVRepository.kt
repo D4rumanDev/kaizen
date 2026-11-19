@@ -42,7 +42,7 @@ object TVRepository {
      * Ficha al abrirla, con capítulos frescos: la web da la ficha y los capítulos en la misma petición,
      * así que no se guarda en caché. Las notas usan la caché común (SourceCache).
      */
-    suspend fun getAnime(url: String): Series? = Series.open(url)
+    suspend fun getAnime(url: String): Series? = withTimeoutOrNull(LoadLimits.OPEN_SERIES) { Series.open(url) }
 
     suspend fun calendarMap(): Map<Int, List<AiringSeries>> = AnimeSources.scheduleAll()
 }

@@ -258,6 +258,8 @@ function eolCheckRange(base, head) {
 }
 
 const cmd = process.argv[2];
+// `--help` / `-h` solo enseña el uso: antes caía en `check` (un `check` completo que, sin los --add del lote, pisaba el estado guardado y hacía fallar `publish`).
+if (process.argv.includes('--help') || process.argv.includes('-h')) { console.log('uso: node tools/ship.js check [--add f]... [--exclude f]... | publish -m "msg" --audited SHA [--trailer t] [--install]  (ver la cabecera del fichero)'); process.exit(0); }
 if (cmd === 'check') check();
 else if (cmd === 'publish') publish();
 else if (cmd === 'docs') docs();

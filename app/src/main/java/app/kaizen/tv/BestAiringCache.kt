@@ -33,12 +33,23 @@ internal object BestAiringCache {
 
     /** Lo guardado para estas fuentes (cualquiera que sea su edad), o null si no hay o es de otro conjunto de fuentes. */
     @Synchronized fun load(sources: List<String>): Stored? = try {
-        prefs.getString(KEY, null)?.let { gson.fromJson(it, Stored::class.java) }?.takeIf { it.sources == sources.sorted() && it.items.isNotEmpty() }
+        decode(prefs.getString(KEY, null), sources)
     } catch (e: Exception) {
         // JSON ilegible o de otra versión (Gson deja a null lo que falta aunque Kotlin lo declare no nulo): se descarta y se rehace; no debe tumbar la sección.
         logError(e)
         prefs.edit { remove(KEY) }
         null
+    }
+
+    /**
+     * Lo guardado en [json] si vale para [sources]: no vacío, de las mismas fuentes y con todos sus campos (Gson deja a null lo que falta aunque Kotlin lo declare no nulo). Un JSON que no
+     * se puede leer lanza la excepción de Gson: [load] la recoge y descarta lo guardado.
+     */
+    internal fun decode(json: String?, sources: List<String>): Stored? {
+        val stored = json?.let { gson.fromJson(it, Stored::class.java) } ?: return null
+        @Suppress("SENSELESS_COMPARISON")
+        if (stored.sources == null || stored.items == null || stored.items.isEmpty() || stored.sources != sources.sorted()) return null
+        return stored
     }
 
     @Synchronized fun save(sources: List<String>, items: List<SeriesSummary>, now: Long = System.currentTimeMillis()) {

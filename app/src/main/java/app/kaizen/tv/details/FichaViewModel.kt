@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import app.kaizen.commons.logError
 import app.kaizen.commons.runCatchingCoop
+import app.kaizen.tv.LoadLimits
+import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.domain.WatchState
 import app.kaizen.domain.SeriesStatuses
 import app.kaizen.pojos.av1.Chapter
@@ -66,7 +68,8 @@ class FichaViewModel(private val url: String) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            val raw = runCatchingCoop { AnimeSources.openAnime(url) }.onFailure(::logError).getOrNull()
+            // Con plazo ([LoadLimits.OPEN_SERIES]): una web colgada deja la ficha en «Failed» (la pantalla avisa con un toast y se cierra; se vuelve a abrir) en vez de quedarse en el esqueleto sin fin.
+            val raw = runCatchingCoop { withTimeoutOrNull(LoadLimits.OPEN_SERIES) { AnimeSources.openAnime(url) } }.onFailure(::logError).getOrNull()
             if (raw == null) {
                 _state.value = State.Failed
                 return@launch
@@ -78,7 +81,7 @@ class FichaViewModel(private val url: String) : ViewModel() {
             // Sin capítulos propios hay que esperar a las demás fuentes (de ellas salen); con ellos la ficha sale ya, sin
             // esperar a la más lenta, y la nota, las relaciones y las series parecidas se completan después.
             if (raw.chapters.isEmpty()) {
-                _state.value = runCatchingCoop { ready(AnimeSources.complete(raw), similar = true, anilist) }.onFailure(::logError).getOrNull() ?: State.Failed
+                _state.value = runCatchingCoop { withTimeoutOrNull(LoadLimits.DATA) { ready(AnimeSources.complete(raw), similar = true, anilist) } }.onFailure(::logError).getOrNull() ?: State.Failed
                 return@launch
             }
             val first = runCatchingCoop {

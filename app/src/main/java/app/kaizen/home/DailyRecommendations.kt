@@ -30,8 +30,19 @@ internal object DailyRecommendations {
     private val gson = Gson()
     private val prefs get() = KaizenStore.prefs("kaizen_recommended_daily")
 
+    /** Lo guardado en [json], o null si no hay o le faltan campos (Gson deja a null lo que falta aunque Kotlin lo declare no nulo). Un JSON ilegible lanza: [read] lo recoge. */
+    internal fun decode(json: String?): Stored? {
+        val stored = json?.let { gson.fromJson(it, Stored::class.java) } ?: return null
+        @Suppress("SENSELESS_COMPARISON")
+        if (stored.items == null || stored.recent == null) return null
+        return stored
+    }
+
+    /** La tanda de [stored] si es de [day] y no está vacía. Un día guardado en el futuro (reloj atrasado) no vale: se rehace. */
+    internal fun itemsFor(stored: Stored?, day: Long): List<SeriesSummary>? = stored?.takeIf { it.day == day && it.items.isNotEmpty() }?.items
+
     private fun read(): Stored? = try {
-        prefs.getString(KEY, null)?.let { gson.fromJson(it, Stored::class.java) }?.takeIf { it.items != null && it.recent != null }
+        decode(prefs.getString(KEY, null))
     } catch (e: Exception) {
         // Ilegible o de otra versión: se descarta y se rehace; no debe tumbar la sección.
         logError(e)
@@ -40,7 +51,7 @@ internal object DailyRecommendations {
     }
 
     /** La tanda guardada de [day], si es de hoy; null si no hay o es de otro día. */
-    @Synchronized fun savedFor(day: Long): List<SeriesSummary>? = read()?.takeIf { it.day == day && it.items.isNotEmpty() }?.items
+    @Synchronized fun savedFor(day: Long): List<SeriesSummary>? = itemsFor(read(), day)
 
     /** Títulos normalizados de lo enseñado en los últimos días, **incluida la tanda guardada** (sea de hoy o de otro día): al rehacer, ni lo de hoy ni lo de ayer deben repetirse. */
     @Synchronized fun recentTitles(): Set<String> = read()?.let { rotate(it.recent, it.items.map { s -> normalizeTitle(s.name) }) }.orEmpty().toSet()
