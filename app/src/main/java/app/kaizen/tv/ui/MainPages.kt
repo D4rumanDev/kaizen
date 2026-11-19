@@ -222,17 +222,21 @@ private fun rememberCardKeys(items: List<Any>): List<String> = remember(items) {
 private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions) {
     val flow = model.section(id) ?: return
     val items by flow.collectAsStateWithLifecycle()
-    val visible = items.filter { it !== LoadingCard }
+    val visible = remember(items) { items.filter { it !== LoadingCard } }
     if (visible.isEmpty() && items.isNotEmpty()) return LoadingGrid(header = true)
     // Orden elegido por el usuario (por defecto el de la sección); con los estados, para ordenar por «Estado».
     val sort = currentSectionSort()
     val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
-    val shown = rememberSorted(visible, sort, statuses)
+    // Más tarjetas que «Recientes» (KaizenSettings.recentsCount): se parten en páginas de ese tamaño.
+    val paged = rememberListPage(rememberSorted(visible, sort, statuses), resetKey = sortResetKey(sort))
+    val shown = paged.items
     val keys = rememberCardKeys(shown)
     val focus = remember { GridFocus() }
     RefocusOnRemoval(focus, listOf(keys))
-    CardGrid {
+    RefocusFirstCard(paged, focus, 0, keys.firstOrNull())
+    CardGrid(state = paged.gridState) {
         cardItems(shown, keys, actions, focus)
+        fullWidth { PageBar(paged) }
     }
 }
 
@@ -246,12 +250,17 @@ private fun HistoryPage(model: MainViewModel, actions: CardActions) {
     val sort = currentSectionSort()
     val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
     val started = rawContinue.filter { it !== LoadingCard }
-    val history = rememberSorted(rawHistory.filter { it !== LoadingCard }, sort, statuses)
-    if (started.isEmpty() && history.isEmpty() && (rawContinue + rawHistory).any { it === LoadingCard }) return LoadingGrid(header = true)
+    // Memorizado: con ~6.500 registros, cambiar de página no debe volver a recorrer toda la lista.
+    val allHistory = rememberSorted(remember(rawHistory) { rawHistory.filter { it !== LoadingCard } }, sort, statuses)
+    if (started.isEmpty() && allHistory.isEmpty() && (rawContinue + rawHistory).any { it === LoadingCard }) return LoadingGrid(header = true)
+    // El historial llega a miles de registros: páginas del tamaño de «Recientes» (Seguir viendo se queda entero, es corto).
+    val paged = rememberListPage(allHistory, resetKey = sortResetKey(sort))
+    val history = paged.items
     val keys = listOf(rememberCardKeys(started), rememberCardKeys(history))
     val focus = remember { GridFocus() }
     RefocusOnRemoval(focus, keys)
-    CardGrid {
+    RefocusFirstCard(paged, focus, 1, keys[1].firstOrNull())
+    CardGrid(state = paged.gridState) {
         if (started.isNotEmpty()) {
             fullWidth { SectionTitle(appString(R.string.ui_seguir_viendo)) }
             // Las tarjetas horizontales ocupan dos columnas: así caben el título y el capítulo.
@@ -260,6 +269,7 @@ private fun HistoryPage(model: MainViewModel, actions: CardActions) {
         if (history.isNotEmpty()) {
             fullWidth { SectionTitle(appString(R.string.ui_historial)) }
             cardItems(history, keys[1], actions, focus, 1)
+            fullWidth { PageBar(paged) }
         }
     }
 }
@@ -373,6 +383,11 @@ private fun BestPage(model: MainViewModel, actions: CardActions) {
         androidx.compose.foundation.layout.Row(Modifier.padding(start = ContentPaddingHorizontal, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             KaizenButton("En emisión", { global = false }, container = if (!global) White60 else White20, fontSize = Text14)
             KaizenButton("De siempre", { global = true }, container = if (global) White60 else White20, fontSize = Text14)
+            // «En emisión» se guarda una semana: el botón lo pide ahora a las webs.
+            if (!global) {
+                val refreshing by model.bestRefreshing.collectAsStateWithLifecycle()
+                KaizenButton(if (refreshing) appString(R.string.ui_actualizando) else appString(R.string.ui_actualizar), onClick = { model.refreshBest() }, fontSize = Text14)
+            }
         }
         Box(Modifier.weight(1f)) { if (global) BestGlobalPage(actions) else SectionGridPage(MainSections.BEST, model, actions) }
     }

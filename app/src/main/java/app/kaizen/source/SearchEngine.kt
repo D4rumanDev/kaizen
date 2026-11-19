@@ -98,16 +98,19 @@ object SearchEngine {
     }
 
     /** Primera página de cada fuente, ya unida y ordenada (filas de inicio como «Mejores en emisión»). */
-    suspend fun first(query: SearchQuery): List<SeriesSummary> = withContext(Dispatchers.IO) {
-        val lists = coroutineScope {
+    suspend fun first(query: SearchQuery): List<SeriesSummary> = firstChecked(query).first
+
+    /** Como [first], y si todas las fuentes respondieron (false: alguna falló y la lista es parcial; no debe guardarse como buena). */
+    suspend fun firstChecked(query: SearchQuery): Pair<List<SeriesSummary>, Boolean> = withContext(Dispatchers.IO) {
+        val results = coroutineScope {
             sourcesFor(query).map { source ->
                 async {
-                    runCatchingCoop { applyLocal(query, source, SourceCache.page(source, query, null).items) }.getOrDefault(emptyList())
+                    runCatchingCoop { applyLocal(query, source, SourceCache.page(source, query, null).items) }
                 }
             }.awaitAll()
         }
-        val combined = combine(lists)
-        if (query.sort == SortBy.RATING) rankByRating(combined) else combined
+        val combined = combine(results.map { it.getOrDefault(emptyList()) })
+        (if (query.sort == SortBy.RATING) rankByRating(combined) else combined) to results.all { it.isSuccess }
     }
 
     /**

@@ -39,6 +39,7 @@ object KaizenStore {
         Entry("app.kaizen", Scope.SETTINGS, "Ajustes del usuario y marcas de la app (KaizenSettings); incluye las cookies del bypass, que son secretas", suffix = "_preferences", middle = 0),
         Entry("kaizen_progress", Scope.STATE, "Capítulos vistos y posición de cada uno"),
         Entry("kaizen_recents", Scope.STATE, "Archivo de capítulos recientes"),
+        Entry("kaizen_best_airing", Scope.CACHE, "«Mejores en emisión» guardado una semana (se rehace al actualizar)"),
         Entry("kaizen_taste", Scope.CACHE, "Gustos aprendidos para recomendar (se recalculan)"),
         Entry("kaizen_servers", Scope.STATE, "Servidor recordado de cada serie"),
         Entry("kaizen_connection_stats", Scope.STATE, "Intentos de conexión de las estadísticas"),

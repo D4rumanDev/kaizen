@@ -243,10 +243,10 @@ internal fun SourcesPage() {
         // Leer el valor aquí suscribe la rejilla: se rehace al cambiar las fuentes marcadas o las pausas.
         changes
         val selected = AnimeSources.selected
-        // La red, la primera tarjeta: dice si hay Internet y, al pulsarla, enciende o apaga el «Modo sin conexión».
+        // La red, la primera tarjeta: solo indica si hay Internet (el «Modo sin conexión» se cambia en Configuración › Datos y caché); pulsarla no hace nada.
         item {
             val (health, text) = networkSummary(network)
-            IconTextCard("Red\n$text", { NetworkState.setManual(network != NetworkState.Mode.OFFLINE_MANUAL) }) {
+            IconTextCard("Red\n$text", {}) {
                 NetworkBadge(health, size = 40.dp)
             }
         }
@@ -283,11 +283,11 @@ internal fun SourcesPage() {
     }
 }
 
-/** Estado y texto de la tarjeta «Red» de «Fuentes». Con conexión es neutra (círculo verde) y ofrece el modo sin conexión. */
+/** Estado y texto de la tarjeta «Red» de «Fuentes», que es solo un indicador: con conexión, círculo verde; sin ella, el motivo. */
 internal fun networkSummary(mode: NetworkState.Mode): Pair<SourcesHealth, String> = when (mode) {
-    NetworkState.Mode.ONLINE -> SourcesHealth.OK to "Con conexión · pulsa para el modo sin conexión"
-    NetworkState.Mode.NO_INTERNET -> SourcesHealth.OFFLINE to "Sin Internet (detectado) · pulsa para el modo sin conexión"
-    NetworkState.Mode.OFFLINE_MANUAL -> SourcesHealth.OFFLINE to "Modo sin conexión · pulsa para volver a conectar"
+    NetworkState.Mode.ONLINE -> SourcesHealth.OK to "Con conexión"
+    NetworkState.Mode.NO_INTERNET -> SourcesHealth.OFFLINE to "Sin Internet (detectado)"
+    NetworkState.Mode.OFFLINE_MANUAL -> SourcesHealth.OFFLINE to "Modo sin conexión (se cambia en Configuración › Datos y caché)"
 }
 
 /** El piloto de la red a tamaño de logo: un cuadro con el piloto grande en el centro. */

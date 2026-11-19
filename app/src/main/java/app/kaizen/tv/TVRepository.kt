@@ -5,17 +5,34 @@ import app.kaizen.pojos.av1.Series
 import app.kaizen.pojos.av1.AiringSeries
 import app.kaizen.pojos.av1.SeriesSummary
 import app.kaizen.source.AnimeSources
+import app.kaizen.source.Catalog
 import app.kaizen.source.SearchEngine
 import app.kaizen.source.SearchQuery
 import app.kaizen.source.SortBy
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 
 /** Fachada de la UI de TV sobre las fuentes activas: todas las listas pasan por [SearchEngine]. */
 object TVRepository {
+    private val BEST_TIMEOUT = 25.seconds
 
-    /** «Mejores en emisión»: primera página, en emisión y por puntuación, de las fuentes activas. */
-    suspend fun bestAiring(): List<SeriesSummary> =
-        SearchEngine.first(SearchQuery(airing = true, sort = SortBy.RATING))
+
+    /**
+     * «Mejores en emisión»: primera página, en emisión y por puntuación, de las fuentes activas. Sale de lo guardado si tiene menos de [BestAiringCache.MAX_AGE]
+     * (salvo [force], el botón «Actualizar»); si no hay red o las webs no dan nada, se enseña lo guardado aunque sea viejo.
+     */
+    suspend fun bestAiring(force: Boolean = false): List<SeriesSummary> {
+        val sources = AnimeSources.enabled.map { it.id }
+        val stored = BestAiringCache.load(sources)
+        if (!force && stored != null && BestAiringCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
+        // Tope de tiempo: una web colgada no debe dejar la sección en «cargando»; pasado el tope cuenta como lista incompleta (sale lo guardado, si lo hay).
+        val (fresh, complete) = withTimeoutOrNull(BEST_TIMEOUT) { SearchEngine.firstChecked(SearchQuery(airing = true, sort = SortBy.RATING)) } ?: (emptyList<SeriesSummary>() to false)
+        // Una lista parcial (una web falló) o sin las notas de AniList todavía (catálogo sin listo) no se guarda una semana: se enseña, pero lo bueno guardado no se pisa.
+        if (fresh.isEmpty() || !complete || !Catalog.isReady()) return stored?.items ?: fresh
+        BestAiringCache.save(sources, fresh)
+        return fresh
+    }
 
     /** Lista paginada de cualquier consulta (directorio, «Mejores en general»). */
     fun paged(query: SearchQuery): Flow<PagingData<SeriesSummary>> = SearchEngine.paged(query)

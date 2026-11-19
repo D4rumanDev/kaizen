@@ -74,7 +74,7 @@ object ConnectionStats {
         NO_INTERNET(24, "sin-internet", "Red sin salida a Internet", "La TV está conectada a una red (el móvil como repetidor sin datos, un router sin línea) pero por ella no sale nada: fallan a la vez varias webs distintas y Android no da la red por validada.", Origin.NETWORK,
             "Revisar los datos del móvil o la línea del router. Mientras tanto se usa lo guardado y no se abren pausas; al volver la salida se recupera solo."),
         OFFLINE(25, "modo-sin-conexion", "Modo sin conexión activado", "El interruptor «Modo sin conexión» está encendido: no se pide nada a las webs y se usa solo lo guardado. No es un fallo.", Origin.DEVICE,
-            "Apagarlo en Configuración › Datos y caché › Modo sin conexión, o pulsando la tarjeta de red de «Fuentes»."),
+            "Apagarlo en Configuración › Datos y caché › Modo sin conexión."),
         PAUSED(26, "en-pausa", "Fuente en pausa", "Una web falló varias veces seguidas y se deja de consultar un rato (2 min, 5 min, 10 min y luego 1 h) para no parecer un ataque ni arriesgar que bloqueen la IP.", Origin.SOURCE,
             "Esperar a que acabe la pausa o pulsar la fuente en «Fuentes» y «Comprobar todas»; si responde, vuelve a usarse."),
         CLOUDFLARE(27, "cloudflare", "Cloudflare no responde", "El bypass de Cloudflare no consigue la verificación o ni siquiera llega a Cloudflare, así que las webs que la piden no se abren.", Origin.SERVER,

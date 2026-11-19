@@ -13,6 +13,7 @@ import android.content.Context
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatDelegate
@@ -103,7 +104,7 @@ class App : Application(), Configuration.Provider {
                     // al arrancar si «Recorrido automático» está activado.
                     // Con las reglas del usuario de ahora: lo que se unió o separó antes de una corrección queda bien sin esperar.
                     // Reagrupar y recorrer el catálogo es lo más pesado del arranque y no hace falta para ver Inicio: después.
-                    delay(LAZY_START_DELAY)
+                    awaitHomeReady()
                     // Reagrupar puede llevar decenas de segundos de CPU: a prioridad de fondo, para no frenar la pantalla.
                     runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "reagrupar el catálogo si hace falta") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
                     runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "poner solo la nota de AniList en el catálogo") { app.kaizen.source.CatalogBuilder.rescoreIfNeeded() } }.onFailure(::logError)
@@ -119,7 +120,7 @@ class App : Application(), Configuration.Provider {
         }
         // Filas de la pantalla de inicio de Android TV (Continuar viendo y Capítulos recientes): no hacen falta para pintar Inicio.
         AppScope.launch {
-            delay(LAZY_START_DELAY)
+            awaitHomeReady()
             // Sin `timed` aquí: keepInSync se queda escuchando para siempre y la cifra sería «hasta que se cancela»; mide solo el volcado inicial (dentro).
             runCatchingCoop { app.kaizen.tv.HomeChannels.keepInSync(this@App) }.onFailure(::logError)
         }
@@ -206,8 +207,19 @@ class App : Application(), Configuration.Provider {
 
     private val browserUaHosts by lazy { AnimeSources.all.filter { it.needsBrowserUa }.map { it.host } }
 
+    /**
+     * Espera a que Inicio tenga sus «Recientes»: pasado [LAZY_START_DELAY] (para dar tiempo a que la pantalla pida la carga), y mientras siga cargando, hasta
+     * [HOME_READY_MAX]. Así el mantenimiento pesado (reagrupar, recorrer el catálogo, filas del launcher) no compite por la CPU con lo primero que se ve, que en una
+     * tele lenta como la TV es lo que más se nota. Pasado el tope sigue igualmente: una carga que no termina no debe dejar el mantenimiento sin hacer.
+     */
+    private suspend fun awaitHomeReady() {
+        delay(LAZY_START_DELAY)
+        kotlinx.coroutines.withTimeoutOrNull(HOME_READY_MAX) { app.kaizen.retrofit.Repository.recentsLoading.first { !it } }
+    }
+
     companion object {
         private const val LEFTOVERS_DONE = "leftovers_v1"
+        private val HOME_READY_MAX = 45.seconds
         private val PROFILE_INSTALL_DELAY = 5.seconds
 
         /** Cuánto espera el trabajo de segundo plano que no hace falta para pintar Inicio (también lo usa TVMain: una sola definición). */

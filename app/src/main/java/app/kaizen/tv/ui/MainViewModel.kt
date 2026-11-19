@@ -51,6 +51,17 @@ class MainViewModel : ViewModel() {
     // Una sola instancia: así la sección no cambia (ni se repinta) en cada emisión.
     private val retryRecents = RetryCard("No se pudieron cargar. Reintentar") { Repository.reloadRecents() }
 
+    // «Actualizar» de «Mejores en emisión»: cada pulsación sube el contador y la lista se rehace sin mirar lo guardado.
+    private val bestRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private var bestForcedTick = 0
+    private val bestRefreshingState = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** Si «Mejores en emisión» se está pidiendo a las webs ahora mismo. */
+    val bestRefreshing: StateFlow<Boolean> = bestRefreshingState
+
+    /** Pide «Mejores en emisión» a las webs. Con una petición en marcha no hace nada: cada pulsación cancelaría y repetiría la red. */
+    fun refreshBest() { if (!bestRefreshingState.value) bestRefresh.value += 1 }
+
     private val sections: Map<Int, StateFlow<List<Any>>> = mapOf(
         // La web solo da 20 recientes; se suman a los guardados (RecentsArchive).
         // Sin recientes y con la última recarga fallida: tarjeta para reintentar.
@@ -83,7 +94,14 @@ class MainViewModel : ViewModel() {
             Recommendations.forHome()
         },
 
-        BEST to enabled.mapLatest { TVRepository.bestAiring() }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf(LoadingCard)),
+        // Guardado una semana (BestAiringCache): abrir la sección no pide nada a las webs mientras valga; «Actualizar» lo rehace.
+        BEST to combine(enabled, bestRefresh) { _, tick -> tick }.mapLatest { tick ->
+            val force = tick > bestForcedTick
+            bestForcedTick = tick
+            bestRefreshingState.value = true
+            // El fallo se recoge aquí y no en el `.catch` de abajo: ese termina el flujo y «Actualizar» dejaría de tener efecto hasta reiniciar la app.
+            try { TVRepository.bestAiring(force) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { logError(e); emptyList() } finally { bestRefreshingState.value = false }
+        }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf(LoadingCard)),
     )
 
     init {

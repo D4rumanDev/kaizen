@@ -74,11 +74,13 @@ class SourceStatusTest {
     }
 
     @Test
-    fun `la tarjeta de red dice el estado y ofrece cambiarlo`() {
+    fun `la tarjeta de red es solo un indicador del estado`() {
         assertEquals(SourcesHealth.OK, networkSummary(app.kaizen.commons.NetworkState.Mode.ONLINE).first)
         assertEquals(SourcesHealth.OFFLINE, networkSummary(app.kaizen.commons.NetworkState.Mode.NO_INTERNET).first)
         assertTrue("detectado" in networkSummary(app.kaizen.commons.NetworkState.Mode.NO_INTERNET).second)
-        assertTrue("volver a conectar" in networkSummary(app.kaizen.commons.NetworkState.Mode.OFFLINE_MANUAL).second)
+        assertTrue("Modo sin conexión" in networkSummary(app.kaizen.commons.NetworkState.Mode.OFFLINE_MANUAL).second)
+        // Es un indicador: ningún texto invita a pulsarla.
+        app.kaizen.commons.NetworkState.Mode.entries.forEach { assertTrue("pulsa" !in networkSummary(it).second) }
     }
 
     @Test
