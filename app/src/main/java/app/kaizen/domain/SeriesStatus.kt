@@ -167,6 +167,44 @@ object SeriesStatuses {
         return missing.size
     }
 
+    /**
+     * Funde los estados de una copia de otro dispositivo: uno que aquí no hay entra, y uno que ya hay se sustituye si el de la copia es **más reciente** ([StatusEntry.at]); lo que [skip]
+     * descarta (una lápida más nueva que la copia) no entra. Devuelve cuántos estados cambiaron.
+     */
+    @Synchronized
+    fun importNewer(json: String, skip: (StatusEntry) -> Boolean = { false }): Int {
+        val incoming = runCatching { Gson().fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
+            .filterValues { (it as StatusEntry?) != null && !(it.source as String?).isNullOrBlank() && !(it.slug as String?).isNullOrBlank() }
+        val before = state.value
+        val merged = StatusMerge.merge(before, incoming, { local, other -> sameSeries(local, other.source, other.slug, seriesIdOf(other.source, other.slug)) }, skip)
+        if (merged == before) return 0
+        save(merged)
+        // «Descartada» excluye la serie de las recomendaciones: se alinea con lo que quedó tras la fusión.
+        val droppedBefore = before.filterValues { it.status == SeriesStatus.DROPPED.id }.keys
+        val droppedAfter = merged.filterValues { it.status == SeriesStatus.DROPPED.id }
+        // Primero se libera y después se excluye: una serie que sigue «Descartada» con otro título comparte la clave de exclusión y la liberación de la vieja la desharía.
+        droppedBefore.filter { it !in droppedAfter }.mapNotNull { before[it] }.forEach { NotRecommended.set(it.name, excluded = false, source = it.source, slug = it.slug) }
+        droppedAfter.filterKeys { it !in droppedBefore }.values.forEach { NotRecommended.set(it.name, excluded = true, source = it.source, slug = it.slug) }
+        return merged.count { (key, entry) -> before[key] != entry } + before.keys.count { it !in merged }
+    }
+
+    /** La hora del último cambio del estado de la serie [source]:[slug]; 0 si no tiene estado. */
+    fun latestChange(source: String, slug: String): Long {
+        val id = seriesIdOf(source, slug)
+        return state.value.values.filter { sameSeries(it, source, slug, id) }.maxOfOrNull { it.at } ?: 0L
+    }
+
+    /** Quita el estado de la serie [source]:[slug] por lo que dice la sincronización (una lápida de otro dispositivo); false si aquí no tenía. */
+    @Synchronized
+    fun removeSeries(source: String, slug: String): Boolean {
+        val id = seriesIdOf(source, slug)
+        val removed = state.value.entries.filter { sameSeries(it.value, source, slug, id) }
+        if (removed.isEmpty()) return false
+        save(state.value - removed.map { it.key }.toSet())
+        removed.filter { it.value.status == SeriesStatus.DROPPED.id }.forEach { NotRecommended.set(it.value.name, excluded = false, source = it.value.source, slug = it.value.slug) }
+        return true
+    }
+
     private fun save(map: Map<String, StatusEntry>) {
         state.value = map
         KaizenSettings.seriesStatuses = Gson().toJson(map)

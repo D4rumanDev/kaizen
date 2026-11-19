@@ -14,7 +14,8 @@ import kotlin.time.Duration.Companion.days
  * - un borrado **masivo** (más de la mitad de lo que había) no se propaga ni se aplica solo: es más probable un «restablecer» que quitar a mano tantas cosas.
  *
  * Las claves son portables (no llevan ids locales): `f/fuente:slug` para un favorito, `r/fuente:slug#número` para un capítulo visto y `c/fuente:slug#número` para un capítulo en curso
- * («Seguir viendo»; sin esta clave, lo que se quitaba de allí volvía con la sincronización desde otro dispositivo). Los estados de las series siguen siendo solo-añadir.
+ * («Seguir viendo»; sin esta clave, lo que se quitaba de allí volvía con la sincronización desde otro dispositivo) y `e/fuente:slug` para el estado de una serie (viendo, pendiente…). El progreso y los
+ * estados llevan además la hora de su último cambio y, entre dos dispositivos, gana el más reciente (ver `KaizenProgress.takeIncoming` y `StatusMerge`).
  */
 object Removals {
     val MAX_AGE = 90.days
@@ -26,21 +27,23 @@ object Removals {
     fun favoriteKey(ficha: String) = "f/$ficha"
     fun recordKey(ficha: String, number: Double) = "r/$ficha#$number"
     fun progressKey(ficha: String, number: Double) = "c/$ficha#$number"
+    fun statusKey(ficha: String) = "e/$ficha"
 
     /** Una clave leída: favorito (`number` null), capítulo visto o capítulo en curso ([progress]), con su ficha. */
-    class Parsed(val favorite: Boolean, val source: String, val slug: String, val number: Double?, val progress: Boolean = false)
+    class Parsed(val favorite: Boolean, val source: String, val slug: String, val number: Double?, val progress: Boolean = false, val status: Boolean = false)
 
     fun parse(key: String): Parsed? {
         if (key.length > MAX_KEY) return null
-        val favorite = key.startsWith("f/")
-        val progress = key.startsWith("c/")
-        if (!favorite && !progress && !key.startsWith("r/")) return null
+        val kind = key.take(2)
+        if (kind != "f/" && kind != "r/" && kind != "c/" && kind != "e/") return null
+        // Favoritos («f/») y estados de serie («e/») no llevan número de capítulo.
+        val withNumber = kind == "r/" || kind == "c/"
         val body = key.substring(2)
-        val number = if (favorite) null else body.substringAfterLast('#', "").toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
-        val ficha = if (favorite) body else body.substringBeforeLast('#')
+        val number = if (!withNumber) null else body.substringAfterLast('#', "").toDoubleOrNull()?.takeIf { it.isFinite() } ?: return null
+        val ficha = if (withNumber) body.substringBeforeLast('#') else body
         val source = ficha.substringBefore(':', "")
         val slug = ficha.substringAfter(':', "")
-        return if (source.isEmpty() || slug.isEmpty()) null else Parsed(favorite, source, slug, number, progress)
+        return if (source.isEmpty() || slug.isEmpty()) null else Parsed(kind == "f/", source, slug, number, kind == "c/", kind == "e/")
     }
 
     /** Las claves de [base] que ya no están; [present] es null si no se sabe (la ficha no es conocida): entonces no cuenta como quitada. */
@@ -55,7 +58,7 @@ object Removals {
 
     /** Como [massive] pero por tipo (favoritos, capítulos vistos y capítulos en curso por separado): quitar todos los favoritos no se esconde tras miles de capítulos. */
     fun massiveAny(removing: Collection<String>, total: Collection<String>): Boolean =
-        listOf("f/", "r/", "c/").any { kind -> massive(removing.count { it.startsWith(kind) }, total.count { it.startsWith(kind) }) }
+        listOf("f/", "r/", "c/", "e/").any { kind -> massive(removing.count { it.startsWith(kind) }, total.count { it.startsWith(kind) }) }
 
     /** Las lápidas de las copias ajenas, por clave canónica ([canon] iguala la misma serie aunque la ficha sea otra) y con la fecha más reciente de cada una. */
     fun blocked(files: List<Map<String, Long>>, canon: (String) -> String?): Map<String, Long> {
@@ -87,6 +90,9 @@ object Removals {
         suspend fun merge(item: T, skip: (String) -> Boolean)
         suspend fun remove(keys: List<String>): Int
         fun canon(key: String): String?
+
+        /** ¿Cambió aquí [key] después de [at] (la hora de una lápida ajena)? Entonces lo de aquí es más reciente y la lápida no lo quita. Favoritos y capítulos vistos no llevan hora: false. */
+        fun changedAfter(key: String, at: Long): Boolean = false
     }
 
     /** El resultado de [step]: las lápidas propias a subir, el estado a guardar y qué pasó. */
@@ -109,7 +115,7 @@ object Removals {
         val fresh = incoming.flatMap { removedOf(it).entries }.filter { now - it.value <= MAX_AGE.inWholeMilliseconds && seenId(it.key, it.value) !in seen }
         val baseCanon = state.base.orEmpty().mapNotNull(local::canon).toSet()
         val after = local.presence()
-        val toRemove = fresh.map { it.key }.distinct().filter { after.isPresent(it) == true && local.canon(it) in baseCanon }
+        val toRemove = fresh.filter { after.isPresent(it.key) == true && local.canon(it.key) in baseCanon && !local.changedAfter(it.key, it.value) }.map { it.key }.distinct()
         val heldRemote = massiveAny(toRemove, after.keys + toRemove)
         val removedHere = if (heldRemote) 0 else local.remove(toRemove)
         // Si se retuvo por masivo no se anotan como vistas, para que no se den por hechas.

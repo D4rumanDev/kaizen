@@ -64,6 +64,7 @@ object SyncManager {
         override suspend fun merge(item: KaizenBackup.Data, skip: (String) -> Boolean) { KaizenBackup.merge(item, skip) }
         override suspend fun remove(keys: List<String>) = KaizenBackup.remove(keys)
         override fun canon(key: String) = KaizenBackup.canon(key)
+        override fun changedAfter(key: String, at: Long) = KaizenBackup.changedAfter(key, at)
     }
 
     /**

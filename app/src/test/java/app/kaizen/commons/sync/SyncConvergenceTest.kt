@@ -19,6 +19,7 @@ class SyncConvergenceTest {
 
     private class Sim(val id: String, val server: Server, val clock: () -> Long) : Removals.Local<Copy> {
         val items = HashSet<String>()
+        val changed = HashMap<String, Long>() // hora del último cambio de cada clave que la lleva (estados y progreso)
         var state = Removals.State()
 
         override suspend fun presence() = object : Removals.Presence {
@@ -30,6 +31,7 @@ class SyncConvergenceTest {
         override suspend fun merge(item: Copy, skip: (String) -> Boolean) { item.items.filterNot(skip).forEach { items += it } }
         override suspend fun remove(keys: List<String>): Int = keys.count { items.remove(it) }
         override fun canon(key: String) = key
+        override fun changedAfter(key: String, at: Long) = (changed[key] ?: 0L) > at
 
         suspend fun sync() {
             val incoming = server.files.filterKeys { it != id }.values.toList()
@@ -107,6 +109,33 @@ class SyncConvergenceTest {
         b.sync(); a.sync()
         assertFalse("sigue en b", key in b.items)
         assertFalse("volvió a a", key in a.items)
+    }
+
+    @Test fun `un estado cambiado despues de la lapida de otro dispositivo no se quita`() = runTest {
+        var time = 1_000L
+        val clock = { time += 10; time }
+        val server = Server()
+        val a = Sim("a", server, clock); val b = Sim("b", server, clock)
+        val key = Removals.statusKey("animeflv:serie")
+        a.items += key; b.items += key; a.sync(); b.sync(); a.sync()
+        a.items -= key; a.sync() // a quita el estado y lo anota
+        b.changed[key] = clock() // b lo cambia después (por ejemplo de Pendiente a Viendo) sin haber sincronizado
+        b.sync() // b lee la lápida de a: su cambio es más reciente y se queda
+        a.sync(); b.sync(); a.sync()
+        assertTrue("b perdió su cambio más reciente", key in b.items)
+        assertTrue("a no recibió el estado más reciente de b", key in a.items)
+    }
+
+    @Test fun `un estado quitado y no tocado despues si se quita en el otro`() = runTest {
+        var time = 1_000L
+        val clock = { time += 10; time }
+        val server = Server()
+        val a = Sim("a", server, clock); val b = Sim("b", server, clock)
+        val key = Removals.statusKey("animeflv:serie")
+        a.items += key; b.items += key; b.changed[key] = clock(); a.sync(); b.sync(); a.sync()
+        a.items -= key; a.sync()
+        b.sync(); a.sync(); b.sync()
+        assertFalse(key in a.items || key in b.items)
     }
 
     @Test fun `las claves de capitulos en curso se leen y se cuentan aparte`() {

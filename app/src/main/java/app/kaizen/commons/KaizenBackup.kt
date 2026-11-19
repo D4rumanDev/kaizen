@@ -176,7 +176,7 @@ object KaizenBackup {
     suspend fun snapshotBytes(removed: Map<String, Long> = emptyMap()): ByteArray = withContext(Dispatchers.IO) { encode(buildData().copy(removed = removed)).toByteArray(Charsets.UTF_8) }
 
     /** Lo que hay ahora, por claves portables, para saber qué se quitó entre dos sincronizaciones ([app.kaizen.commons.sync.Removals]). */
-    class Presence internal constructor(private val favoriteIds: Set<Long>, private val records: Set<Pair<Long, Double>>, override val keys: Set<String>, private val progress: Set<Pair<Long, Double>> = emptySet(), private val progressByFicha: Set<Pair<String, Double>> = emptySet()) : app.kaizen.commons.sync.Removals.Presence {
+    class Presence internal constructor(private val favoriteIds: Set<Long>, private val records: Set<Pair<Long, Double>>, override val keys: Set<String>, private val progress: Set<Pair<Long, Double>> = emptySet(), private val progressByFicha: Set<Pair<String, Double>> = emptySet(), private val statusIds: Set<Long> = emptySet()) : app.kaizen.commons.sync.Removals.Presence {
         /** ¿Sigue [key] (un favorito o un capítulo visto)? null si no se sabe (la ficha no es conocida). */
         override fun isPresent(key: String): Boolean? {
             val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
@@ -187,6 +187,7 @@ object KaizenBackup {
                 return if (id == null) byFicha.takeIf { it } else (id to parsed.number) in progress || byFicha
             }
             if (id == null) return null
+            if (parsed.status) return id in statusIds
             return if (parsed.favorite) id in favoriteIds else (id to parsed.number!!) in records
         }
     }
@@ -195,7 +196,17 @@ object KaizenBackup {
     fun canon(key: String): String? {
         val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
         val id = SeriesLedger.peek(parsed.source, parsed.slug) ?: return null
-        return if (parsed.favorite) "f/$id" else if (parsed.progress) "c/$id#${parsed.number}" else "r/$id#${parsed.number}"
+        return if (parsed.favorite) "f/$id" else if (parsed.status) "e/$id" else if (parsed.progress) "c/$id#${parsed.number}" else "r/$id#${parsed.number}"
+    }
+
+    /** ¿Cambió aquí la clave [key] (un estado o un capítulo en curso) después de [at]? Solo ellos llevan hora; los favoritos y los capítulos vistos no. */
+    fun changedAfter(key: String, at: Long): Boolean {
+        val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return false
+        return when {
+            parsed.status -> app.kaizen.domain.SeriesStatuses.latestChange(parsed.source, parsed.slug) > at
+            parsed.progress -> KaizenProgress.latestChange(SeriesLedger.peek(parsed.source, parsed.slug), "${parsed.source}:${parsed.slug}", parsed.number!!) > at
+            else -> false
+        }
     }
 
     suspend fun presence(): Presence = withContext(Dispatchers.IO) {
@@ -211,7 +222,11 @@ object KaizenBackup {
         val (bySeries, byFicha) = KaizenProgress.chapters()
         bySeries.forEach { (id, number) -> ficha(id)?.let { keys += app.kaizen.commons.sync.Removals.progressKey(it, number) } }
         byFicha.forEach { (fichaKey, number) -> keys += app.kaizen.commons.sync.Removals.progressKey(fichaKey, number) }
-        Presence(favorites.map { it.seriesId }.toSet(), records.map { it.seriesId to it.number }.toSet(), keys, bySeries.toSet(), byFicha.toSet())
+        // Estados de serie: una clave por serie con estado (la ficha de la entrada) y sus ids para saber si sigue.
+        val statusEntries = app.kaizen.domain.SeriesStatuses.all.value.values
+        statusEntries.forEach { keys += app.kaizen.commons.sync.Removals.statusKey("${it.source}:${it.slug}") }
+        val statusIds = statusEntries.mapNotNull { app.kaizen.source.seriesIdOf(it.source, it.slug).takeIf { id -> id != 0L } }.toSet()
+        Presence(favorites.map { it.seriesId }.toSet(), records.map { it.seriesId to it.number }.toSet(), keys, bySeries.toSet(), byFicha.toSet(), statusIds)
     }
 
     /** Quita lo que dicen estas claves (favoritos y capítulos vistos); devuelve cuántas filas había. */
@@ -223,6 +238,8 @@ object KaizenBackup {
             val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: continue
             if (parsed.favorite) {
                 if (db.favoriteAV1DAO().isFav(parsed.source, parsed.slug)) { db.favoriteAV1DAO().removeFav(parsed.source, parsed.slug); count++ }
+            } else if (parsed.status) {
+                if (app.kaizen.domain.SeriesStatuses.removeSeries(parsed.source, parsed.slug)) count++
             } else if (parsed.progress) {
                 if (KaizenProgress.removeChapter(SeriesLedger.peek(parsed.source, parsed.slug), listOf("${parsed.source}:${parsed.slug}"), parsed.number!!)) count++
             } else if (db.recordAV1DAO().chapterIsSeen(parsed.source, parsed.slug, parsed.number!!)) {
@@ -302,7 +319,8 @@ object KaizenBackup {
         })
         KaizenProgress.migrateFichaKeys { source, slug -> app.kaizen.source.seriesIdOf(source, slug) }
         if (data.titles.isNotEmpty()) UserTitles.import(data.titles)
-        if (data.statuses.isNotEmpty()) SeriesStatuses.importMissing(data.statuses)
+        // Un estado nuevo entra y uno ya existente se sustituye si el de la copia es más reciente; una lápida más nueva que la copia lo impide.
+        if (data.statuses.isNotEmpty()) SeriesStatuses.importNewer(data.statuses) { entry -> skip(app.kaizen.commons.sync.Removals.statusKey("${entry.source}:${entry.slug}")) }
         Summary(newFavorites.size, data.records.size, newProgress)
     }
 }

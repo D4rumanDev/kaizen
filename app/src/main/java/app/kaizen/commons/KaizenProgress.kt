@@ -1,5 +1,6 @@
 package app.kaizen.commons
 
+import kotlin.time.Duration.Companion.days
 import android.content.SharedPreferences
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -25,6 +26,10 @@ object KaizenProgress {
     private const val TAG = "KaizenProgress"
     private const val KEY_PREFIX = "s:"
     private const val FICHA_PREFIX = "p:"
+
+    /** Junto a cada progreso va, con la clave «t:clave», la hora (ms) de su último cambio: con ella gana el más reciente entre dos dispositivos. Sin ella (progreso de antes) se vale la posición mayor. */
+    private const val TIME_PREFIX = "t:"
+    private val MAX_FUTURE = 1.days
 
     /** El capítulo de una serie: [seriesId] (0 = el libro aún no la conoce) y [number]. Es lo que identifica el progreso (y no cambia con el hash del eid). */
     data class Key(val seriesId: Long, val number: Double) {
@@ -127,14 +132,31 @@ object KaizenProgress {
         if (eid > 0) forget(eid.toString())
     }
 
-    private fun store(key: String, value: String) {
+    /** La hora del último cambio de [key]; 0 si no consta (progreso de antes de que se guardara). */
+    private fun timeOf(key: String): Long = entries["$TIME_PREFIX$key"]?.toLongOrNull() ?: 0L
+
+    private fun store(key: String, value: String, at: Long = System.currentTimeMillis()) {
         entries[key] = value
-        persist { putString(key, value) }
+        if (at > 0) entries["$TIME_PREFIX$key"] = at.toString() else entries.remove("$TIME_PREFIX$key")
+        persist { putString(key, value); if (at > 0) putString("$TIME_PREFIX$key", at.toString()) else remove("$TIME_PREFIX$key") }
     }
 
     private fun forget(key: String) {
         entries.remove(key)
-        persist { remove(key) }
+        entries.remove("$TIME_PREFIX$key")
+        persist { remove(key); remove("$TIME_PREFIX$key") }
+    }
+
+    /**
+     * ¿Se queda el progreso de otro dispositivo en lugar del de aquí? Si los dos traen su hora gana el más reciente (una hora de más de un día en el futuro, de un reloj roto,
+     * no cuenta); si falta alguna se vale la posición mayor, como antes. Sin progreso aquí, el ajeno entra siempre.
+     */
+    internal fun takeIncoming(localValue: String?, localAt: Long, incomingValue: String, incomingAt: Long, now: Long = System.currentTimeMillis()): Boolean {
+        val incoming = parse(incomingValue) ?: return false
+        val local = localValue?.let(::parse) ?: return true
+        val theirs = incomingAt.takeIf { it in 1..(now + MAX_FUTURE.inWholeMilliseconds) } ?: 0L
+        val mine = localAt.takeIf { it in 1..(now + MAX_FUTURE.inWholeMilliseconds) } ?: 0L
+        return if (theirs > 0 && mine > 0 && theirs != mine) theirs > mine else incoming.positionMs > local.positionMs
     }
 
     /** Las claves de progreso son series («s:…»), fichas («p:…», versión anterior) o eids de versiones anteriores; el resto del fichero son marcas internas. */
@@ -147,18 +169,28 @@ object KaizenProgress {
      * Como [exportAll] pero sin ids locales: el progreso por serie («s:…») sale con la clave de una de sus fichas ([fichaOf] da su fuente y
      * slug), que es lo que otro equipo entiende ([migrateFichaKeys] la devuelve a su serie).
      */
-    fun exportPortable(fichaOf: (seriesId: Long) -> Pair<String, String>?): Map<String, String> = exportAll().entries.associate { (text, value) ->
-        val key = Key.parse(text)
-        val ficha = key?.let { fichaOf(it.seriesId) }
-        (if (key != null && ficha != null) "$FICHA_PREFIX${ficha.first}:${ficha.second}#${numberText(key.number)}" else text) to value
-    }.filterKeys { !it.startsWith(KEY_PREFIX) } // un id local sin fichas no significa nada en otro equipo
+    fun exportPortable(fichaOf: (seriesId: Long) -> Pair<String, String>?): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        for ((text, value) in exportAll()) {
+            val key = Key.parse(text)
+            val ficha = key?.let { fichaOf(it.seriesId) }
+            val portable = if (key != null && ficha != null) "$FICHA_PREFIX${ficha.first}:${ficha.second}#${numberText(key.number)}" else text
+            if (portable.startsWith(KEY_PREFIX)) continue // un id local sin fichas no significa nada en otro equipo
+            out[portable] = value
+            // La hora del cambio viaja con la clave «t:…»: los dispositivos con la versión anterior no la reconocen y la ignoran.
+            timeOf(text).takeIf { it > 0 }?.let { out["$TIME_PREFIX$portable"] = it.toString() }
+        }
+        return out
+    }
 
     /** Añade el progreso de [saved] que no existe aquí; devuelve cuántos añadió. */
     fun importMissing(saved: Map<String, String>): Int {
         val missing = saved.filter { (key, value) -> isProgressKey(key) && !entries.containsKey(key) && parse(value) != null }
         if (missing.isEmpty()) return 0
+        val times = missing.keys.mapNotNull { key -> saved["$TIME_PREFIX$key"]?.toLongOrNull()?.takeIf { it > 0 }?.let { "$TIME_PREFIX$key" to it.toString() } }.toMap()
         entries.putAll(missing)
-        persist { missing.forEach { (key, value) -> putString(key, value) } }
+        entries.putAll(times)
+        persist { missing.forEach { (key, value) -> putString(key, value) }; times.forEach { (key, value) -> putString(key, value) } }
         _changes.value = System.currentTimeMillis()
         return missing.size
     }
@@ -178,6 +210,12 @@ object KaizenProgress {
             body.substringBeforeLast('#') to number
         }
         return series to fichas
+    }
+
+    /** La hora del último cambio del progreso de un capítulo (por serie o por ficha); 0 si no hay o no consta. */
+    fun latestChange(seriesId: Long?, ficha: String, number: Double): Long {
+        val keys = listOfNotNull(seriesId?.takeIf { it > 0 }?.let { Key(it, number).text }) + "$FICHA_PREFIX$ficha#${numberText(number)}"
+        return keys.maxOfOrNull { timeOf(it) } ?: 0L
     }
 
     /** Quita el progreso de un capítulo por lo que dice la sincronización (una lápida de otro dispositivo); false si aquí no había. */
@@ -206,7 +244,7 @@ object KaizenProgress {
             val record = byEid[old.toInt()]?.firstOrNull { it.progressKey().isValid } ?: continue
             val value = entries[old] ?: continue
             val key = record.progressKey().text
-            if (!entries.containsKey(key)) store(key, value)
+            if (!entries.containsKey(key)) store(key, value, at = 0L)
             forget(old)
             moved = true
         }
@@ -229,8 +267,7 @@ object KaizenProgress {
             val id = seriesOf(body.substring(0, colon), body.substring(colon + 1, hash)).takeIf { it > 0 } ?: continue
             val value = entries[text] ?: continue
             val key = Key(id, number).text
-            val keep = entries[key]?.let(::parse)
-            if (keep == null || (parse(value)?.positionMs ?: 0L) > keep.positionMs) store(key, value)
+            if (takeIncoming(entries[key], timeOf(key), value, timeOf(text))) store(key, value, at = timeOf(text))
             forget(text)
             moved = true
         }
@@ -249,8 +286,7 @@ object KaizenProgress {
             if (current == key.seriesId) continue
             val value = entries[text] ?: continue
             val target = Key(current, key.number).text
-            val keep = entries[target]?.let(::parse)
-            if (keep == null || (parse(value)?.positionMs ?: 0L) > keep.positionMs) store(target, value)
+            if (takeIncoming(entries[target], timeOf(target), value, timeOf(text))) store(target, value, at = timeOf(text))
             forget(text)
             moved = true
         }
