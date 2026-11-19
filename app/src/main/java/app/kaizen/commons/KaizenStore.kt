@@ -40,6 +40,7 @@ object KaizenStore {
         Entry("kaizen_progress", Scope.STATE, "Capítulos vistos y posición de cada uno"),
         Entry("kaizen_recents", Scope.STATE, "Archivo de capítulos recientes"),
         Entry("kaizen_best_airing", Scope.CACHE, "«Mejores en emisión» guardado una semana (se rehace al actualizar)"),
+        Entry("kaizen_recommended_daily", Scope.CACHE, "Tanda de «Recomendados» de hoy y títulos enseñados los días anteriores (se rehace)"),
         Entry("kaizen_taste", Scope.CACHE, "Gustos aprendidos para recomendar (se recalculan)"),
         Entry("kaizen_servers", Scope.STATE, "Servidor recordado de cada serie"),
         Entry("kaizen_connection_stats", Scope.STATE, "Intentos de conexión de las estadísticas"),

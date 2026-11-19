@@ -375,11 +375,11 @@ internal fun PagedGrid(
             // Sin saber todavía cuántas hay en total (la lista sigue cargando) solo se dice la página.
             fullWidth { PageBar(paged, knownTotal = endReached) }
             // Falló o se atascó la carga de más series: sin esto el usuario se quedaba sin «Siguiente» ni mensaje.
-            if (!empty && (appendFailed || stalled)) fullWidth { LoadProblem(if (appendFailed) appString(R.string.ui_no_se_pudo_cargar) else appString(R.string.ui_tarda_mas_de_lo_normal), retryLoad) }
+            if (!empty && (appendFailed || stalled)) fullWidth { LoadProblem(loadProblemMessage(stalled), retryLoad) }
         }
         when {
             (refresh is LoadState.Error || stalled) && empty ->
-                LoadProblem(if (stalled) appString(R.string.ui_tarda_mas_de_lo_normal) else appString(R.string.ui_no_se_pudo_cargar), retryLoad, Modifier.align(Alignment.Center))
+                LoadProblem(loadProblemMessage(stalled), retryLoad, Modifier.align(Alignment.Center))
             refresh is LoadState.NotLoading && empty -> CenterMessage(appString(R.string.ui_sin_resultados), illustration = true)
             refresh is LoadState.Loading && empty -> LoadingGrid()
         }

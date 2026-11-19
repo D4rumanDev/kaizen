@@ -94,3 +94,13 @@ internal fun LoadProblem(message: String, onRetry: () -> Unit, modifier: Modifie
         KaizenButton(appString(R.string.ui_reintentar), onClick = onRetry, fontSize = Text14)
     }
 }
+
+/**
+ * El texto del aviso de una carga que falló o se atascó: sin Internet (detectado o con el «Modo sin conexión») se dice eso, que es la causa, y no que «tarda más de lo normal» (con la red
+ * caída las cargas acaban rápido en error, no en espera). Con red, el atasco o el fallo de siempre.
+ */
+internal fun loadProblemMessage(stalled: Boolean): String = when {
+    app.kaizen.commons.NetworkState.isOffline -> appString(R.string.ui_sin_conexion_aviso)
+    stalled -> appString(R.string.ui_tarda_mas_de_lo_normal)
+    else -> appString(R.string.ui_no_se_pudo_cargar)
+}
