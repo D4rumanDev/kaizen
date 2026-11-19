@@ -111,8 +111,7 @@ object SearchEngine {
     }
 
     /**
-     * Ordena por nota de más a menos. Las fichas sin nota en el listado (animeav1, jkanime) la toman de
-     * [AnimeSources.cardRating] (media ponderada de las fuentes activas, en caché 15 días); sin nota quedan al final.
+     * Ordena por nota de más a menos. La nota es la de AniList que guarda el catálogo ([Catalog.ratingOf]); las series sin nota quedan al final.
      * Sin esto, con varias fuentes la lista saldría intercalada por el orden de cada una, no por nota.
      */
     suspend fun rankByRating(items: List<SeriesSummary>): List<SeriesSummary> {
@@ -120,7 +119,7 @@ object SearchEngine {
             items.map { item ->
                 async {
                     if (item.score != null) item
-                    else AnimeSources.cardRating(AnimeSources.of(item.source), item.slug)?.let { item.copy(score = it) } ?: item
+                    else Catalog.ratingOf(item.source, item.slug)?.let { item.copy(score = it) } ?: item
                 }
             }.awaitAll()
         }

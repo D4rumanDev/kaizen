@@ -106,8 +106,9 @@ class App : Application(), Configuration.Provider {
                     delay(LAZY_START_DELAY)
                     // Reagrupar puede llevar decenas de segundos de CPU: a prioridad de fondo, para no frenar la pantalla.
                     runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "reagrupar el catálogo si hace falta") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
+                    runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "poner solo la nota de AniList en el catálogo") { app.kaizen.source.CatalogBuilder.rescoreIfNeeded() } }.onFailure(::logError)
                     runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "comprobar si el catálogo está al día") { app.kaizen.source.CatalogBuilder.ensureFresh() } }.onFailure(::logError)
-                    // Emparejar con AniList (apagado de fábrica): arranca si el usuario lo activó. Su primera pasada son ~30 s de CPU y memoria (26.000 fichas: el
+                    // Emparejar con AniList (encendido de fábrica: da la nota de las series): arranca salvo que el usuario lo apagara. Su primera pasada son ~30 s de CPU y memoria (26.000 fichas: el
                     // GC no paraba y «Últimos vistos» tardaba en salir), así que espera a que la app lleve un rato abierta.
                     delay(ANILIST_START_DELAY)
                     app.kaizen.commons.DebugLog.timed("Arranque", "encender el emparejado") { app.kaizen.source.AnilistSyncRunner.apply() }

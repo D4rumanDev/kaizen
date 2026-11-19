@@ -69,15 +69,6 @@ interface AnimeSource {
     /** Portada de un anime. */
     fun coverUrl(aid: Int, slug: String): String
 
-    /** Nota de la ficha en estrellas (escala /5) y número de votos; null si la fuente no tiene valoraciones. */
-    suspend fun rating(slug: String): Pair<Float, Int>? = null
-
-    /** Si la nota se puede pedir sin bajar la ficha completa. Las tarjetas (recomendados) solo usan fuentes así. */
-    val lightRating: Boolean get() = true
-
-    /** Si sus listados traen la nota de cada serie. Si no, ordenar por nota exige que la fuente lo ordene ella (SORT_RATING). */
-    val listsScores: Boolean get() = true
-
     /**
      * Número de series que anuncia el listado completo de la fuente (una sola petición), o null si no lo da.
      * Con él, el catálogo interno se salta el recorrido de cientos de páginas si el total no ha cambiado.
@@ -216,7 +207,7 @@ object AnimeSources {
     }
 
     /**
-     * Guarda la ficha descargada para [url] (la copia entera, y su nota y episodios para las tarjetas). Solo con red: sin ella la
+     * Guarda la ficha descargada para [url] (la copia entera, y sus episodios para las tarjetas). Solo con red: sin ella la
      * ficha puede venir de la copia local de la fuente y no se debe sellar como recién descargada. (Con red y la web caída, una fuente
      * con `cacheFiche` también devuelve su copia local: se sirve como mucho [SourceCache] 60 min y se corrige en la siguiente renovación.)
      */
@@ -224,7 +215,7 @@ object AnimeSources {
         if (!Network.isConnected) return
         SourceCache.saveFiche(url, series)
         SourceCache.noteFiche(series)
-        // La ficha completa lo que el catálogo no trae (nota, votos, año), pero que falle no debe estropear la apertura.
+        // La ficha completa lo que el catálogo no trae (el año), pero que falle no debe estropear la apertura.
         // Aparte: el catálogo puede estar escribiéndose y la ficha no debe esperar a su cerrojo.
         AppScope.launch { runCatchingCoop { CatalogBuilder.noteFicha(series) }.onFailure(::logError) }
     }
@@ -266,7 +257,6 @@ object AnimeSources {
      * Ficha completa a partir de la de la fuente abierta y de la misma serie en las demás fuentes activas, pidiendo
      * cada ficha una sola vez y en paralelo (una fuente que falla solo deja de aportar):
      *  - capítulos: si la abierta no los tiene (serie terminada que su web no lista), los de la primera que sí;
-     *  - nota: media de todas, ponderada por votos;
      *  - relaciones: las de todas, sin repetir serie (las de la ficha base primero).
      */
     suspend fun complete(anime: Series): Series {
@@ -275,11 +265,8 @@ object AnimeSources {
         val base = if (anime.chapters.isEmpty()) others.firstOrNull { it.chapters.isNotEmpty() } ?: anime else anime
         val all = listOf(anime) + others
         // Solo fichas con nota y votos: una fuente con votos pero sin nota no cuenta como 0 estrellas.
-        val rating = weightedStars(all.filter { it.rateCount > 0 && it.rateStars > 0f }.map { toStars(it.rateStars.toDouble()) to it.rateCount })
         val relations = mergeRelations(base.slug, base.name, base.source, (listOf(base) + (all - base)).flatMap { it.relations }, AnimeAv1.ID)
         return base.copy(
-            rateStars = rating?.first?.toFloat() ?: base.rateStars,
-            rateCount = rating?.second ?: base.rateCount,
             relations = relations
         )
     }
@@ -295,40 +282,6 @@ object AnimeSources {
                 }
             }
         }.awaitAll().filterNotNull()
-    }
-
-    /**
-     * Nota para una tarjeta de [owner]/[slug]: la que ya guarda el catálogo (con o sin votos) o, si no, la media ponderada por votos de las fuentes activas que la tienen
-     * (según el catálogo). Las fuentes que solo dan la nota con la ficha completa (animeav1) cuestan una petición
-     * por serie: la puerta de [ratingGate] las limita a dos a la vez y la nota se guarda 15 días.
-     */
-    private val cardGate = kotlinx.coroutines.sync.Semaphore(3)
-
-    suspend fun cardRating(owner: AnimeSource, slug: String): Double? = cardGate.withPermit {
-        // Si el catálogo ya guarda la nota de la serie no se pide ninguna ficha.
-        Catalog.ratingOf(owner.id, slug)?.let { return@withPermit it }
-        val ratings = coroutineScope {
-            enabled.map { source ->
-                async {
-                    val target = if (source.id == owner.id) slug else Catalog.slugIn(source, owner.id, slug)
-                    target?.let { runCatchingCoop { SourceCache.ratedOrNull(source, it) }.getOrNull() }
-                }
-            }.awaitAll()
-        }.filterNotNull()
-        weightedStars(ratings.map { toStars(it.first.toDouble()) to it.second })?.first
-    }
-
-    /** Nota de una serie por slug: la del catálogo si la tiene (con o sin votos); si no, ponderada por votos entre las fuentes activas; null si no hay. */
-    suspend fun ratingOf(slug: String): Double? {
-        Catalog.ratingOfSlug(slug)?.let { return it }
-        val ratings = coroutineScope {
-            enabled.filter { it.lightRating }.map { source ->
-                async {
-                    runCatchingCoop { Catalog.slugAny(source, slug)?.let { SourceCache.ratedOrNull(source, it) } }.getOrNull()
-                }
-            }.awaitAll()
-        }.filterNotNull()
-        return weightedStars(ratings.map { toStars(it.first.toDouble()) to it.second })?.first
     }
 
     /**
@@ -442,9 +395,6 @@ internal fun cleanSlug(slug: String): String = slug.removeSuffix("-anime").remov
 /** El slug de una ficha a partir de su URL: el último tramo de la ruta. */
 internal fun slugOfUrl(url: String): String = url.trimEnd('/').substringAfterLast('/')
 
-/** Nota en estrellas, máximo 5. Algunas fuentes publican sobre 10 (animeav1): se pasan a /5. */
-internal fun toStars(raw: Double): Double = (if (raw > 5.0) raw / 2.0 else raw).coerceIn(0.0, 5.0)
-
 /** Media de notas ponderada por votos, pares (estrellas, votos). Null si ninguna nota tiene votos. */
 internal fun weightedStars(ratings: List<Pair<Double, Int>>): Pair<Double, Int>? {
     val votes = ratings.sumOf { it.second }
@@ -457,8 +407,8 @@ internal fun weightedStarsOf(group: List<SeriesSummary>): Pair<Double, Int>? =
     weightedStars(group.mapNotNull { item -> item.score?.takeIf { item.votes > 0 }?.let { it to item.votes } })
 
 /**
- * Une las fichas de una misma serie (mismo slug). Si varias traen nota con votos, la nota es la media
- * ponderada por votos, igual que en la ficha. Mantiene el orden de la primera aparición.
+ * Une las fichas de una misma serie (mismo slug). La nota que lleve cada una es la de AniList (o ninguna); si varias la traen, se promedian por su peso.
+ * Mantiene el orden de la primera aparición.
  */
 internal fun mergeSeries(items: List<SeriesSummary>): List<SeriesSummary> {
     // Misma serie: mismo slug, o el mismo título en otra fuente, y en los dos casos con años compatibles ([SeriesMatch]).

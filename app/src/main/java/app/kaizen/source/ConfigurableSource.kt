@@ -65,9 +65,7 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
     override val host = spec.host
 
     // Su ficha pide la nota solo al abrirla cuando la página es pesada (animeav1).
-    override val lightRating: Boolean get() = spec.lightRating
 
-    override val listsScores: Boolean get() = spec.listsScores
     override val needsBrowserUa: Boolean get() = spec.browserUa
 
     private val base = spec.base
@@ -328,8 +326,9 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
                 slug = slug,
                 category = 1,
                 source = id,
-                score = fields.score?.let { anime.optDouble(it, Double.NaN) }?.takeUnless { it.isNaN() }?.div(api.scoreScale),
-                votes = fields.votes?.let { anime.optInt(it, 0) } ?: 0,
+                // La nota que da la web se descarta: solo vale la de AniList (ver [AnilistScores]).
+                score = null,
+                votes = 0,
                 year = fields.year?.let { anime.optString(it) }?.toDoubleOrNull()?.toInt()
             )
         }
@@ -522,8 +521,9 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
             name = data.romaji ?: "",
             slug = slug,
             description = data.descripcion ?: "",
-            rateStars = data.nota?.toFloat() ?: 0f,
-            rateCount = data.votos ?: 0,
+            // La nota y los votos de la web se descartan: solo vale la nota de AniList (ver [AnilistScores]).
+            rateStars = 0f,
+            rateCount = 0,
             type = kindOf(data.formato),
             state = if (data.estado == "RELEASING") 1 else 2,
             day = spec.anime.day?.first(node)?.let(::dayOfWeek),
@@ -548,21 +548,6 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
     internal fun dayOfWeek(text: String): Int? =
         runCatching { OffsetDateTime.parse(text.replace(" ", "T"), ISO_WITH_OFFSET).dayOfWeek.value }.getOrNull()
             ?: runCatching { LocalDate.parse(text.take(10), DateTimeFormatter.ISO_LOCAL_DATE).dayOfWeek.value }.getOrNull()
-
-    override suspend fun rating(slug: String): Pair<Float, Int>? = withContext(Dispatchers.IO) {
-        if ("score" !in spec.ficha.fields) return@withContext null
-        // Si la página es pesada (`lightRating` falso) la nota sale de la ficha completa.
-        if (!spec.lightRating) {
-            return@withContext anime(animeUrl(slug))?.takeIf { it.rateCount > 0 }?.let { toStars(it.rateStars.toDouble()).toFloat() to it.rateCount }
-        }
-        // Un fallo de red se propaga (no se guarda como «sin nota»); solo un 404 significa que no hay ficha.
-        val doc = try {
-            SourceHttp.page(animeUrl(slug))
-        } catch (e: org.jsoup.HttpStatusException) {
-            if (e.statusCode == 404) return@withContext null else throw e
-        }
-        WebFichaSchema.rating(spec.ficha, HtmlNode(doc))?.takeIf { (_, votes) -> votes > 0 }
-    }
 
     /** Capítulos de la ficha: de su lista JSON, de sus tarjetas o, si el fichero lo indica, de una API o de un total (un fallo deja la lista vacía y la ficha se abre igualmente). */
     private fun chaptersOf(slug: String, node: Node, context: AjaxEpisodes.Context?, htmlPage: Pair<SourceHttp.Reply, Document>? = null): List<Chapter> {
@@ -631,13 +616,10 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
         }
         if (schedule.columns != null) {
             val doc = document(fill(schedule.url)) ?: throw noResponse(fill(schedule.url))
-            val scores = schedule.scoresUrl?.let { apiScores(fill(it)) }.orEmpty()
             return@withContext parseSchedule(HtmlNode(doc)).mapValues { (day, cards) ->
                 cards.map { card ->
                     covers.remember(card.slug, card.cover)
-                    AiringSeries(AnimeIds.forSlug(card.slug, id), card.name, card.slug, day, category = 1).also { airing ->
-                        scores[card.slug]?.let { (stars, count) -> airing.score = stars; airing.votes = count }
-                    }
+                    AiringSeries(AnimeIds.forSlug(card.slug, id), card.name, card.slug, day, category = 1)
                 }
             }
         }

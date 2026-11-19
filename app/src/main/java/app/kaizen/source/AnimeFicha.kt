@@ -77,6 +77,10 @@ interface AnimeFichaDao {
     @Query("SELECT COUNT(*) FROM AnimeFicha")
     fun count(): Int
 
+    /** La nota de AniList (0 a 100) de cada ficha descargada que la tiene: es la única nota de la app (ver [AnilistScores]). */
+    @Query("SELECT anilistId, nota FROM AnimeFicha WHERE nota IS NOT NULL")
+    fun notes(): List<Note>
+
     /** Fichas descargadas a las que aún no se ha mirado el texto en español (las que se miraron sin resultado llevan un marcador). */
     @Query("SELECT anilistId FROM AnimeFicha WHERE es IS NULL")
     fun idsWithoutEs(): List<Long>
@@ -94,6 +98,8 @@ interface AnimeFichaDao {
     class EsMark(val anilistId: Long, val es: ByteArray?)
 
     data class Downloaded(val anilistId: Long, val descargada: Long)
+
+    data class Note(val anilistId: Long, val nota: Int?)
 
     data class Titles(val anilistId: Long, val tituloRomaji: String?, val tituloIngles: String?, val formato: String? = null)
 }

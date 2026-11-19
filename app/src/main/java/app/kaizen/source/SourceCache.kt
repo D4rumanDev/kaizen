@@ -14,13 +14,6 @@ import java.lang.reflect.Type
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-/** Nota guardada. [votes] = 0 si la fuente no tiene valoraciones: así no se vuelve a pedir. */
-@androidx.annotation.Keep
-data class RatingValue(
-    @SerializedName("stars") val stars: Float,
-    @SerializedName("votes") val votes: Int
-)
-
 /**
  * Capa única de caché de datos de todas las fuentes. Cada fuente obtiene sus datos como puede (API, HTML o JS),
  * pero el guardado, los plazos y la purga están aquí. La ficha completa se guarda 60 min (clave «fiche|versión|url», ver
@@ -32,9 +25,7 @@ object SourceCache {
     private val SCHEDULE_TTL: Duration get() = Timings.schedule()    // horario (estrenos y cambios de día)
     /** Recientes: lo guardado caduca a la mitad del intervalo de renovación (como mucho 30 min), para que cada pasada pida datos nuevos. */
     private fun recentsTtl(): Duration = runCatching { KaizenSettings.recentsEveryMinutes.coerceIn(15, 180) / 2 }.getOrDefault(30).coerceAtMost(30).minutes
-    private val RATING_TTL: Duration get() = Timings.rating()        // notas
     private val EPISODES_TTL: Duration get() = Timings.episodes()    // episodios publicados: una serie en emisión suma uno cada semana
-    internal const val MAX_VOTES = 10_000_000      // más votos que esto en una ficha no es creíble
 
     // RecentEpisode lleva objetos que apuntan a sí mismo (state): se guarda una copia plana de sus datos.
     // @Keep y nombres fijos: el JSON guardado debe sobrevivir a R8 y a las actualizaciones.
@@ -71,20 +62,12 @@ object SourceCache {
     suspend fun schedule(source: AnimeSource): Map<Int, List<AiringSeries>> =
         ApiCache.obj("schedule|${source.id}", SCHEDULE_TTL, scheduleType) { source.schedule().takeIf { it.isNotEmpty() } }.orEmpty()
 
-    /** Nota de una serie en una fuente (con votos 0 si no tiene). Errores de red se propagan. */
-    suspend fun rating(source: AnimeSource, slug: String): RatingValue =
-        ApiCache.obj("rating|${source.id}|$slug", RATING_TTL, RatingValue::class.java) {
-            val rated = source.rating(slug)
-            RatingValue(rated?.first ?: 0f, rated?.second ?: 0)
-        } ?: RatingValue(0f, 0)
-
     /**
-     * Episodios publicados de la ficha [slug] de [source]. La ficha trae a la vez la nota y los episodios: al pedirla se guardan
-     * las dos cosas ([noteFiche]), y quien pida luego una de ellas no vuelve a pedir la página.
+     * Episodios publicados de la ficha [slug] de [source]. Al abrir la ficha se guardan ([noteFiche]) y quien los pida luego no vuelve a pedir la página.
      */
     suspend fun episodes(source: AnimeSource, slug: String): Int? =
         ApiCache.obj("episodes|${source.id}|$slug", EPISODES_TTL, Int::class.javaObjectType) {
-            source.anime(source.animeUrl(slug))?.also { noteRating(it) }?.chapters?.size?.takeIf { it > 0 }
+            source.anime(source.animeUrl(slug))?.chapters?.size?.takeIf { it > 0 }
         }
 
     /**
@@ -115,28 +98,11 @@ object SourceCache {
         runCatchingCoop { ApiCache.put("fiche|${BuildConfig.VERSION_CODE}|$url", series) }.onFailure(::logError)
     }
 
-    /** Guarda los datos de una ficha ya descargada (nota y episodios) para que no se pidan otra vez por separado. */
+    /** Guarda los episodios de una ficha ya descargada para que no se pidan otra vez por separado. */
     suspend fun noteFiche(series: Series) {
         // Guardar de más nunca debe impedir abrir la ficha.
         runCatchingCoop {
-            noteRating(series)
             series.chapters.size.takeIf { it > 0 }?.let { ApiCache.put("episodes|${series.source}|${series.slug}", it) }
         }.onFailure(::logError)
     }
-
-    // Sin votos no se guarda: no pisa una nota anterior ni marca «sin nota» una serie que solo aún no la trae la ficha. Los datos
-    // vienen de una web y quedan 15 días: votos absurdos o una nota que no es un número tampoco se guardan. Un fallo al guardar no
-    // debe estropear lo que pidió quien llama (los episodios).
-    private suspend fun noteRating(series: Series) {
-        runCatchingCoop {
-            val stars = toStars(series.rateStars.toDouble())
-            if (series.rateCount in 1..MAX_VOTES && stars.isFinite()) {
-                ApiCache.put("rating|${series.source}|${series.slug}", RatingValue(stars.toFloat(), series.rateCount))
-            }
-        }.onFailure(::logError)
-    }
-
-    /** Nota con votos, o null si la fuente no tiene valoraciones (animeav1 da 0 hasta que una serie nueva reúne votos). */
-    suspend fun ratedOrNull(source: AnimeSource, slug: String): Pair<Float, Int>? =
-        rating(source, slug).takeIf { it.votes > 0 && it.stars > 0f }?.let { it.stars to it.votes }
 }

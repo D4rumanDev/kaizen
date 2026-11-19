@@ -209,6 +209,8 @@ internal object AnilistSyncRunner {
             lastLine = line
             // Los enlaces nuevos pueden unir series de distintas fuentes: el catálogo se reagrupa con ellos.
             if (report != null && report.applied > 0) runCatching { CatalogBuilder.regroup() }.onFailure { logError(it) }
+            // Con fichas nuevas sin enlaces nuevos solo cambian las notas de AniList: se ponen sin reagrupar.
+            else if (report != null && report.fichasDownloaded > 0) runCatching { CatalogBuilder.rescore() }.onFailure { logError(it) }
             delay(
                 when (report?.stopped) {
                     null -> if (report == null) RETRY else IDLE

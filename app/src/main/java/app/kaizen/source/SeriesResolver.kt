@@ -95,7 +95,7 @@ object SeriesResolver {
         // Con «x» y «x-latino» unidas, el nombre de la serie sale de la ficha base si tiene nombre real.
         group.sortedBy { it.slug.endsWith("-latino") }.firstOrNull { !it.name.equals(it.slug.replace('-', ' '), ignoreCase = true) }?.name ?: group.first().name
 
-    /** Une las fichas de una misma serie en una entrada: nombre real, nota ponderada y año más antiguo. */
+    /** Une las fichas de una misma serie en una entrada: nombre real, nota (la de AniList de sus fichas) y año más antiguo. */
     fun entryOf(key: String, group: List<SeriesSummary>, updatedAt: Long): CatalogEntry {
         val weighted = weightedStarsOf(group)
         return CatalogEntry(

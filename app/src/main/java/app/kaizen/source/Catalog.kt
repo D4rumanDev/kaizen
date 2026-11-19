@@ -29,8 +29,7 @@ object Catalog {
 
     /** Si el catálogo puede responder: alguna fuente activa está recorrida y la consulta no pide género ni «en emisión». */
     suspend fun canServe(query: SearchQuery): Boolean = withContext(Dispatchers.IO) {
-        query.genre == null && !query.airing && isUsable() &&
-            (query.sort != SortBy.RATING || AnimeSources.enabled.all { it.listsScores })
+        query.genre == null && !query.airing && isUsable()
     }
 
     /** Si el catálogo se ha recorrido y tiene series: sin él no se puede buscar series ni proponer uniones (se recorre en Configuración › Catálogo). */
@@ -336,8 +335,8 @@ object Catalog {
     }
 
     /**
-     * Nota en estrellas que el catálogo ya guarda de la serie de la ficha [source]/[slug] (la de los listados que la traen, con o sin
-     * votos, como la muestran las tarjetas del listado), o null si no tiene o la serie no está: así una tarjeta no pide la ficha.
+     * Nota en estrellas que el catálogo guarda de la serie de la ficha [source]/[slug]: la de AniList (ver [AnilistScores]), o null si no tiene
+     * o la serie no está.
      */
     suspend fun ratingOf(source: String, slug: String): Double? = withContext(Dispatchers.IO) {
         if (!isUsable()) return@withContext null
@@ -351,12 +350,6 @@ object Catalog {
         ratingOfKey(key) to dao.entriesOf(listOf(key)).firstOrNull()?.year
     }
 
-    /** Igual que [ratingOf] cuando no se sabe de qué fuente viene el slug (recomendados). */
-    suspend fun ratingOfSlug(slug: String): Double? = withContext(Dispatchers.IO) {
-        if (!isUsable()) return@withContext null
-        dao.keyOfSlug(slug)?.let(::ratingOfKey)
-    }
-
     private fun ratingOfKey(key: String): Double? =
-        dao.entriesOf(listOf(key)).firstOrNull()?.score?.takeIf { it > 0 }?.let(::toStars)
+        dao.entriesOf(listOf(key)).firstOrNull()?.score?.takeIf { it > 0 }
 }

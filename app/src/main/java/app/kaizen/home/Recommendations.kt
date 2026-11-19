@@ -69,8 +69,8 @@ object Recommendations {
         val byGenre = coroutineScope {
             top.map { genre ->
                 async {
-                    // Sin minScore en la consulta: animeav1 y jkanime no traen nota en el listado y ese filtro las quitaría
-                    // todas. Con SortBy.RATING el motor les pide la nota (en caché 15 días) y Taste.rank descarta las de menos de 3.
+                    // Sin minScore en la consulta: las series sin nota de AniList (sin enlace o con la ficha sin descargar) quedarían fuera.
+                    // Con SortBy.RATING el catálogo las da por nota de AniList (las que no la tienen, al final) y Taste.rank descarta las de menos de 3.
                     val query = SearchQuery(genre = genre.slug, sort = SortBy.RATING)
                     genre.slug to (runCatchingCoop { withTimeoutOrNull(GENRE_TIMEOUT) { SearchEngine.firstPages(query, GENRE_PAGES) } }.getOrNull() ?: emptyList())
                 }

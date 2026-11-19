@@ -58,7 +58,6 @@ import app.kaizen.source.userCover
 import app.kaizen.tv.cards.SCORE_LOADING
 import app.kaizen.tv.cards.SCORE_NONE
 import app.kaizen.tv.cards.formatScore
-import app.kaizen.tv.cards.ratingGate
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -130,34 +129,20 @@ internal fun rememberSensitive(source: String?, slug: String?): Boolean {
 /** El título de la tarjeta: el romaji de AniList si la serie está enlazada (y el ajuste encendido). */
 private fun romajiOr(card: AnilistCard?, name: String): String = card?.romaji?.takeIf { it.isNotBlank() } ?: name
 
-/** La nota de la serie: la que trae, «…» mientras se pide o «—» si ninguna fuente la tiene. */
+/** La nota de la serie: la de AniList («…» mientras se pide, «—» si la serie no está enlazada o no tiene nota). Las notas de las webs se descartan. */
 @Composable
-private fun scoreLine(slug: String, score: Double?, source: String?): State<String> {
-    fun line(text: String) = text
-    // Con «Datos de AniList en la ficha» la nota es solo la de AniList (como en la ficha): sin anime enlazado no hay nota y no se pide a ninguna web.
-    val anilistOnly = KaizenSettings.anilistFicha && source != null
-    val willFetch = !anilistOnly && score == null && source != null
-    val seen = if (anilistOnly) AnilistCards.peek(source, slug) else null
-    val initial = line(when {
+private fun scoreLine(slug: String, source: String?): State<String> {
+    val seen = if (source != null) AnilistCards.peek(source, slug) else null
+    val initial = when {
+        source == null -> SCORE_NONE
         seen != null -> seen.score?.let { formatScore(it / 20.0) } ?: SCORE_NONE
-        anilistOnly -> SCORE_LOADING
-        score != null -> formatScore(score)
-        willFetch -> SCORE_LOADING
-        else -> SCORE_NONE
-    })
-    return produceState(initial, slug, score, source) {
+        else -> SCORE_LOADING
+    }
+    return produceState(initial, slug, source) {
         value = initial
-        if (anilistOnly) {
-            val stars = AnilistCards.of(source, slug)?.score?.let { it / 20.0 }
-            value = line(if (stars != null) formatScore(stars) else SCORE_NONE)
-            return@produceState
-        }
-        // Sin nota en el listado (animeav1, jkanime, favoritos): se pide al pintar la tarjeta, de una en una, y se guarda 15 días.
-        if (willFetch) {
-            val owner = AnimeSources.of(source)
-            val stars = runCatchingCoop { ratingGate.withPermit { AnimeSources.cardRating(owner, slug) } }.getOrNull()
-            value = line(if (stars != null) formatScore(stars) else SCORE_NONE)
-        }
+        if (source == null) return@produceState
+        val stars = AnilistCards.of(source, slug)?.score?.let { it / 20.0 }
+        value = if (stars != null) formatScore(stars) else SCORE_NONE
     }
 }
 
@@ -190,7 +175,7 @@ internal fun SeriesCard(
     /** Fuerza el corazón: en «Favoritos» todas lo son (esa lista no consulta el estado de cada una). */
     isFavorite: Boolean? = null
 ) {
-    val line = detail ?: scoreLine(slug, score, source).value
+    val line = detail ?: scoreLine(slug, source).value
     val covers = rememberCovers(source, slug, remember(aid, slug, image) { coverCandidates(aid, slug, image) })
     val favorite = isFavorite ?: (markFavorite && isFavoriteSeries(name, aid, source, slug))
     MediaCard(covers, name, line, onClick, onLongClick, detailColor = if (detail != null) White60 else ScoreColor, favorite = favorite, source = source, slug = slug)
@@ -208,10 +193,8 @@ internal fun RecommendedCard(data: Recommended, onClick: () -> Unit, onLongClick
                 Catalog.slugAny(source, data.slug)?.let { source to it }
             }
             data.resolved = found
-            // Nota ponderada de las fuentes que la dan en tarjeta; si no hay, la de la ficha de la fuente donde está.
-            data.score = AnimeSources.ratingOf(data.slug) ?: found?.let { (source, slug) ->
-                runCatchingCoop { ratingGate.withPermit { SourceCache.ratedOrNull(source, slug) } }.getOrNull()?.first?.toDouble()
-            }
+            // La nota es la de AniList de la serie donde se encontró; sin enlace o sin ficha no hay nota.
+            data.score = found?.let { (source, slug) -> runCatchingCoop { AnilistCards.of(source.id, slug) }.getOrNull()?.score?.let { it / 20.0 } }
             // Solo al terminar: una tarjeta que vuelve a pantalla durante la consulta la repite en vez de quedarse en «—».
             data.scoreRequested = true
         }

@@ -32,7 +32,6 @@ internal class DataSettingsItems {
         choiceItem("Ficha de una serie finalizada: renovar cada", KaizenSettings.FICHA_SETTLED_OPTIONS, KaizenSettings::fichaSettledDays) { "$it días" },
         choiceItem("Episodios publicados: renovar cada", KaizenSettings.EPISODES_HOURS_OPTIONS, KaizenSettings::episodesHours) { "$it h" },
         choiceItem("Horario de emisión: renovar cada", KaizenSettings.SCHEDULE_HOURS_OPTIONS, KaizenSettings::scheduleHours) { "$it h" },
-        choiceItem("Notas: renovar cada", KaizenSettings.RATING_DAYS_OPTIONS, KaizenSettings::ratingDays) { "$it días" },
         choiceItem("Listados y búsquedas: renovar cada", KaizenSettings.PAGES_DAYS_OPTIONS, KaizenSettings::pagesDays) { "$it días" },
         choiceItem("Catálogo: preguntar a cada web cuántas series tiene cada", KaizenSettings.CATALOG_CHECK_OPTIONS, KaizenSettings::catalogCheckDays) { "$it días" },
         choiceItem("Catálogo: recorrerlo entero cada", KaizenSettings.CATALOG_WALK_OPTIONS, KaizenSettings::catalogWalkDays) { "$it días" },

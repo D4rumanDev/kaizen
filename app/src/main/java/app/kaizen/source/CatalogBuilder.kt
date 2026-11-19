@@ -54,6 +54,7 @@ object CatalogBuilder {
             followMoves = SeriesLedger::followMoves,
             afterWrite = SeriesLedger::load,
             anilistLinks = ::appliedAnilistLinks,
+            anilistStars = AnilistScores::byAnilistId,
             snapshots = CatalogSnapshotFile,
             saveSeedLinks = { app.kaizen.database.UserDB.INSTANCE.animeFuenteDao().insertIfAbsent(it) }
         )
@@ -154,11 +155,20 @@ object CatalogBuilder {
         if (done) KaizenSettings.catalogSeedAt = seed.createdAt
     }
 
-    /** Completa en el catálogo la ficha recién abierta con su nota, sus votos y su año (ver [CatalogBuildCore.noteFicha]). */
-    suspend fun noteFicha(series: Series): Unit = withContext(Dispatchers.IO) {
-        val stars = toStars(series.rateStars.toDouble()).takeIf { it.isFinite() }
-        core.noteFicha(series.source, series.slug, stars, series.rateCount.takeIf { it in 1..SourceCache.MAX_VOTES } ?: 0, series.year)
+    /** Completa en el catálogo la ficha recién abierta con su año (ver [CatalogBuildCore.noteFicha]). La nota de la fuente se descarta: solo vale la de AniList. */
+    suspend fun noteFicha(series: Series): Unit = withContext(Dispatchers.IO) { core.noteFicha(series.source, series.slug, series.year) }
+
+    /** Pone en cada serie la nota de AniList que toca (tras descargar fichas nuevas, o la primera vez que se dejan las notas de las fuentes). */
+    suspend fun rescore(): Unit = withContext(Dispatchers.IO) { core.rescore() }
+
+    /** Una sola vez: quita del catálogo ya guardado las notas de las webs y pone las de AniList (las fichas que aún no estén descargadas quedan sin nota hasta que lo estén). */
+    suspend fun rescoreIfNeeded() {
+        if (KaizenSettings.catalogScores >= SCORES_VERSION) return
+        rescore()
+        KaizenSettings.catalogScores = SCORES_VERSION
     }
+
+    private const val SCORES_VERSION = 1
 
     /**
      * Recorre las fuentes activas que lo necesitan (todas si no hay datos). Sin red no hace nada. Con el recorrido automático
@@ -207,6 +217,8 @@ internal class CatalogBuildCore(
     private val afterWrite: () -> Unit = {},
     /** Los enlaces con AniList de las fichas (fuente, slug) → anime; sin ellos las series de distintas fuentes no se unen por anime. */
     private val anilistLinks: () -> Map<Pair<String, String>, Long> = { emptyMap() },
+    /** Las estrellas de AniList de cada anime con la ficha descargada: la única nota que guarda el catálogo (ver [AnilistScores]). */
+    private val anilistStars: () -> Map<Long, Double> = { emptyMap() },
     private val clock: () -> Long = System::currentTimeMillis,
     private val onError: (Throwable) -> Unit = ::logError,
     /** Dónde se guarda la fotografía del catálogo; null = sin fotografías. */
@@ -459,27 +471,52 @@ internal class CatalogBuildCore(
     }
 
     /**
-     * Completa la ficha ([sourceId], [slug]) del catálogo con lo que acaba de leer de su página: nota y votos (si [votes] > 0) y el
-     * año, solo si la ficha no lo tenía (el del listado manda). Si cambia algo, la serie recalcula su nota y su año. Sin esa ficha
-     * en el catálogo no hace nada.
+     * Completa la ficha ([sourceId], [slug]) del catálogo con el año que acaba de leer de su página, solo si la ficha no lo tenía (el del
+     * listado manda). Si cambia, la serie recalcula su año. La nota no se toma de la página: solo vale la de AniList ([rescore]). Sin esa
+     * ficha en el catálogo no hace nada.
      */
     @Synchronized
-    fun noteFicha(sourceId: String, slug: String, stars: Double?, votes: Int, year: Int?) {
+    fun noteFicha(sourceId: String, slug: String, year: Int?) {
         val key = dao.keyOf(sourceId, slug) ?: return
         val links = dao.links(key)
         val link = links.firstOrNull { it.sourceId == sourceId && it.slug == slug } ?: return
-        val rated = stars != null && stars > 0.0 && votes > 0
-        val changed = link.copy(
-            score = if (rated) stars else link.score,
-            votes = if (rated) votes else link.votes,
-            year = link.year ?: year
-        )
+        val changed = link.copy(year = link.year ?: year)
         if (changed == link) return
         inTransaction {
             val entry = dao.entriesOf(listOf(key)).firstOrNull() ?: return@inTransaction
             dao.putLinks(listOf(changed))
             val group = (links - link + changed).map { it.asSummary(entry.name) }
             dao.putEntries(listOf(SeriesResolver.entryOf(key, group, entry.updatedAt).copy(seriesId = entry.seriesId)))
+        }
+    }
+
+    /**
+     * Vuelve a poner en cada ficha y en cada serie la nota de AniList que le toca (la de las webs se descarta): se llama al descargar fichas nuevas y una vez al
+     * dejar de usar las notas de las fuentes. Solo toca la nota y los votos; no reagrupa nada. Sin enlace con AniList, o con la ficha sin descargar, queda sin nota.
+     */
+    @Synchronized
+    fun rescore() {
+        // Si no se pueden leer las notas o los enlaces, el fallo sube: con mapas vacíos se borrarían todas las notas del catálogo y la versión quedaría marcada como hecha.
+        val starsById = runCatchingCoop { anilistStars() }.onFailure(onError).getOrThrow()
+        val linked = runCatchingCoop { anilistLinks() }.onFailure(onError).getOrThrow()
+        val byKey = dao.allLinks().groupBy { it.key }
+        val newLinks = ArrayList<CatalogLink>()
+        val newEntries = ArrayList<CatalogEntry>()
+        for (entry in dao.allEntries()) {
+            val links = byKey[entry.key].orEmpty()
+            val scored = links.map { link ->
+                val stars = linked[link.sourceId to link.slug]?.let(starsById::get)
+                link.copy(score = stars, votes = if (stars != null) 1 else 0)
+            }
+            scored.forEachIndexed { i, link -> if (link != links[i]) newLinks += link }
+            val weighted = weightedStarsOf(scored.map { it.asSummary(entry.name) })
+            val rescored = entry.copy(score = weighted?.first, votes = weighted?.second ?: 0)
+            if (rescored != entry) newEntries += rescored
+        }
+        if (newLinks.isEmpty() && newEntries.isEmpty()) return
+        inTransaction {
+            newEntries.chunked(500).forEach { dao.putEntries(it) }
+            newLinks.chunked(500).forEach { dao.putLinks(it) }
         }
     }
 
@@ -514,10 +551,12 @@ internal class CatalogBuildCore(
         // catálogo, los ids ya dados quedan sin usar, sin daño; nunca queda un enlace con un id que el libro no conozca.
         var series: List<List<Pair<AnimeSource, SeriesSummary>>> = emptyList()
         var assignment: SeriesIds.Assignment? = null
+        var linkedAnilist: Map<Pair<String, String>, Long> = emptyMap()
         ensureIds()
         idsTransaction {
             val known = ids.allMap().associate { (it.sourceId to it.slug) to it.seriesId }
             val linked = runCatchingCoop { anilistLinks() }.onFailure(onError).getOrDefault(emptyMap())
+            linkedAnilist = linked
             series = SeriesResolver.resolveSeries(items, idOf = { source, slug -> known[source to slug] },
                 anilistOf = { source, slug -> linked[source to slug] })
             val assigned = SeriesIds.assign(
@@ -532,6 +571,14 @@ internal class CatalogBuildCore(
         }
         val assigned = checkNotNull(assignment) { "no se repartieron los ids de serie" }
         followMoves(assigned.moves)
+        // La nota que traen los listados de las webs se descarta: cada ficha lleva la de AniList (con un voto, para que pese igual) o ninguna.
+        val stars = runCatchingCoop { anilistStars() }.onFailure(onError).getOrDefault(emptyMap())
+        series = series.map { members ->
+            members.map { (source, item) ->
+                val own = linkedAnilist[source.id to item.slug]?.let(stars::get)
+                source to item.copy(score = own, votes = if (own != null) 1 else 0)
+            }
+        }
         val entries = series.mapIndexed { index, members ->
             val id = assigned.ids[index]
             SeriesResolver.entryOf(id.toString(), members.map { it.second }, startedAt).copy(seriesId = id)

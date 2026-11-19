@@ -164,14 +164,6 @@ internal object WebFichaSchema {
     private fun outOfFive(raw: Double, max: Int): Double =
         java.math.BigDecimal(raw.toString()).multiply(java.math.BigDecimal(SCORE_SCALE.toInt())).divide(java.math.BigDecimal(max), 2, java.math.RoundingMode.HALF_UP).toDouble()
 
-    /** Solo la nota de la web (sobre 5) y sus votos, sin leer el resto: para la nota ligera de una página pesada. */
-    fun rating(spec: FichaSpec, node: Node): Pair<Float, Int>? {
-        val score = spec.fields["score"]?.let { read(field("score"), it, node) } as? Double ?: return null
-        val votes = (spec.fields["votes"]?.let { read(field("votes"), it, node) } as? Int) ?: return null
-        val max = spec.scoreMax?.takeIf { it > 0 } ?: return null
-        return outOfFive(score, max).toFloat() to votes
-    }
-
     private fun read(field: Field, declared: FichaField, node: Node): Any? = when (field.kind) {
         Kind.LIST -> (declared as ListField).parts.flatMap { values(it, node) }.map { it.trim() }.filter { it.isNotEmpty() }.distinct().takeIf { it.isNotEmpty() }?.let(::JSONArray)
         Kind.ITEMS -> items(field, declared as ItemsField, node).takeIf { it.length() > 0 }

@@ -16,7 +16,6 @@ class TimingsTest {
         assertEquals(30.days, Timings.catalogWalk())
         assertEquals(24.hours, Timings.schedule())
         assertEquals(6.hours, Timings.episodes())
-        assertEquals(15.days, Timings.rating())
         assertEquals(7.days, Timings.pages())
     }
 
@@ -27,7 +26,6 @@ class TimingsTest {
         assertEquals(14 * 86_400_000L, Timings.catalogCheck().inWholeMilliseconds)
         assertEquals(24 * 3_600_000L, Timings.schedule().inWholeMilliseconds)
         assertEquals(6 * 3_600_000L, Timings.episodes().inWholeMilliseconds)
-        assertEquals(15 * 86_400_000L, Timings.rating().inWholeMilliseconds)
         assertEquals(7 * 86_400_000L, Timings.pages().inWholeMilliseconds)
     }
 
@@ -55,6 +53,6 @@ class TimingsTest {
         assertTrue(60 in KaizenSettings.FICHA_AIRING_OPTIONS && 30 in KaizenSettings.FICHA_SETTLED_OPTIONS)
         assertTrue(14 in KaizenSettings.CATALOG_CHECK_OPTIONS && 30 in KaizenSettings.CATALOG_WALK_OPTIONS)
         assertTrue(24 in KaizenSettings.SCHEDULE_HOURS_OPTIONS && 6 in KaizenSettings.EPISODES_HOURS_OPTIONS)
-        assertTrue(15 in KaizenSettings.RATING_DAYS_OPTIONS && 7 in KaizenSettings.PAGES_DAYS_OPTIONS)
+        assertTrue(7 in KaizenSettings.PAGES_DAYS_OPTIONS)
     }
 }

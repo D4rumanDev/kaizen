@@ -30,9 +30,6 @@ object Timings {
     /** Episodios publicados de una serie (una serie en emisión suma uno cada semana). */
     fun episodes(): Duration = value(KaizenSettings.EPISODES_HOURS_OPTIONS, 6) { KaizenSettings.episodesHours }.hours
 
-    /** Notas de las series. */
-    fun rating(): Duration = value(KaizenSettings.RATING_DAYS_OPTIONS, 15) { KaizenSettings.ratingDays }.days
-
     /** Listados, géneros y búsquedas de las webs. */
     fun pages(): Duration = value(KaizenSettings.PAGES_DAYS_OPTIONS, 7) { KaizenSettings.pagesDays }.days
 
@@ -40,7 +37,7 @@ object Timings {
      * Cuánto se conserva una respuesta guardada antes de borrarla: lo que pida el plazo más largo configurado más la dispersión máxima (el plazo × 1,5), y nunca menos de 30 días.
      * Así ningún plazo elegido en el menú (hasta 90 días) ni su dispersión chocan con la limpieza de la caché.
      */
-    fun retention(): Duration = maxOf(30.days, listOf(fichaSettled(), rating(), pages(), schedule(), episodes()).max() * 3 / 2)
+    fun retention(): Duration = maxOf(30.days, listOf(fichaSettled(), pages(), schedule(), episodes()).max() * 3 / 2)
 
     /** Dispersión elegida en %; sin Android (pruebas) o sin ajuste, ninguna (los plazos son exactos). */
     private fun spreadPercent(): Int = runCatching { KaizenSettings.spreadPercent }.getOrDefault(0).takeIf { it in KaizenSettings.SPREAD_OPTIONS } ?: 0

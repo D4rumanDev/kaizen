@@ -62,13 +62,12 @@ internal object AnilistFicha {
     }.onFailure(::logError).getOrDefault(emptyList())
 
     /**
-     * La serie con la nota de AniList (de 0 a 100 pasada a estrellas de 0 a 5) en lugar de la de las fuentes, que se descartan, y con la
-     * sinopsis de Animeoteca si la tiene. Sin anime enlazado no hay nota (0) y la sinopsis es la de la fuente. Con el ajuste apagado todo
-     * queda como lo dio la fuente.
+     * La serie con la nota de AniList (de 0 a 100 pasada a estrellas de 0 a 5); la de las fuentes se descarta siempre. Sin anime enlazado no hay
+     * nota (0). Con la sinopsis de Animeoteca si la tiene y el ajuste está encendido; apagado, la sinopsis queda como la dio la fuente.
      */
     fun applied(series: Series, data: FichaData?): Series {
-        if (!KaizenSettings.anilistFicha) return series
-        val scored = series.copy(rateStars = (data?.puntuacion ?: 0) / 20f)
+        val scored = series.copy(rateStars = AnilistScores.stars(data?.puntuacion)?.toFloat() ?: 0f, rateCount = 0)
+        if (!KaizenSettings.anilistFicha) return scored
         return data?.es?.sinopsis?.takeIf { it.isNotBlank() }?.let { scored.copy(description = it) } ?: scored
     }
 

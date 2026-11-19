@@ -29,7 +29,6 @@ object KaizenSettings {
     val CATALOG_WALK_OPTIONS = listOf(15, 30, 60, 90)             // días
     val SCHEDULE_HOURS_OPTIONS = listOf(6, 12, 24, 48)            // horas
     val EPISODES_HOURS_OPTIONS = listOf(1, 3, 6, 12, 24)          // horas
-    val RATING_DAYS_OPTIONS = listOf(7, 15, 30, 60)               // días
     val PAGES_DAYS_OPTIONS = listOf(1, 3, 7, 14, 30)              // días
     /** Dispersión de las renovaciones: cada elemento (serie, fuente, portada) caduca entre ±N % del plazo, no todos el mismo día. */
     val SPREAD_OPTIONS = listOf(0, 10, 20, 30, 50)                // %
@@ -116,8 +115,14 @@ object KaizenSettings {
     /** Deja que el shell de ADB cree copias y consulte recuentos (ver [app.kaizen.control.AdbControlReceiver]). Apagado de fábrica. */
     var adbControl: Boolean by booleanPref("kaizen_adb_control", false)
 
-    /** Empareja las series con AniList y guarda sus fichas en segundo plano (ver [app.kaizen.source.AnilistSyncRunner]). Apagado de fábrica. */
-    var anilistSync: Boolean by booleanPref("kaizen_anilist_sync", false)
+    /**
+     * Empareja las series con AniList y guarda sus fichas en segundo plano (ver [app.kaizen.source.AnilistSyncRunner]). **Encendido de fábrica**: la nota de AniList
+     * es la única nota de la app (ver [app.kaizen.source.AnilistScores]) y solo existe para las series emparejadas con la ficha descargada. Manda a AniList los títulos de las series.
+     */
+    var anilistSync: Boolean by booleanPref("kaizen_anilist_sync", true)
+
+    /** Versión del criterio de notas con la que se escribió el catálogo (ver [app.kaizen.source.CatalogBuilder.rescoreIfNeeded]): 1 = solo la nota de AniList. */
+    var catalogScores: Int by intPref("kaizen_catalog_scores", 0)
 
     /** Versión del criterio por pruebas (año, formato, idMal, episodios) con la que se revisaron los enlaces automáticos «probable» (ver [app.kaizen.source.AnilistMatcher.levelWithEvidence]). */
     var anilistEvidence: Int by intPref("kaizen_anilist_evidence", 0)
@@ -367,7 +372,6 @@ object KaizenSettings {
     var catalogWalkDays: Int by intPref("kaizen_catalog_walk_days", 30)
     var scheduleHours: Int by intPref("kaizen_schedule_hours", 24)
     var episodesHours: Int by intPref("kaizen_episodes_hours", 6)
-    var ratingDays: Int by intPref("kaizen_rating_days", 15)
     var pagesDays: Int by intPref("kaizen_pages_days", 7)
     var spreadPercent: Int by intPref("kaizen_spread_percent", 20)
     var coverQuality: Int by intPref("kaizen_cover_quality", 0)

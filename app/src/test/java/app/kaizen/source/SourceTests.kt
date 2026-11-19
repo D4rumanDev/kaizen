@@ -1050,6 +1050,7 @@ class AnilistReviewTest {
         val saved = mutableMapOf<Long, AnimeFicha>()
         override fun put(fichas: List<AnimeFicha>) { fichas.forEach { saved[it.anilistId] = it } }
         override fun get(id: Long) = saved[id]
+        override fun notes() = emptyList<AnimeFichaDao.Note>()
         override fun freshIds(version: Int, since: Long) = emptyList<Long>()
         override fun downloaded(version: Int) = emptyList<AnimeFichaDao.Downloaded>()
         override fun count() = saved.size
@@ -1417,6 +1418,7 @@ class AnilistSyncTest {
         val rows = mutableMapOf<Long, AnimeFicha>()
         override fun put(fichas: List<AnimeFicha>) { fichas.forEach { rows[it.anilistId] = it } }
         override fun get(id: Long) = rows[id]
+        override fun notes() = emptyList<AnimeFichaDao.Note>()
         override fun freshIds(version: Int, since: Long) = rows.values.filter { it.consulta == version && it.descargada >= since }.map { it.anilistId }
         override fun downloaded(version: Int) = rows.values.map { AnimeFichaDao.Downloaded(it.anilistId, it.descargada) }
         override fun count() = rows.size
@@ -1765,6 +1767,7 @@ class AnilistWebFichaTest {
         val rows = mutableMapOf<Long, AnimeFicha>()
         override fun put(fichas: List<AnimeFicha>) { fichas.forEach { rows[it.anilistId] = it } }
         override fun get(id: Long) = rows[id]
+        override fun notes() = emptyList<AnimeFichaDao.Note>()
         override fun freshIds(version: Int, since: Long) = rows.values.filter { it.consulta == version && it.descargada >= since }.map { it.anilistId }
         override fun downloaded(version: Int) = rows.values.map { AnimeFichaDao.Downloaded(it.anilistId, it.descargada) }
         override fun count() = rows.size
@@ -2231,6 +2234,7 @@ class AnimeotecaTest {
         val dao = object : AnimeFichaDao {
             override fun put(fichas: List<AnimeFicha>) {}
             override fun get(id: Long) = fichas[id]
+            override fun notes() = emptyList<AnimeFichaDao.Note>()
             override fun freshIds(version: Int, since: Long) = emptyList<Long>()
             override fun downloaded(version: Int) = emptyList<AnimeFichaDao.Downloaded>()
             override fun count() = fichas.size
@@ -2283,6 +2287,7 @@ class AnimeotecaTest {
         val dao = object : AnimeFichaDao {
             override fun put(fichas: List<AnimeFicha>) {}
             override fun get(id: Long) = fichas[id]
+            override fun notes() = emptyList<AnimeFichaDao.Note>()
             override fun freshIds(version: Int, since: Long) = emptyList<Long>()
             override fun downloaded(version: Int) = emptyList<AnimeFichaDao.Downloaded>()
             override fun count() = fichas.size
@@ -2483,6 +2488,8 @@ class CatalogBuildCoreTest {
 
         /** Enlaces de las fichas con AniList (fuente, slug) → anime: dos fichas con el mismo anime se unen. */
         var anilist: Map<Pair<String, String>, Long> = emptyMap()
+        /** Las estrellas de AniList de cada anime con la ficha descargada: la única nota que guarda el catálogo. */
+        var stars: Map<Long, Double> = emptyMap()
         /** Los enlaces con AniList que el catálogo descargado dejó guardados. */
         val savedSeedLinks = mutableListOf<AnimeFuente>()
         val core: CatalogBuildCore = CatalogBuildCore(
@@ -2497,6 +2504,7 @@ class CatalogBuildCoreTest {
             scope = scope,
             retry = { retried++; if (chain) core.ensureFresh() },
             anilistLinks = { anilist },
+            anilistStars = { stars },
             clock = { now },
             onError = { errors += it },
             snapshots = snapshots,
@@ -2863,59 +2871,55 @@ class CatalogBuildCoreTest {
     }
 
     @Test
-    fun `abrir la ficha completa nota votos y año de la ficha del catalogo y de su serie`() = runTest {
+    fun `abrir la ficha completa el año de la ficha del catalogo y de su serie y no toma la nota de la web`() = runTest {
         val av1 = FakeSource("av1", listOf("naruto"))
         val h = harness(av1)
         h.core.ensureFresh()
         h.core.addNew(listOf(av1 to summary("av1", "frieren")))
 
-        h.core.noteFicha("av1", "frieren", 4.5, 120, 2023)
+        h.core.noteFicha("av1", "frieren", 2023)
 
         val link = h.linksOf("frieren").single()
-        assertEquals(4.5, link.score)
-        assertEquals(120, link.votes)
         assertEquals(2023, link.year)
+        assertNull(link.score)
         val entry = h.dao.entries.values.single { it.name == "frieren" }
-        assertEquals(4.5, entry.score)
-        assertEquals(120, entry.votes)
+        assertNull(entry.score)
         assertEquals(2023, entry.year)
     }
 
     @Test
-    fun `abrir la ficha no cambia el año que ya traia el listado ni borra la nota si la ficha no tiene votos`() = runTest {
+    fun `abrir la ficha no cambia el año que ya traia el listado`() = runTest {
         val av1 = FakeSource("av1", listOf("naruto"))
         val h = harness(av1)
         h.core.ensureFresh()
 
-        h.core.noteFicha("av1", "naruto", 0.0, 0, 1999)
+        h.core.noteFicha("av1", "naruto", 1999)
 
         val link = h.linksOf("naruto").single()
         assertEquals(2020, link.year)
-        assertEquals(7.0, link.score)
-        assertEquals(10, link.votes)
-
-        // Votos sin nota (la ficha no la trae): tampoco pisa la nota que había.
-        h.core.noteFicha("av1", "naruto", 0.0, 5, null)
-
-        assertEquals(7.0, h.linksOf("naruto").single().score)
-        assertEquals(10, h.linksOf("naruto").single().votes)
+        // La nota del listado de la web (7,0) se descartó al escribir el catálogo: sin ficha de AniList no hay nota.
+        assertNull(link.score)
+        assertEquals(0, link.votes)
     }
 
     @Test
-    fun `la nota de una ficha unida se recalcula con las demas fichas de la serie`() = runTest {
+    fun `la nota de una serie unida es la de AniList y se pone al descargar su ficha`() = runTest {
         val av1 = FakeSource("av1", listOf("naruto"), ratings = mapOf("naruto" to (8.0 to 30)))
         val jk = FakeSource("jk", listOf("naruto"), ratings = mapOf("naruto" to (4.0 to 10)))
         val h = harness(av1, jk)
         h.anilist = mapOf(("av1" to "naruto") to 1L, ("jk" to "naruto") to 1L)
         h.core.ensureFresh()
-        assertEquals(7.0, h.dao.entries.values.single().score)
+        // Las webs dan 8,0 y 4,0, pero se descartan: sin la ficha de AniList descargada no hay nota.
+        assertNull(h.dao.entries.values.single().score)
 
-        h.core.noteFicha("jk", "naruto", 6.0, 30, null)
+        h.stars = mapOf(1L to 3.9)
+        h.core.rescore()
 
         val entry = h.dao.entries.values.single()
-        assertEquals(60, entry.votes)
-        assertEquals(7.0, entry.score)
+        assertEquals(3.9, entry.score)
+        assertEquals(2, entry.votes)
         assertEquals(2, h.dao.links.size)
+        assertTrue(h.dao.links.all { it.score == 3.9 })
     }
 
     @Test
@@ -2925,7 +2929,7 @@ class CatalogBuildCoreTest {
         h.core.ensureFresh()
         val before = h.dao.entries.toMap()
 
-        h.core.noteFicha("av1", "desconocida", 4.5, 120, 2023)
+        h.core.noteFicha("av1", "desconocida", 2023)
 
         assertEquals(before, h.dao.entries)
     }
@@ -2990,37 +2994,40 @@ class CatalogBuildCoreTest {
         val jk = FakeSource("jk", listOf("naruto"))
         val h = harness(av1, jk)
         h.anilist = mapOf(("av1" to "naruto") to 1L, ("jk" to "naruto") to 1L)
+        h.stars = mapOf(1L to 3.5)
         h.core.ensureFresh()
         val before = h.dao.entries.values.single()
-        // Dos fichas con 10 votos y nota 7,0 cada una.
-        assertEquals(20, before.votes)
-        assertEquals(7.0, before.score)
+        // Dos fichas con la misma nota de AniList (3,5): cada una pesa un voto.
+        assertEquals(2, before.votes)
+        assertEquals(3.5, before.score)
 
         repeat(5) { h.core.regroup() }
 
         val after = h.dao.entries.values.single()
-        assertEquals(20, after.votes)
-        assertEquals(7.0, after.score)
+        assertEquals(2, after.votes)
+        assertEquals(3.5, after.score)
     }
 
     @Test
-    fun `reagrupar y separar conserva la nota y los votos de cada ficha`() = runTest {
+    fun `reagrupar y separar conserva la nota de AniList de cada ficha`() = runTest {
         val av1 = FakeSource("av1", listOf("naruto-a"), titles = mapOf("naruto-a" to "Naruto A"), ratings = mapOf("naruto-a" to (8.0 to 30)))
         val jk = FakeSource("jk", listOf("naruto-b"), titles = mapOf("naruto-b" to "Naruto B"), ratings = mapOf("naruto-b" to (4.0 to 10)))
         val h = harness(av1, jk)
+        h.anilist = mapOf(("av1" to "naruto-a") to 1L, ("jk" to "naruto-b") to 2L)
+        h.stars = mapOf(1L to 4.0, 2L to 2.0)
         h.core.ensureFresh()
         h.ids.map["av1" to "naruto-a"] = 500L
         h.ids.map["jk" to "naruto-b"] = 500L
         repeat(3) { h.core.regroup() }
         val joined = h.dao.entries.values.single()
-        assertEquals(40, joined.votes)
-        assertEquals(7.0, joined.score)
+        assertEquals(2, joined.votes)
+        assertEquals(3.0, joined.score)
 
         h.ids.map["jk" to "naruto-b"] = 600L
         h.core.regroup()
 
-        assertEquals(setOf(8.0 to 30, 4.0 to 10), h.dao.entries.values.map { it.score to it.votes }.toSet())
-        assertEquals(setOf(8.0 to 30, 4.0 to 10), h.dao.links.map { it.score to it.votes }.toSet())
+        assertEquals(setOf(4.0 to 1, 2.0 to 1), h.dao.entries.values.map { it.score to it.votes }.toSet())
+        assertEquals(setOf(4.0 to 1, 2.0 to 1), h.dao.links.map { it.score to it.votes }.toSet())
     }
 
     @Test
@@ -3325,7 +3332,6 @@ class ConfigurableAnimeAv1Test {
         assertEquals("https://animeav1.com/media/black-clover/3", source.chapterUrl("black-clover", "3"))
         assertEquals("https://cdn.animeav1.com/covers/897.jpg", source.coverUrl(897, "black-clover"))
         assertEquals("https://cdn.animeav1.com/screenshots/897/3.jpg", source.thumbnailUrl(897, "3"))
-        assertEquals(false, source.lightRating)
         assertEquals(setOf(Filter.AIRING, Filter.SORT_RATING), source.pushes(SearchQuery()))
         assertEquals("black-clover", source.slugOf("https://animeav1.com/media/black-clover"))
         assertEquals("black-clover", source.slugOf("https://animeav1.com/media/black-clover/3"))
@@ -3385,8 +3391,9 @@ class ConfigurableAnimeAv1Test {
         assertEquals("tv-anime", series.type)
         // El estado sale del registro de la ficha (0 = acabada en esta web): 1 es «en emisión» y 2 lo demás, igual que en todas las fuentes.
         assertEquals(2, series.state)
-        assertEquals(8.14f / 2, series.rateStars, 0.001f)
-        assertEquals(1001378, series.rateCount)
+        // La nota y los votos de la web se descartan: solo vale la de AniList, que se aplica después (AnilistFichaData.applied).
+        assertEquals(0f, series.rateStars, 0.001f)
+        assertEquals(0, series.rateCount)
         assertEquals(listOf("accion", "fantasia", "shounen"), series.genres.map { it.slug })
         assertEquals(listOf(900 to 10, 898 to 5, 4454 to 2), series.relations.map { it.aid to it.relation })
         assertEquals(listOf(14499 to 1.0, 14500 to 2.0, 14501 to 3.0), series.chapters.map { it.eid to it.number })
@@ -3557,7 +3564,6 @@ class ConfigurableAnimeGratisTest {
         assertEquals("black-clover", source.slugOf("/anime/black-clover-anime"))
         assertEquals("black-clover-2nda-temporada", source.slugOf("/anime/black-clover-2nda-temporada/episodio-12"))
         assertNull(source.slugOf("https://animegratis.net/"))
-        assertEquals(true, source.listsScores)
     }
 
     @Test
@@ -3620,7 +3626,7 @@ class ConfigurableAnimeGratisTest {
         val (series, ficha) = checkNotNull(source.readFicha("x", 1, HtmlNode(page), emptyList()))
         // La nota de la web (9,5 sobre 10) se guarda sobre 5, como en todas las fuentes.
         assertEquals(4.75, ficha.getJSONObject("web").getDouble("score"), 0.001)
-        assertEquals(4.75f, series.rateStars, 0.001f)
+        assertEquals(0f, series.rateStars, 0.001f)
         assertEquals(11, ficha.getJSONObject("web").getInt("votes"))
         assertEquals("Sinopsis.", ficha.getJSONObject("description").getString("es"))
         assertEquals("24", spec.anime.chapters.count.first(doc("<p>24 de 24 episodios</p>")))
@@ -6132,10 +6138,9 @@ class SeriesMatchingTest {
     }
 
     @Test
-    fun starsAreScaledToFive() {
-        assertEquals(4.365, toStars(8.73), 0.001)
-        assertEquals(4.0, toStars(4.0), 0.001)
+    fun aWeightedMeanNeedsAtLeastOneVote() {
         assertNull(weightedStars(listOf(4.0 to 0)))
+        assertEquals(3.0, weightedStars(listOf(4.0 to 1, 2.0 to 1))!!.first, 1e-9)
     }
 
     // ---- fechas ----
@@ -7333,8 +7338,6 @@ class WebFichaEsquemaTest {
     fun `la nota de la web se guarda siempre sobre cinco`() {
         val ten = HtmlNode(Jsoup.parse("<h1>X</h1><p>Puntuación 8 / 10</p><p>20 valoraciones</p>"))
         assertEquals(4.0, checkNotNull(WebFichaSchema.build(spec("animegratis").ficha, ten, emptyList(), "animegratis", "x", "https://example.test/x")).getJSONObject("web").getDouble("score"), 0.001)
-        assertEquals(4.0f to 20, WebFichaSchema.rating(spec("animegratis").ficha, ten))
-        assertNull(WebFichaSchema.rating(spec("animegratis").ficha, HtmlNode(Jsoup.parse("<h1>X</h1>"))))
     }
 
     // ---- una fuente nueva queda obligada al mismo esquema
@@ -7391,7 +7394,6 @@ class WebFichaEsquemaTest {
         val page = JsonNode(JSONObject("""{"title":"X","score":"Infinity","votes":5}"""))
         val media = checkNotNull(WebFichaSchema.build(av1.ficha, page, emptyList(), "animeav1", "x", "https://example.test/x"))
         assertTrue(media.getJSONObject("web").isNull("score"))
-        assertNull(WebFichaSchema.rating(av1.ficha, page))
     }
 
     // ---- columnas
@@ -7659,7 +7661,7 @@ class WebFichaFuentesTest {
     fun `la serie de la app sale del registro en todas las fuentes`() {
         val jk = series("jkanime", "ficha-serie.html")
         assertEquals(listOf("Black Clover (TV)", "tv-anime", 2, 2017, "Pierrot"), listOf(jk.name, jk.type, jk.state, jk.year, jk.studio))
-        assertEquals(4.07f, jk.rateStars, 0.001f)
+        assertEquals(0f, jk.rateStars, 0.001f)
         assertEquals(0, jk.rateCount)
         assertTrue(jk.description.startsWith("Hay un mundo en donde la magia"))
         assertEquals("pelicula", series("jkanime", "ficha-pelicula.html").type)
@@ -7669,7 +7671,7 @@ class WebFichaFuentesTest {
         assertEquals(listOf(2, 2017), listOf(mc.state, mc.year))
         val ag = series("animegratis", "ficha-black-clover.html")
         assertEquals(listOf("Studio Pierrot", 2017), listOf(ag.studio, ag.year))
-        assertEquals(4.65f, ag.rateStars, 0.001f)
+        assertEquals(0f, ag.rateStars, 0.001f)
         // La sinopsis sale en el primer idioma que tiene: animeflv.ar solo la da en inglés.
         assertTrue(series("animeflvar", "ficha.html").description.startsWith("Yuri, a pretty Japanese girl"))
     }

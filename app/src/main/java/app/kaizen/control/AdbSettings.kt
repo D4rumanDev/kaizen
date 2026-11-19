@@ -114,7 +114,6 @@ object AdbSettings {
             ints("catalogo_recorrer_dias", KaizenSettings.CATALOG_WALK_OPTIONS, KaizenSettings::catalogWalkDays),
             ints("horario_horas", KaizenSettings.SCHEDULE_HOURS_OPTIONS, KaizenSettings::scheduleHours),
             ints("episodios_horas", KaizenSettings.EPISODES_HOURS_OPTIONS, KaizenSettings::episodesHours),
-            ints("notas_dias", KaizenSettings.RATING_DAYS_OPTIONS, KaizenSettings::ratingDays),
             ints("listados_dias", KaizenSettings.PAGES_DAYS_OPTIONS, KaizenSettings::pagesDays),
             ints("dispersion_porcentaje", KaizenSettings.SPREAD_OPTIONS, KaizenSettings::spreadPercent),
             ints("calidad_portadas", KaizenSettings.COVER_QUALITY_OPTIONS, KaizenSettings::coverQuality),
