@@ -363,9 +363,12 @@ if (COMMAND === 'backup') {
   if (!made) fail('BACKUP', b.out.split('\n').pop());
   console.log(`[tv] copia creada en la TV: ${made[1]}`);
   const iso = new Date().toISOString();
-  let dest = path.join(ROOT, 'backups', `tv-${iso.slice(0, 10)}`);
-  if (fs.existsSync(dest)) dest += `-${iso.slice(11, 16).replace(':', '')}`;
-  fs.mkdirSync(dest, { recursive: true });
+  // Siempre una carpeta que no existía: dos copias en el mismo minuto (las dos teles seguidas) caían en la misma y la segunda pisaba los ficheros de nombre común.
+  const base = path.join(ROOT, 'backups', `tv-${iso.slice(0, 10)}`);
+  let dest = base;
+  for (let n = 2; fs.existsSync(dest); n++) dest = `${base}-${iso.slice(11, 16).replace(':', '')}${n > 2 ? `-${n - 1}` : ''}`;
+  fs.mkdirSync(path.dirname(base), { recursive: true }); // `backups/` (ignorada por git) puede no existir en un clon nuevo
+  fs.mkdirSync(dest); // sin recursive: si otro proceso la creó entre medias, falla en vez de compartirla
   const pull = run('adb', ['-s', device, 'pull', remote, dest], { env: { ...process.env, MSYS_NO_PATHCONV: '1' } });
   if (pull.code !== 0) fail('adb pull', pull.out.split('\n').pop());
   try {
