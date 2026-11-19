@@ -79,7 +79,8 @@ internal fun WideCard(
  */
 @Composable
 internal fun EpisodeCard(chapter: Chapter, version: Int, onLongClick: () -> Unit, onClick: () -> Unit) {
-    val seen by remember(chapter) { chapter.seenFlow() }.collectAsState(initial = false)
+    // Lo visto en memoria, compartido por todas las tarjetas (antes una consulta de Room por capítulo, cientos en una serie larga).
+    val seen = app.kaizen.tv.ui.rememberSeen(chapter.source, chapter.slug, chapter.number)
     val progress = remember(chapter, version) { KaizenProgress.get(chapter.progressKey(), chapter.eid)?.takeIf { it.isInProgress }?.fraction }
     FocusCard(Modifier.width(EpisodeCardWidth), onClick, onLongClick) {
         Box(Modifier.fillMaxWidth().height(EpisodeImageHeight).clip(CardImageShape).background(White10)) {

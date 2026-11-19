@@ -229,6 +229,12 @@ object KaizenSettings {
     /** Estados de las series en JSON (ver [app.kaizen.domain.SeriesStatuses]). */
     var seriesStatuses: String? by stringPref("kaizen_series_statuses", null)
 
+    /**
+     * Guarda los estados de serie con commit() (síncrono): llamar fuera del hilo principal. Con apply() Android espera la escritura pendiente en el hilo principal al
+     * cambiar de pantalla (QueuedWork.waitToFinish), y el JSON de todos los estados es grande; es lo que causó el ANR del progreso del 2026-10-27.
+     */
+    fun commitSeriesStatuses(json: String): Boolean = prefs.edit().putString("kaizen_series_statuses", json).commit()
+
     /** La migración única de estados del historial ya se hizo (ver [app.kaizen.domain.StatusMigration]). */
     var statusesMigrated: Boolean by booleanPref("kaizen_statuses_migrated_2", false)
 

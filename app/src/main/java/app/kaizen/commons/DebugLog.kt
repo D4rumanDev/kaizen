@@ -101,6 +101,9 @@ object DebugLog {
         return json.toString()
     }
 
+    /** El fichero antiguo ya recortado (por su ruta); bajo [lock]. */
+    private var legacyTrimmedIn: String? = null
+
     private fun append(line: String) {
         var failure: String? = null
         synchronized(lock) {
@@ -109,7 +112,9 @@ object DebugLog {
                 trim(target)
                 // El de texto de versiones anteriores ya no se escribe: solo se recorta, para que no se quede en el disco con su tamaño de entonces.
                 // Aparte: que no se pueda recortar el antiguo no debe impedir escribir en el actual (ni dar un falso aviso de disco).
-                runCatching { trim(legacyFile) }
+                // Como ya no crece, basta una vez por carpeta: antes se miraba en cada anotación (dos accesos al disco más por línea, en el hilo que anota).
+                val legacy = legacyFile
+                if (legacyTrimmedIn != legacy.path) { runCatching { trim(legacy) }; legacyTrimmedIn = legacy.path }
                 // Lo que esperó en memoria por un fallo anterior va primero (el orden se conserva) y todo en una sola escritura: si falla, no queda a medias ni se duplica nada.
                 target.appendText(pending.joinToString("") { it + "\n" } + line + "\n")
                 pending.clear()

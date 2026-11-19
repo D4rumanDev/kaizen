@@ -80,6 +80,9 @@ object SeriesStatuses {
     private fun sameSeries(entry: StatusEntry, source: String, slug: String, id: Long) =
         (entry.source == source && entry.slug == slug) || (id != 0L && seriesIdOf(entry.source, entry.slug) == id)
 
+    /** La serie de una entrada como clave: su id (leído ahora) o, si el libro no la conoce, su ficha. Dos entradas con la misma clave son [sameSeries]. */
+    private fun seriesKey(entry: StatusEntry): Any = seriesIdOf(entry.source, entry.slug).takeIf { it != 0L } ?: "${entry.source}:${entry.slug}"
+
     /** Las series de [entries] una sola vez cada una (las unidas de varias fuentes cuentan como una): la de estado más reciente. */
     fun distinctSeries(entries: Collection<StatusEntry>): List<StatusEntry> =
         entries.sortedByDescending { it.at }.distinctBy { entry -> seriesKeyOf(entry.source, entry.slug) }
@@ -160,9 +163,7 @@ object SeriesStatuses {
     fun importMissing(json: String): Int {
         val incoming = runCatching { Gson().fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
         // Lo que ya está (por título o porque es la misma serie con otro título) no se duplica.
-        val missing = incoming.filter { (key, entry) ->
-            key !in state.value && state.value.values.none { sameSeries(it, entry.source, entry.slug, seriesIdOf(entry.source, entry.slug)) }
-        }
+        val missing = StatusMerge.missing(state.value, incoming, ::seriesKey)
         if (missing.isNotEmpty()) save(state.value + missing)
         return missing.size
     }
@@ -176,7 +177,7 @@ object SeriesStatuses {
         val incoming = runCatching { Gson().fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
             .filterValues { (it as StatusEntry?) != null && !(it.source as String?).isNullOrBlank() && !(it.slug as String?).isNullOrBlank() }
         val before = state.value
-        val result = StatusMerge.mergeCounted(before, incoming, { local, other -> sameSeries(local, other.source, other.slug, seriesIdOf(other.source, other.slug)) }, skip)
+        val result = StatusMerge.mergeCounted(before, incoming, ::seriesKey, skip)
         if (result.map == before) return result
         save(result.map)
         // «Descartada» excluye la serie de las recomendaciones: se alinea con lo que quedó tras la fusión.
@@ -203,8 +204,21 @@ object SeriesStatuses {
         return true
     }
 
+    /**
+     * El mapa nuevo vale al instante (en memoria); el disco se escribe aparte, en un hilo propio con commit(), con el JSON del mapa **más reciente**: si
+     * llegan varios cambios seguidos, se escribe una vez el último (nunca uno viejo encima de uno nuevo, porque el hilo es uno y lee [state] al escribir).
+     * Como en el progreso (KaizenProgress), si el proceso muere en los milisegundos entre el cambio y la escritura, ese último cambio se pierde: es el precio de no esperar en el hilo principal.
+     */
     private fun save(map: Map<String, StatusEntry>) {
         state.value = map
-        KaizenSettings.seriesStatuses = Gson().toJson(map)
+        if (pendingWrite.compareAndSet(false, true)) writer.execute {
+            pendingWrite.set(false)
+            // commit() avisa de un fallo de escritura (disco lleno…) devolviendo false, sin excepción: también se anota.
+            runCatching { check(KaizenSettings.commitSeriesStatuses(Gson().toJson(state.value))) { "commit() devolvió false" } }
+                .onFailure { app.kaizen.commons.DebugLog.error("Estados", "No se pudieron guardar los estados de serie en el disco (siguen en memoria hasta cerrar la app)", it) }
+        }
     }
+
+    private val pendingWrite = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { task -> Thread(task, "kaizen-statuses-writer").apply { isDaemon = true } }
 }

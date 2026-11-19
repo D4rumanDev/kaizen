@@ -11,7 +11,7 @@ import org.junit.Test
 class StatusMergeTest {
     private val now = 1_800_000_000_000L
     private fun entry(slug: String, status: SeriesStatus, at: Long) = StatusEntry(status.id, "Serie $slug", "animeflv", slug, 1, at)
-    private val same = { a: StatusEntry, b: StatusEntry -> a.slug == b.slug }
+    private val same = { e: StatusEntry -> e.slug } // la serie de una entrada (aquí, su slug)
 
     @Test fun `un estado que aqui no existe entra`() {
         val merged = StatusMerge.merge(emptyMap(), mapOf("a" to entry("a", SeriesStatus.WATCHING, 10)), same, { false }, now)
@@ -96,6 +96,40 @@ class StatusMergeTest {
         // Ni una hora rota (que cuenta como 0) gana a uno sin hora.
         val future = mapOf("a" to entry("a", SeriesStatus.WATCHING, now + 3 * 86_400_000L))
         assertEquals(SeriesStatus.COMPLETED.id, StatusMerge.merge(local, future, same, { false }, now)["a"]!!.status)
+    }
+
+    @Test fun `si el reloj roto es el de aqui, el estado del otro dispositivo entra y convergen`() {
+        val broken = mapOf("a" to entry("a", SeriesStatus.DROPPED, now + 5 * 86_400_000L))
+        val sane = mapOf("a" to entry("a", SeriesStatus.WATCHING, now - 1000))
+        assertEquals(SeriesStatus.WATCHING.id, StatusMerge.merge(broken, sane, same, { false }, now)["a"]!!.status)
+        assertEquals(SeriesStatus.WATCHING.id, StatusMerge.merge(sane, broken, same, { false }, now)["a"]!!.status)
+    }
+
+    @Test fun `una clave que era de otra serie deja de contar para aquella`() {
+        // El mismo título para dos series distintas: la nueva ocupa la clave; una segunda entrada de la primera serie entra como nueva, no como sustitución.
+        val local = mapOf("titulo" to entry("a", SeriesStatus.PLAN, 100))
+        val incoming = linkedMapOf("titulo" to entry("b", SeriesStatus.WATCHING, 200), "otro titulo" to entry("a", SeriesStatus.COMPLETED, 50))
+        val result = StatusMerge.mergeCounted(local, incoming, same, { false }, now)
+        assertEquals("b", result.map["titulo"]!!.slug)
+        assertEquals("a", result.map["otro titulo"]!!.slug)
+        assertEquals(2, result.added)
+        assertEquals(0, result.replaced)
+    }
+
+    @Test fun `la fusion de miles de estados es lineal`() {
+        val local = (1..20_000).associate { "t$it" to entry("s$it", SeriesStatus.PLAN, 100) }
+        val incoming = (1..20_000).associate { "t$it" to entry("s$it", SeriesStatus.WATCHING, 200) }
+        val started = System.nanoTime()
+        val result = StatusMerge.mergeCounted(local, incoming, same, { false }, now)
+        assertEquals(20_000, result.replaced)
+        // Con la búsqueda una a una eran 400 millones de comparaciones (minutos); por serie, milisegundos. Margen amplio para una máquina lenta.
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 5_000)
+    }
+
+    @Test fun `al restaurar solo entra lo de series sin estado aqui`() {
+        val local = mapOf("titulo viejo" to entry("a", SeriesStatus.PLAN, 100))
+        val incoming = mapOf("titulo nuevo" to entry("a", SeriesStatus.DROPPED, 300), "b" to entry("b", SeriesStatus.PLAN, 1), "titulo viejo" to entry("z", SeriesStatus.PLAN, 1))
+        assertEquals(setOf("b"), StatusMerge.missing(local, incoming, same).keys)
     }
 
     @Test fun `la hora del ultimo cambio ignora la de un reloj roto`() {

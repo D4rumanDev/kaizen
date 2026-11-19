@@ -1,6 +1,14 @@
 package app.kaizen.tv.ui
 
 import app.kaizen.pojos.av1.Record
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.WhileSubscribed
+import kotlin.time.Duration.Companion.seconds
 
 /** Qué capítulos de «Recientes» se muestran: todos, solo los vistos o solo los no vistos. */
 internal enum class SeenFilter(val label: String) { ALL("Todos"), SEEN("Vistos"), UNSEEN("No vistos") }
@@ -17,6 +25,35 @@ internal class SeenIndex(records: List<Record>, private val resuming: (seriesId:
 
     fun isSeen(eid: Int, aid: Int, seriesId: Long, number: Double): Boolean =
         ((eid != 0 && eid in eids) || (aid to number) in byAid || (seriesId != 0L && (seriesId to number) in bySeries)) && !resuming(seriesId, number, eid)
+}
+
+/**
+ * Los capítulos vistos (id de serie y número), en memoria y compartidos por todas las tarjetas de «Recientes». Es el criterio de `RecordDao.chapterIsSeenFlow`
+ * (el registro con ese número cuya serie es la de la ficha), pero con **una** suscripción a Room para toda la pantalla: antes cada tarjeta abría la suya y cada
+ * cambio en lo visto relanzaba una consulta por tarjeta. null mientras se lee la primera vez. Se mantiene mientras alguien lo mira (y unos segundos después).
+ */
+internal object SeenChapters {
+    // Antes de [all]: lo usa al crearse.
+    private val KEEP = 5.seconds
+
+    val all: kotlinx.coroutines.flow.StateFlow<Set<Pair<Long, Double>>?> by lazy {
+        app.kaizen.domain.Library.history
+            .map { records -> seenOf(records) }
+            .flowOn(kotlinx.coroutines.Dispatchers.Default)
+            .stateIn(app.kaizen.commons.AppScope, SharingStarted.WhileSubscribed(KEEP), null)
+    }
+
+    /** Lo visto de [records] por serie y número (los registros sin serie no cuentan: la consulta de Room tampoco los encuentra). */
+    fun seenOf(records: List<Record>): Set<Pair<Long, Double>> = records.mapNotNullTo(HashSet()) { r -> r.seriesId.takeIf { it != 0L }?.let { it to r.number } }
+}
+
+/** ¿Está visto el capítulo [number] de la serie de la ficha ([source], [slug])? Lo leen las tarjetas de capítulo de «Recientes», de la ficha y del reproductor, todas de [SeenChapters]. */
+@androidx.compose.runtime.Composable
+internal fun rememberSeen(source: String, slug: String, number: Double): Boolean {
+    // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a mirar.
+    val ledger = app.kaizen.source.SeriesLedger.version.collectAsState().value
+    val seen = SeenChapters.all.collectAsState().value
+    return remember(source, slug, number, ledger, seen) { seen?.contains(app.kaizen.source.seriesIdOf(source, slug) to number) == true }
 }
 
 /** Cómo se marca un capítulo en «Recientes»: sin marca, visto (acabado) o empezado y sin acabar (se puede seguir). */

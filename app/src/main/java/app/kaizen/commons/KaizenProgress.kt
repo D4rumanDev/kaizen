@@ -147,6 +147,9 @@ object KaizenProgress {
     /**
      * ¿Se queda el progreso de otro dispositivo en lugar del de aquí? Si los dos traen su hora gana el más reciente (una hora de más de un día en el futuro, de un reloj roto,
      * no cuenta); si falta alguna se vale la posición mayor, como antes. Sin progreso aquí, el ajeno entra siempre.
+     * Empates (misma hora, o sin hora en alguno, y la misma posición): decide el texto «posición/duración» (el mayor), para que los dos dispositivos acaben con el mismo valor;
+     * así un progreso sin hora puede sustituir a otro con la misma posición y otra duración (otro vídeo del mismo capítulo), lo que no cambia dónde se reanuda.
+     * Un dispositivo con una versión anterior a la 6.2.1 no aplica este desempate y conserva el suyo hasta actualizarse.
      */
     internal fun takeIncoming(localValue: String?, localAt: Long, incomingValue: String, incomingAt: Long, now: Long = System.currentTimeMillis()): Boolean {
         val incoming = parse(incomingValue) ?: return false

@@ -140,6 +140,15 @@ class SeenIndexTest {
     private val index by lazy { SeenIndex(listOf(record(eid = 1, number = 3.0, aid = 10), record(eid = 2, number = 4.0, aid = 11, slug = "serie"))) }
 
     @Test
+    fun `lo visto compartido de las tarjetas va por serie y numero como la consulta de Room`() {
+        val seen = SeenChapters.seenOf(listOf(record(eid = 1, number = 3.0, aid = 10), record(eid = 2, number = 4.0, aid = 11, slug = "serie")))
+        // Solo el registro con serie: uno sin serie tampoco lo encuentra la consulta (seriesId IN la serie de la ficha).
+        assertEquals(setOf(5L to 4.0), seen)
+        assertFalse((5L to 3.0) in seen)
+        assertFalse((0L to 3.0) in seen)
+    }
+
+    @Test
     fun `el mismo capitulo cuenta como visto por eid`() {
         assertTrue(index.isSeen(eid = 1, aid = 99, seriesId = 0L, number = 9.0))
     }

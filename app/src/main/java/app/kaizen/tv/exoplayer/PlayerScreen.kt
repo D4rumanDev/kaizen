@@ -502,7 +502,7 @@ private fun ChaptersRow(controller: PlaybackController) {
                     .padding(CardInset),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val seen by remember(chapter) { chapter.seenFlow() }.collectAsState(initial = false)
+                val seen = app.kaizen.tv.ui.rememberSeen(chapter.source, chapter.slug, chapter.number)
                 Cover(covers, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(CardImageShape), showLabel = false, under = remember(chapter) { chapter.coverUnderThumbnail })
                 Row(Modifier.padding(horizontal = CardTextInset, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (seen) SeenCheck()

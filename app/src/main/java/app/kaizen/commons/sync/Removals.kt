@@ -124,7 +124,9 @@ object Removals {
         // Si se retuvo por masivo no se anotan como vistas, para que no se den por hechas.
         val applied = if (heldRemote) emptyList() else fresh
         val keep = (seen + applied.map { seenId(it.key, it.value) }).filter { id -> now - (id.substringAfterLast('@').toLongOrNull() ?: 0L) <= MAX_AGE.inWholeMilliseconds }
-        return Outcome(removed, State(local.presence().keys.toList(), removed, keep), removedHere, heldBack, heldRemote, keptNewer)
+        // Si no se quitó nada, lo de ahora es [after]: no hace falta volver a leer todo (favoritos, capítulos vistos, progreso y estados).
+        val final = if (removedHere == 0) after else local.presence()
+        return Outcome(removed, State(final.keys.toList(), removed, keep), removedHere, heldBack, heldRemote, keptNewer)
     }
 
     /** El estado local de la sincronización: lo que había en la última (`base`, null = nunca), las lápidas propias y las ajenas ya aplicadas. */

@@ -288,12 +288,12 @@ internal fun ContinueCard(record: Record, onClick: () -> Unit, onLongClick: (() 
     WideCard(covers, record.name, onClick, Modifier.fillMaxWidth(), onLongClick, details = listOf(line to AccentLight), titleLines = 1, coverWidth = 52.dp, height = 68.dp, progress = progress)
 }
 
-/** Capítulo reciente: el ojo sigue a Room, así que se actualiza al marcarlo o desmarcarlo desde cualquier pantalla. */
+/** Capítulo reciente: el ojo sigue a Room (por [app.kaizen.tv.ui.SeenChapters], una suscripción para todas), así que se actualiza al marcarlo o desmarcarlo desde cualquier pantalla. */
 @Composable
 internal fun RecentCard(data: RecentEpisode, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
-    // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a consultar el visto.
+    // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a mirar el visto.
     val ledger by SeriesLedger.version.collectAsState()
-    val seen by remember(data, ledger) { data.seenFlow() }.collectAsState(initial = false)
+    val seen = app.kaizen.tv.ui.rememberSeen(data.source, data.slug, data.number)
     // Empezado y sin acabar: la barra de lo visto y el triángulo azul, no el check verde. Se relee cuando cambia el progreso guardado (al salir del reproductor).
     val changes by KaizenProgress.changes.collectAsState()
     val started = remember(data, ledger, changes) { KaizenProgress.startedOf(KaizenProgress.Key(seriesIdOf(data.source, data.slug), data.number), data.eid) }
