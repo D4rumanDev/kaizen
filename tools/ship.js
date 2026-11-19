@@ -52,6 +52,13 @@ function changeSet() {
   return all.filter((f) => !exclude.some((x) => f === x || f.startsWith(x.endsWith('/') ? x : `${x}/`))).sort();
 }
 
+/** Los ficheros nuevos (no versionados ni ignorados) de app/ que no están en [files] ni se excluyeron. */
+function newAppFiles(files) {
+  const exclude = list('--exclude');
+  return git('ls-files', '--others', '--exclude-standard', '--', 'app').out.split('\n').filter(Boolean).map((f) => f.replace(/\\/g, '/'))
+    .filter((f) => !files.includes(f) && !exclude.some((x) => f === x || f.startsWith(x.endsWith('/') ? x : `${x}/`)));
+}
+
 /** El SHA del cambio exacto: el diff de lo seguido (con binarios) y el contenido de lo nuevo. */
 function changeSha(files) {
   const h = crypto.createHash('sha256');
@@ -123,7 +130,8 @@ function docs() {
     console.log(`[ship] sync_docs.js (replica todo el árbol de trabajo): ${resumen}`);
   }
   if (git('add', '--', ...files).code !== 0) die('git add falló');
-  const c = git('commit', '-q', '-m', `${message}\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`, '--', ...files);
+  // Sin líneas de coautoría ni de «generado por»: el autor del commit es quien lo pide.
+  const c = git('commit', '-q', '-m', message, '--', ...files);
   if (c.code !== 0) die(`git commit falló: ${(c.out + c.err).split('\n').pop()}`);
   console.log(`[ship] commit local: ${git('log', '--oneline', '-1').out}\n[ship] ${git('status', '-sb').out.split('\n')[0]} (sin push)`);
 }
@@ -133,6 +141,9 @@ function check() {
   if (!files.length) die('no hay cambios que publicar');
   console.log(`[ship] ${files.length} ficheros en el cambio:`);
   files.forEach((f) => console.log(`  ${f}`));
+  // Un fichero nuevo de la app que no se pasa con --add compila aquí pero no entra en el commit: el remoto quedaría sin compilar.
+  const forgotten = newAppFiles(files);
+  if (forgotten.length) console.log(`[ship] ⚠ ficheros nuevos de app/ que NO entran en el commit (pásalos con --add o exclúyelos con --exclude si no son del lote):\n  ${forgotten.join('\n  ')}`);
   eolCheck(files);
   const problems = scan(files);
   if (problems.length) die(`datos que no deben subir (nada se ha publicado):\n  ${problems.join('\n  ')}`);

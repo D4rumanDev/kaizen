@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -191,11 +192,19 @@ private const val SKELETON_COUNT = 24
 /** Rejilla de huecos para las secciones que aún cargan: se llena la pantalla y no recibe el foco. */
 @Composable
 internal fun LoadingGrid(header: Boolean = false) {
-    // Con las animaciones del sistema desactivadas los huecos quedan quietos.
+    val pulse = rememberSkeletonPulse()
+    CardGrid(userScrollEnabled = false) {
+        if (header) fullWidth { SkeletonHeader(pulse) }
+        skeletonCards(pulse)
+    }
+}
+
+/** Una sola animación para todos los huecos de carga; con las animaciones del sistema desactivadas quedan quietos. */
+@Composable
+internal fun rememberSkeletonPulse(): State<Float> {
     val context = LocalContext.current
     val animate = remember { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f }
-    // Una sola animación para todos los huecos.
-    val pulse = if (animate) {
+    return if (animate) {
         rememberInfiniteTransition(label = "skeleton").animateFloat(
             initialValue = 0.45f, targetValue = 1f, label = "skeletonAlpha",
             animationSpec = infiniteRepeatable(tween(SKELETON_PULSE_MS), RepeatMode.Reverse)
@@ -203,10 +212,11 @@ internal fun LoadingGrid(header: Boolean = false) {
     } else {
         rememberUpdatedState(0.7f)
     }
-    CardGrid(userScrollEnabled = false) {
-        if (header) fullWidth { SkeletonHeader(pulse) }
-        items(SKELETON_COUNT) { SkeletonCard(pulse) }
-    }
+}
+
+/** Los huecos de carga dentro de una rejilla que ya tiene su cabecera (un conmutador que debe seguir a mano y con el foco mientras carga). No reciben el foco. */
+internal fun LazyGridScope.skeletonCards(pulse: State<Float>) {
+    items(SKELETON_COUNT, contentType = { "skeleton" }) { SkeletonCard(pulse) }
 }
 
 

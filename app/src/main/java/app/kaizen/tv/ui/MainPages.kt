@@ -225,7 +225,11 @@ private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions,
     val flow = model.section(id) ?: return
     val items by flow.collectAsStateWithLifecycle()
     val visible = remember(items) { items.filter { it !== LoadingCard } }
-    if (visible.isEmpty() && items.isNotEmpty()) return LoadingGrid(header = true)
+    val loading = visible.isEmpty() && items.isNotEmpty()
+    // Con cabecera (el conmutador de «Mejores») los huecos de carga van en la misma rejilla, tras ella: así sigue a mano y no pierde el foco al terminar de cargar.
+    if (loading && header == null) return LoadingGrid(header = true)
+    // La animación de los huecos solo existe mientras carga (una infinita sin huecos tendría el reloj de fotogramas en marcha para nada).
+    val pulse = if (loading) rememberSkeletonPulse() else null
     // Orden elegido por el usuario (por defecto el de la sección); con los estados, para ordenar por «Estado».
     val sort = currentSectionSort()
     val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
@@ -237,8 +241,11 @@ private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions,
     RefocusOnRemoval(focus, listOf(keys))
     CardGrid(state = window.gridState) {
         header?.invoke(this)
-        cardItems(shown, keys, actions, focus)
-        fullWidth { WindowFooter(window) }
+        if (pulse != null) skeletonCards(pulse)
+        else {
+            cardItems(shown, keys, actions, focus)
+            fullWidth { WindowFooter(window) }
+        }
     }
 }
 
@@ -361,9 +368,13 @@ internal fun PagedGrid(
     }
     val focus = remember { GridFocus() }
     LaunchedEffect(shownKeys) { focus.retain(listOf(shownKeys)) }
+    // Con cabecera, los huecos de la primera carga van dentro de la rejilla, tras ella (encima la tapaban y el conmutador quedaba sin ver).
+    val firstLoad = refresh is LoadState.Loading && empty
+    val pulse = if (firstLoad && header != null) rememberSkeletonPulse() else null
     Box(Modifier.fillMaxSize()) {
         CardGrid(state = window.gridState) {
             header?.invoke(this)
+            if (pulse != null) skeletonCards(pulse)
             items(shown.size, key = { shownKeys[it] }, contentType = { "series" }) { index ->
                 val series = shown[index]
                 Box(Modifier.focusRequester(focus.requester(0, shownKeys[index]))) {
@@ -380,7 +391,7 @@ internal fun PagedGrid(
             (refresh is LoadState.Error || stalled) && empty ->
                 LoadProblem(loadProblemMessage(stalled), retryLoad, Modifier.align(Alignment.Center))
             refresh is LoadState.NotLoading && empty -> CenterMessage(appString(R.string.ui_sin_resultados), illustration = true)
-            refresh is LoadState.Loading && empty -> LoadingGrid()
+            firstLoad && pulse == null -> LoadingGrid()
         }
     }
 }

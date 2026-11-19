@@ -197,7 +197,7 @@ class App : Application(), Configuration.Provider {
                 .memoryCacheMaxSizePercentWhileInBackground(app.kaizen.commons.MemoryBudget.IMAGE_CACHE_BACKGROUND_PERCENT)
                 .build()
         } } catch (e: IllegalStateException) {
-            android.util.Log.w("App", "El cargador de imágenes ya existía: se usa el que hay", e)
+            app.kaizen.commons.DebugLog.error("App", "El cargador de imágenes ya existía al arrancar: se usa el que hay, sin los ajustes de la app hasta que se cierre", e)
         } finally { imageLoaderReady.countDown() }
     }
 

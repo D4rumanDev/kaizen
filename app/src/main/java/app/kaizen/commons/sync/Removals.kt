@@ -95,8 +95,8 @@ object Removals {
         fun changedAfter(key: String, at: Long): Boolean = false
     }
 
-    /** El resultado de [step]: las lápidas propias a subir, el estado a guardar y qué pasó. */
-    class Outcome(val removed: Map<String, Long>, val state: State, val removedHere: Int, val heldBack: Boolean, val heldRemote: Boolean)
+    /** El resultado de [step]: las lápidas propias a subir, el estado a guardar y qué pasó; [keptNewer] cuenta las lápidas ajenas que no se aplicaron porque lo de aquí cambió después. */
+    class Outcome(val removed: Map<String, Long>, val state: State, val removedHere: Int, val heldBack: Boolean, val heldRemote: Boolean, val keptNewer: Int = 0)
 
     /**
      * Un paso de sincronización (la lógica entera, sin red ni Android): anota lo quitado aquí desde la última vez, funde las copias ajenas sin devolver lo que una lápida (propia o
@@ -115,13 +115,16 @@ object Removals {
         val fresh = incoming.flatMap { removedOf(it).entries }.filter { now - it.value <= MAX_AGE.inWholeMilliseconds && seenId(it.key, it.value) !in seen }
         val baseCanon = state.base.orEmpty().mapNotNull(local::canon).toSet()
         val after = local.presence()
-        val toRemove = fresh.filter { after.isPresent(it.key) == true && local.canon(it.key) in baseCanon && !local.changedAfter(it.key, it.value) }.map { it.key }.distinct()
+        val candidates = fresh.filter { after.isPresent(it.key) == true && local.canon(it.key) in baseCanon }
+        val (newerHere, applicable) = candidates.partition { local.changedAfter(it.key, it.value) }
+        val keptNewer = newerHere.map { it.key }.distinct().size
+        val toRemove = applicable.map { it.key }.distinct()
         val heldRemote = massiveAny(toRemove, after.keys + toRemove)
         val removedHere = if (heldRemote) 0 else local.remove(toRemove)
         // Si se retuvo por masivo no se anotan como vistas, para que no se den por hechas.
         val applied = if (heldRemote) emptyList() else fresh
         val keep = (seen + applied.map { seenId(it.key, it.value) }).filter { id -> now - (id.substringAfterLast('@').toLongOrNull() ?: 0L) <= MAX_AGE.inWholeMilliseconds }
-        return Outcome(removed, State(local.presence().keys.toList(), removed, keep), removedHere, heldBack, heldRemote)
+        return Outcome(removed, State(local.presence().keys.toList(), removed, keep), removedHere, heldBack, heldRemote, keptNewer)
     }
 
     /** El estado local de la sincronización: lo que había en la última (`base`, null = nunca), las lápidas propias y las ajenas ya aplicadas. */

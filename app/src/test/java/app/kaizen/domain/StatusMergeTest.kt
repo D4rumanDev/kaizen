@@ -62,6 +62,74 @@ class StatusMergeTest {
         assertFalse(KaizenProgress.takeIncoming("900000/1400000", 100, "60000/1400000", now + 9 * 86_400_000L, now))
     }
 
+    @Test fun `una sustitucion que cambia de clave cuenta una vez`() {
+        val local = mapOf("titulo viejo" to entry("a", SeriesStatus.PLAN, 100), "b" to entry("b", SeriesStatus.PLAN, 100))
+        val incoming = mapOf("titulo nuevo" to entry("a", SeriesStatus.WATCHING, 300), "c" to entry("c", SeriesStatus.PLAN, 50))
+        val result = StatusMerge.mergeCounted(local, incoming, same, { false }, now)
+        assertEquals(1, result.replaced)
+        assertEquals(1, result.added)
+        assertEquals(2, result.changed)
+        assertEquals(setOf("titulo nuevo", "b", "c"), result.map.keys)
+    }
+
+    @Test fun `con la misma hora y distinto estado los dos dispositivos acaban con el mismo`() {
+        val a = mapOf("a" to entry("a", SeriesStatus.WATCHING, 500))
+        val b = mapOf("a" to entry("a", SeriesStatus.COMPLETED, 500))
+        val inA = StatusMerge.merge(a, b, same, { false }, now)
+        val inB = StatusMerge.merge(b, a, same, { false }, now)
+        assertEquals(inA, inB)
+    }
+
+    @Test fun `con la misma hora y estado pero otro titulo tambien convergen y no se cuenta dos veces`() {
+        val a = mapOf("titulo a" to entry("a", SeriesStatus.PLAN, 500))
+        val b = mapOf("titulo b" to entry("a", SeriesStatus.PLAN, 500))
+        assertEquals(StatusMerge.merge(a, b, same, { false }, now).keys, StatusMerge.merge(b, a, same, { false }, now).keys)
+        val again = StatusMerge.mergeCounted(a, a, same, { false }, now)
+        assertEquals("lo mismo que ya hay no cuenta", 0, again.changed)
+        assertEquals(a, again.map)
+    }
+
+    @Test fun `dos estados sin hora no se pisan por desempate`() {
+        val local = mapOf("a" to entry("a", SeriesStatus.COMPLETED, 0))
+        val incoming = mapOf("a" to entry("a", SeriesStatus.WATCHING, 0))
+        assertEquals(SeriesStatus.COMPLETED.id, StatusMerge.merge(local, incoming, same, { false }, now)["a"]!!.status)
+        // Ni una hora rota (que cuenta como 0) gana a uno sin hora.
+        val future = mapOf("a" to entry("a", SeriesStatus.WATCHING, now + 3 * 86_400_000L))
+        assertEquals(SeriesStatus.COMPLETED.id, StatusMerge.merge(local, future, same, { false }, now)["a"]!!.status)
+    }
+
+    @Test fun `la hora del ultimo cambio ignora la de un reloj roto`() {
+        val map = mapOf("a" to entry("a", SeriesStatus.PLAN, now + 2 * 86_400_000L), "a2" to entry("a", SeriesStatus.PLAN, 300), "b" to entry("b", SeriesStatus.PLAN, 900))
+        assertEquals(300L, StatusMerge.latestChange(map, { it.slug == "a" }, now))
+        assertEquals(0L, StatusMerge.latestChange(map, { it.slug == "z" }, now))
+        assertEquals(0L, StatusMerge.latestChange(mapOf("a" to entry("a", SeriesStatus.PLAN, now + 2 * 86_400_000L)), { true }, now))
+    }
+
+    @Test fun `quitar una serie quita todas sus entradas y dice cuales`() {
+        val map = mapOf("t1" to entry("a", SeriesStatus.DROPPED, 1), "t2" to entry("a", SeriesStatus.PLAN, 2), "b" to entry("b", SeriesStatus.PLAN, 3))
+        val (rest, removed) = StatusMerge.removeSeries(map) { it.slug == "a" }
+        assertEquals(setOf("b"), rest.keys)
+        assertEquals(2, removed.size)
+        assertTrue(StatusMerge.removeSeries(rest) { it.slug == "a" }.second.isEmpty())
+    }
+
+    @Test fun `descartadas se liberan y se excluyen segun lo que cambio`() {
+        val before = mapOf("x" to entry("x", SeriesStatus.DROPPED, 1), "y" to entry("y", SeriesStatus.PLAN, 1), "z" to entry("z", SeriesStatus.DROPPED, 1))
+        val after = mapOf("x" to entry("x", SeriesStatus.WATCHING, 2), "y" to entry("y", SeriesStatus.DROPPED, 2), "z" to entry("z", SeriesStatus.DROPPED, 1))
+        val (release, exclude) = StatusMerge.droppedChanges(before, after)
+        assertEquals(listOf("x"), release.map { it.slug })
+        assertEquals(listOf("y"), exclude.map { it.slug })
+    }
+
+    @Test fun `con la misma hora el progreso de mas posicion gana en los dos sentidos`() {
+        assertTrue(KaizenProgress.takeIncoming("60000/1400000", 200, "900000/1400000", 200, now))
+        assertFalse(KaizenProgress.takeIncoming("900000/1400000", 200, "60000/1400000", 200, now))
+        // Misma posición: decide el texto, así que de los dos lados gana el mismo valor.
+        val one = "600000/1400000"; val other = "600000/1450000"
+        assertTrue(KaizenProgress.takeIncoming(one, 200, other, 200, now) != KaizenProgress.takeIncoming(other, 200, one, 200, now))
+        assertFalse(KaizenProgress.takeIncoming(one, 200, one, 200, now))
+    }
+
     @Test fun `las lapidas de estado se leen y cuentan aparte`() {
         val parsed = Removals.parse(Removals.statusKey("animeflv:serie"))!!
         assertTrue(parsed.status); assertFalse(parsed.favorite); assertFalse(parsed.progress)

@@ -1,6 +1,7 @@
 package app.kaizen.commons
 
 import app.kaizen.domain.SeriesStatuses
+import app.kaizen.commons.sync.SyncKeys
 import androidx.annotation.Keep
 import app.kaizen.App
 import app.kaizen.database.CacheDB
@@ -68,7 +69,8 @@ object KaizenBackup {
         @SerializedName("removed") val removed: Map<String, Long?>?
     )
 
-    class Summary(val favorites: Int, val records: Int, val progress: Int) {
+    /** Lo que trajo una copia; [progressReplaced] y [statusesReplaced] cuentan lo de aquí que se sustituyó por algo más reciente de la copia. */
+    class Summary(val favorites: Int, val records: Int, val progress: Int, val progressReplaced: Int = 0, val statusesReplaced: Int = 0) {
         override fun toString() = "$favorites favoritos, $records capítulos vistos, $progress en curso"
     }
 
@@ -175,78 +177,42 @@ object KaizenBackup {
     /** Los estados de ahora serializados, sin escribir nada ni rotar copias: lo que sube la sincronización entre dispositivos. */
     suspend fun snapshotBytes(removed: Map<String, Long> = emptyMap()): ByteArray = withContext(Dispatchers.IO) { encode(buildData().copy(removed = removed)).toByteArray(Charsets.UTF_8) }
 
-    /** Lo que hay ahora, por claves portables, para saber qué se quitó entre dos sincronizaciones ([app.kaizen.commons.sync.Removals]). */
-    class Presence internal constructor(private val favoriteIds: Set<Long>, private val records: Set<Pair<Long, Double>>, override val keys: Set<String>, private val progress: Set<Pair<Long, Double>> = emptySet(), private val progressByFicha: Set<Pair<String, Double>> = emptySet(), private val statusIds: Set<Long> = emptySet()) : app.kaizen.commons.sync.Removals.Presence {
-        /** ¿Sigue [key] (un favorito o un capítulo visto)? null si no se sabe (la ficha no es conocida). */
-        override fun isPresent(key: String): Boolean? {
-            val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
-            val id = SeriesLedger.peek(parsed.source, parsed.slug)
-            if (parsed.progress) {
-                val byFicha = ("${parsed.source}:${parsed.slug}" to parsed.number!!) in progressByFicha
-                // Sin serie conocida solo cuenta la ficha de versiones anteriores; si tampoco está, no se sabe.
-                return if (id == null) byFicha.takeIf { it } else (id to parsed.number) in progress || byFicha
-            }
-            if (id == null) return null
-            if (parsed.status) return id in statusIds
-            return if (parsed.favorite) id in favoriteIds else (id to parsed.number!!) in records
-        }
-    }
-
-    /** La clave que iguala la misma serie en dos dispositivos aunque la ficha sea otra: su id local. null si la ficha no es conocida. */
-    fun canon(key: String): String? {
-        val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
-        val id = SeriesLedger.peek(parsed.source, parsed.slug) ?: return null
-        return if (parsed.favorite) "f/$id" else if (parsed.status) "e/$id" else if (parsed.progress) "c/$id#${parsed.number}" else "r/$id#${parsed.number}"
-    }
+    /** La clave que iguala la misma serie en dos dispositivos aunque la ficha sea otra: su id local. null si la ficha no es conocida (la lógica, en [SyncKeys]). */
+    fun canon(key: String): String? = SyncKeys.canon(key, SeriesLedger::peek)
 
     /** ¿Cambió aquí la clave [key] (un estado o un capítulo en curso) después de [at]? Solo ellos llevan hora; los favoritos y los capítulos vistos no. */
-    fun changedAfter(key: String, at: Long): Boolean {
-        val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return false
-        return when {
-            parsed.status -> app.kaizen.domain.SeriesStatuses.latestChange(parsed.source, parsed.slug) > at
-            parsed.progress -> KaizenProgress.latestChange(SeriesLedger.peek(parsed.source, parsed.slug), "${parsed.source}:${parsed.slug}", parsed.number!!) > at
-            else -> false
-        }
-    }
+    fun changedAfter(key: String, at: Long): Boolean = SyncKeys.changedAfter(key, at,
+        statusAt = { source, slug -> SeriesStatuses.latestChange(source, slug) },
+        progressAt = { source, slug, number -> KaizenProgress.latestChange(SeriesLedger.peek(source, slug), "$source:$slug", number) })
 
-    suspend fun presence(): Presence = withContext(Dispatchers.IO) {
+    /** Lo que hay ahora, por claves portables, para saber qué se quitó entre dos sincronizaciones ([app.kaizen.commons.sync.Removals]). */
+    suspend fun presence(): app.kaizen.commons.sync.Removals.Presence = withContext(Dispatchers.IO) {
         SeriesLedger.ensureLoaded()
         val db = CacheDB.INSTANCE
-        val favorites = db.favoriteAV1DAO().allRaw
-        val records = db.recordAV1DAO().all.toList()
-        fun ficha(seriesId: Long) = SeriesLedger.fichaKeysOf(seriesId).minOrNull()
-        val keys = HashSet<String>()
-        favorites.forEach { fav -> ficha(fav.seriesId)?.let { keys += app.kaizen.commons.sync.Removals.favoriteKey(it) } }
-        records.forEach { rec -> ficha(rec.seriesId)?.let { keys += app.kaizen.commons.sync.Removals.recordKey(it, rec.number) } }
+        val favorites = db.favoriteAV1DAO().allRaw.map { it.seriesId }
+        val records = db.recordAV1DAO().all.map { it.seriesId to it.number }
         // «Seguir viendo»: el progreso por serie («s:») y el de fichas de versiones anteriores («p:»).
         val (bySeries, byFicha) = KaizenProgress.chapters()
-        bySeries.forEach { (id, number) -> ficha(id)?.let { keys += app.kaizen.commons.sync.Removals.progressKey(it, number) } }
-        byFicha.forEach { (fichaKey, number) -> keys += app.kaizen.commons.sync.Removals.progressKey(fichaKey, number) }
         // Estados de serie: una clave por serie con estado (la ficha de la entrada) y sus ids para saber si sigue.
-        val statusEntries = app.kaizen.domain.SeriesStatuses.all.value.values
-        statusEntries.forEach { keys += app.kaizen.commons.sync.Removals.statusKey("${it.source}:${it.slug}") }
+        val statusEntries = SeriesStatuses.all.value.values
         val statusIds = statusEntries.mapNotNull { app.kaizen.source.seriesIdOf(it.source, it.slug).takeIf { id -> id != 0L } }.toSet()
-        Presence(favorites.map { it.seriesId }.toSet(), records.map { it.seriesId to it.number }.toSet(), keys, bySeries.toSet(), byFicha.toSet(), statusIds)
+        val keys = SyncKeys.keys(favorites, records, bySeries, byFicha, statusEntries.map { "${it.source}:${it.slug}" }) { id -> SeriesLedger.fichaKeysOf(id).minOrNull() }
+        SyncKeys.Presence(favorites.toSet(), records.toSet(), keys, bySeries.toSet(), byFicha.toSet(), statusIds, SeriesLedger::peek)
     }
 
-    /** Quita lo que dicen estas claves (favoritos y capítulos vistos); devuelve cuántas filas había. */
+    /** Quita lo que dicen estas claves (favoritos, capítulos vistos, capítulos en curso y estados); devuelve cuántas había. */
     suspend fun remove(keys: Collection<String>): Int = withContext(Dispatchers.IO) {
         val db = CacheDB.INSTANCE
         SeriesLedger.ensureLoaded()
-        var count = 0
-        for (key in keys) {
-            val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: continue
-            if (parsed.favorite) {
-                if (db.favoriteAV1DAO().isFav(parsed.source, parsed.slug)) { db.favoriteAV1DAO().removeFav(parsed.source, parsed.slug); count++ }
-            } else if (parsed.status) {
-                if (app.kaizen.domain.SeriesStatuses.removeSeries(parsed.source, parsed.slug)) count++
-            } else if (parsed.progress) {
-                if (KaizenProgress.removeChapter(SeriesLedger.peek(parsed.source, parsed.slug), listOf("${parsed.source}:${parsed.slug}"), parsed.number!!)) count++
-            } else if (db.recordAV1DAO().chapterIsSeen(parsed.source, parsed.slug, parsed.number!!)) {
-                db.recordAV1DAO().deleteChapter(parsed.source, parsed.slug, parsed.number); count++
-            }
-        }
-        count
+        SyncKeys.remove(keys, object : SyncKeys.Target {
+            override fun removeFavorite(source: String, slug: String) =
+                db.favoriteAV1DAO().isFav(source, slug).also { if (it) db.favoriteAV1DAO().removeFav(source, slug) }
+            override fun removeRecord(source: String, slug: String, number: Double) =
+                db.recordAV1DAO().chapterIsSeen(source, slug, number).also { if (it) db.recordAV1DAO().deleteChapter(source, slug, number) }
+            override fun removeProgress(source: String, slug: String, number: Double) =
+                KaizenProgress.removeChapter(SeriesLedger.peek(source, slug), listOf("$source:$slug"), number)
+            override fun removeStatus(source: String, slug: String) = SeriesStatuses.removeSeries(source, slug)
+        })
     }
 
     private fun buildData(): Data {
@@ -285,12 +251,12 @@ object KaizenBackup {
     /** Une los grupos de fichas que dice [data] (para poder resolver las series antes de fundir). */
     suspend fun joinGroups(data: Data) = withContext(Dispatchers.IO) {
         SeriesLedger.ensureLoaded()
-        val sources = app.kaizen.source.AnimeSources.all.map { it.id }.toSet()
-        SeriesLedger.join(data.groups.take(MAX_GROUPS).map { group ->
-            group.take(MAX_GROUP_SIZE).filter { ':' in it && it.substringBefore(':') in sources && it.substringAfter(':').isNotBlank() }
-                .map { it.substringBefore(':') to it.substringAfter(':') }
-        })
+        joinGroupsNow(data)
     }
+
+    // Una copia ajena o corrupta no puede inventar fichas ni unir sin tope: solo grupos con «fuente:slug» de una fuente conocida.
+    private fun joinGroupsNow(data: Data) =
+        SeriesLedger.join(SyncKeys.groups(data.groups, app.kaizen.source.AnimeSources.all.map { it.id }.toSet(), MAX_GROUPS, MAX_GROUP_SIZE))
 
     /** Funde [data] añadiendo lo que falta; [skip] deja fuera un favorito o un capítulo (por su clave portable): lo que una lápida más nueva que la copia dice que se quitó. */
     suspend fun merge(data: Data, skip: (String) -> Boolean = { false }): Summary = withContext(Dispatchers.IO) {
@@ -298,12 +264,7 @@ object KaizenBackup {
         SeriesLedger.ensureLoaded()
         // Primero se unen las fichas que la copia dice que son la misma serie; después cada fila toma el id de su serie (el de la copia, si
         // trae alguno, es de otro equipo o de antes y no vale).
-        // Una copia ajena o corrupta no puede inventar fichas ni unir sin tope: solo grupos con «fuente:slug» de una fuente conocida.
-        val sources = app.kaizen.source.AnimeSources.all.map { it.id }.toSet()
-        SeriesLedger.join(data.groups.take(MAX_GROUPS).map { group ->
-            group.take(MAX_GROUP_SIZE).filter { ':' in it && it.substringBefore(':') in sources && it.substringAfter(':').isNotBlank() }
-                .map { it.substringBefore(':') to it.substringAfter(':') }
-        })
+        joinGroupsNow(data)
         val dao = db.favoriteAV1DAO()
         val newFavorites = data.favorites.map { it.copy(seriesId = 0L) }
             .filter { !skip(app.kaizen.commons.sync.Removals.favoriteKey("${it.source}:${it.slug}")) && !dao.isFav(it.source, it.slug) }
@@ -311,16 +272,13 @@ object KaizenBackup {
         db.recordAV1DAO().addAllIgnore(data.records.map { it.copy(seriesId = 0L) }
             .filter { !skip(app.kaizen.commons.sync.Removals.recordKey("${it.source}:${it.slug}", it.number)) })
         // El progreso de otro dispositivo no vuelve si una lápida más nueva que su copia dice que aquí se quitó de «Seguir viendo».
-        val newProgress = KaizenProgress.importMissing(data.progress.filterKeys { key ->
-            if (key.startsWith("s:")) return@filterKeys false // los ids de serie son locales
-            val body = key.removePrefix("p:")
-            val number = body.substringAfterLast('#', "").toDoubleOrNull()
-            !(key.startsWith("p:") && number != null && skip(app.kaizen.commons.sync.Removals.progressKey(body.substringBeforeLast('#'), number)))
-        })
-        KaizenProgress.migrateFichaKeys { source, slug -> app.kaizen.source.seriesIdOf(source, slug) }
+        val newProgress = KaizenProgress.importMissing(SyncKeys.progressToImport(data.progress, skip))
+        // Lo que entró por ficha pasa a su serie; si allí ya había progreso, gana el más reciente.
+        val moved = KaizenProgress.migrateFichaKeys { source, slug -> app.kaizen.source.seriesIdOf(source, slug) }
         if (data.titles.isNotEmpty()) UserTitles.import(data.titles)
         // Un estado nuevo entra y uno ya existente se sustituye si el de la copia es más reciente; una lápida más nueva que la copia lo impide.
-        if (data.statuses.isNotEmpty()) SeriesStatuses.importNewer(data.statuses) { entry -> skip(app.kaizen.commons.sync.Removals.statusKey("${entry.source}:${entry.slug}")) }
-        Summary(newFavorites.size, data.records.size, newProgress)
+        val statuses = if (data.statuses.isEmpty()) null
+            else SeriesStatuses.importNewer(data.statuses) { entry -> skip(app.kaizen.commons.sync.Removals.statusKey("${entry.source}:${entry.slug}")) }
+        Summary(newFavorites.size, data.records.size, newProgress, moved.replaced, statuses?.replaced ?: 0)
     }
 }

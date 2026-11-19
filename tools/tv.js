@@ -58,6 +58,19 @@ const PACKAGE = 'app.kaizen';
 
 const COMMAND = process.argv[2];
 
+/**
+ * La carpeta local de registros (ignorada por git): `backups/tv-logs`. La de antes se llamaba `backups/shield-logs`: si solo existe esa, se renombra; si existen las
+ * dos (se renombró a mano a medias), se devuelven ambas y `health` lee la más reciente de cualquiera. Nunca se borra nada.
+ */
+function logsRoots() {
+  const current = path.join(ROOT, 'backups', 'tv-logs');
+  const old = path.join(ROOT, 'backups', 'shield-logs');
+  if (fs.existsSync(old) && !fs.existsSync(current)) {
+    try { fs.renameSync(old, current); console.log('[tv] backups/shield-logs renombrada a backups/tv-logs'); } catch (e) { console.log(`[tv] no se pudo renombrar backups/shield-logs (${e.code || e.message}): se leen las dos`); }
+  }
+  return [current, old].filter((d) => fs.existsSync(d));
+}
+
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
@@ -127,6 +140,7 @@ if (COMMAND === 'logs') {
   run('adb', ['connect', device]);
   if (adb('get-state').out !== 'device') fail('dispositivo en línea', 'no responde');
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+  logsRoots(); // antes de escribir: la carpeta antigua pasa a la nueva
   const out = path.resolve(ROOT, arg('--out', path.join('backups', 'tv-logs', stamp)));
   fs.mkdirSync(out, { recursive: true });
   // MSYS_NO_PATHCONV: Git Bash no debe convertir la ruta de /sdcard.
@@ -366,11 +380,12 @@ if (COMMAND === 'backup') {
 if (COMMAND === 'health') {
   // Informe de salud (solo lectura): cuenta en el registro lo que vigilan los pendientes y lo compara con el informe anterior (backups/health/).
   const noLogs = process.argv.includes('--no-logs');
-  const logsRoot = path.join(ROOT, 'backups', 'tv-logs');
   let dir;
   if (noLogs) {
-    const dirs = fs.existsSync(logsRoot) ? fs.readdirSync(logsRoot).filter((d) => fs.existsSync(path.join(logsRoot, d, 'debug.log'))).sort() : [];
-    dir = dirs.length ? path.join(logsRoot, dirs[dirs.length - 1]) : null;
+    // Las carpetas se llaman por su fecha: la más reciente de las dos raíces (la nueva y, si sigue, la antigua).
+    const dirs = logsRoots().flatMap((root) => fs.readdirSync(root).filter((d) => fs.existsSync(path.join(root, d, 'debug.log'))).map((d) => ({ d, full: path.join(root, d) })))
+      .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    dir = dirs.length ? dirs[dirs.length - 1].full : null;
   } else {
     const r = run('node', [__filename, 'logs', '--device', device]);
     const m = r.out.match(/guardado en (.+?) \(debug\.log/);

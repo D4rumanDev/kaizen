@@ -27,7 +27,6 @@ const argv = process.argv.slice(2);
 const cmd = argv[0];
 const has = (flag) => argv.includes(flag);
 const opt = (flag, fallback = null) => { const i = argv.indexOf(flag); return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback; };
-const list = (flag) => argv.reduce((out, v, i) => (v === flag && argv[i + 1] ? [...out, argv[i + 1]] : out), []);
 
 const step = (text) => console.log(`\n[release] ${text}`);
 const die = (text, done = []) => {
@@ -51,7 +50,9 @@ function prepare() {
   if (check.status !== 0 || !sha) die('`ship.js check` no pasó: arréglalo y repite (nada se ha publicado)');
   step('diff para el auditor');
   const prev = opt('--prev');
-  const diff = node('audit-diff.js', [sha, ...(prev ? ['--prev', prev] : [])]);
+  // Lo excluido del lote tampoco va al diff (audit-diff toma además la lista exacta de `check`).
+  const excludes = argv.flatMap((v, i) => (v === '--exclude' && argv[i + 1] ? ['--exclude', argv[i + 1]] : []));
+  const diff = node('audit-diff.js', [sha, ...(prev ? ['--prev', prev] : []), ...excludes]);
   if (diff.status !== 0) die('no se pudo generar el diff para el auditor');
   const short = sha.slice(0, 8);
   console.log(`\n[release] LISTO PARA AUDITAR`);
@@ -62,13 +63,31 @@ function prepare() {
 }
 
 // ---------------------------------------------------------------------------------------------- release
+/** Compara «34.0.0» con «9.0.0» por números (y «35.0.0-rc1» queda antes que «35.0.0»). */
+function compareVersions(a, b) {
+  const parts = (v) => v.split(/[.\-]/).map((p) => (/^\d+$/.test(p) ? Number(p) : p));
+  const pa = parts(a), pb = parts(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i], y = pb[i];
+    if (x === undefined) return typeof y === 'number' ? -1 : 1; // 35.0.0 < 35.0.0.1, pero 35.0.0-rc1 < 35.0.0
+    if (y === undefined) return typeof x === 'number' ? 1 : -1;
+    if (x === y) continue;
+    if (typeof x === 'number' && typeof y === 'number') return x - y;
+    if (typeof x === 'number') return 1;
+    if (typeof y === 'number') return -1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
 function apksigner() {
   const roots = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT, process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Android', 'Sdk'), path.join(os.homedir(), 'Android', 'Sdk')].filter(Boolean);
   const exe = process.platform === 'win32' ? 'apksigner.bat' : 'apksigner';
   for (const root of roots) {
     const tools = path.join(root, 'build-tools');
     if (!fs.existsSync(tools)) continue;
-    for (const version of fs.readdirSync(tools).sort().reverse()) {
+    // Por versión numérica (34.0.0 antes que 9.0.0); el orden de texto ponía delante la vieja.
+    for (const version of fs.readdirSync(tools).sort(compareVersions).reverse()) {
       const candidate = path.join(tools, version, exe);
       if (fs.existsSync(candidate)) return candidate;
     }
@@ -79,7 +98,9 @@ function apksigner() {
 function apkCertificate() {
   const signer = apksigner();
   if (!signer) die('no encuentro `apksigner` (SDK de Android): no puedo comprobar la firma del APK, así que no lo subo');
-  const r = run(signer, ['verify', '--print-certs', APK], { shell: process.platform === 'win32' });
+  // En Windows el .bat necesita la consola y, con ella, las rutas entre comillas (el SDK suele estar bajo una carpeta con espacios).
+  const quote = (p) => (process.platform === 'win32' ? `"${p}"` : p);
+  const r = run(quote(signer), ['verify', '--print-certs', quote(APK)], { shell: process.platform === 'win32' });
   const cert = (r.stdout.match(/Signer #1 certificate SHA-256 digest: ([0-9a-f]{64})/i) || [])[1];
   if (r.status !== 0 || !cert) die(`el APK no pasa \`apksigner verify\` (${(r.stderr || r.stdout || '').trim().split('\n')[0]})`);
   return cert.toLowerCase();
@@ -146,6 +167,8 @@ function install(device, done) {
   const result = adb('install', '-r', '-f', APK);
   if (!/Success/.test(result.stdout)) { console.error(`[release] ✗ ${device}: la instalación falló: ${(result.stdout + result.stderr).trim().split('\n').pop()}`); return false; }
   adb('shell', 'am', 'force-stop', 'app.kaizen');
+  // El registro se vacía antes de abrir la app: así FATAL/ANR cuentan solo lo de este arranque y no fallos antiguos que seguían en el búfer.
+  adb('logcat', '-c');
   adb('shell', 'monkey', '-p', 'app.kaizen', '-c', 'android.intent.category.LEANBACK_LAUNCHER', '1');
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10000);
   const pid = (adb('shell', 'pidof', 'app.kaizen').stdout || '').trim();

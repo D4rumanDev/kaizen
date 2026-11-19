@@ -21,6 +21,7 @@ class SyncConvergenceTest {
         val items = HashSet<String>()
         val changed = HashMap<String, Long>() // hora del último cambio de cada clave que la lleva (estados y progreso)
         var state = Removals.State()
+        var keptNewer = 0 // lápidas ajenas retenidas en la última sincronización
 
         override suspend fun presence() = object : Removals.Presence {
             val snapshot = items.toSet()
@@ -37,6 +38,7 @@ class SyncConvergenceTest {
             val incoming = server.files.filterKeys { it != id }.values.toList()
             val outcome = Removals.step(state, clock(), this, incoming, { it.createdAt }, { it.removed })
             state = outcome.state
+            keptNewer = outcome.keptNewer
             server.files[id] = Copy(clock(), items.toSet(), outcome.removed)
         }
     }
@@ -121,7 +123,9 @@ class SyncConvergenceTest {
         a.items -= key; a.sync() // a quita el estado y lo anota
         b.changed[key] = clock() // b lo cambia después (por ejemplo de Pendiente a Viendo) sin haber sincronizado
         b.sync() // b lee la lápida de a: su cambio es más reciente y se queda
+        assertEquals("b no cuenta la lápida retenida", 1, b.keptNewer)
         a.sync(); b.sync(); a.sync()
+        assertEquals("una lápida ya vista no se vuelve a contar", 0, b.keptNewer)
         assertTrue("b perdió su cambio más reciente", key in b.items)
         assertTrue("a no recibió el estado más reciente de b", key in a.items)
     }
@@ -136,6 +140,14 @@ class SyncConvergenceTest {
         a.items -= key; a.sync()
         b.sync(); a.sync(); b.sync()
         assertFalse(key in a.items || key in b.items)
+    }
+
+    @Test fun `el registro dice cuantas bajas se retuvieron y cuanto se sustituyo`() {
+        assertEquals(null, SyncManager.syncDetails(0, 0, 0))
+        assertEquals("Sincronización de estados: 1 baja de otro dispositivo no se aplicó porque aquí se cambió después",
+            SyncManager.syncDetails(1, 0, 0))
+        assertEquals("Sincronización de estados: 2 bajas de otro dispositivo no se aplicaron porque aquí se cambió después; " +
+            "3 estados de serie se sustituyeron por uno más reciente; 1 capítulo en curso se sustituyó por uno más reciente", SyncManager.syncDetails(2, 3, 1))
     }
 
     @Test fun `las claves de capitulos en curso se leen y se cuentan aparte`() {

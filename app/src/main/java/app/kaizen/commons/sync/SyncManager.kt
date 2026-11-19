@@ -59,12 +59,33 @@ object SyncManager {
 
     /** El dispositivo de verdad: la base de datos de la app (ver [Removals.step]). */
     private object Device : Removals.Local<KaizenBackup.Data> {
+        /** Lo de aquí que las copias de esta sincronización sustituyeron por algo más reciente (se pone a cero al empezar, bajo [lock]). */
+        var progressReplaced = 0
+        var statusesReplaced = 0
+
         override suspend fun presence(): Removals.Presence = KaizenBackup.presence()
         override suspend fun join(item: KaizenBackup.Data) = KaizenBackup.joinGroups(item)
-        override suspend fun merge(item: KaizenBackup.Data, skip: (String) -> Boolean) { KaizenBackup.merge(item, skip) }
+        override suspend fun merge(item: KaizenBackup.Data, skip: (String) -> Boolean) {
+            val summary = KaizenBackup.merge(item, skip)
+            progressReplaced += summary.progressReplaced
+            statusesReplaced += summary.statusesReplaced
+        }
         override suspend fun remove(keys: List<String>) = KaizenBackup.remove(keys)
         override fun canon(key: String) = KaizenBackup.canon(key)
         override fun changedAfter(key: String, at: Long) = KaizenBackup.changedAfter(key, at)
+    }
+
+    /**
+     * La línea del registro con lo que decidió la hora de cada cambio: lápidas de otro dispositivo que no se aplicaron porque aquí se cambió después, y estados y capítulos en
+     * curso de aquí sustituidos por otros más recientes. null si no pasó nada de eso.
+     */
+    internal fun syncDetails(keptNewer: Int, statusesReplaced: Int, progressReplaced: Int): String? {
+        val parts = listOfNotNull(
+            keptNewer.takeIf { it > 0 }?.let { "$it ${if (it == 1) "baja de otro dispositivo no se aplicó" else "bajas de otro dispositivo no se aplicaron"} porque aquí se cambió después" },
+            statusesReplaced.takeIf { it > 0 }?.let { "$it ${if (it == 1) "estado de serie se sustituyó" else "estados de serie se sustituyeron"} por uno más reciente" },
+            progressReplaced.takeIf { it > 0 }?.let { "$it ${if (it == 1) "capítulo en curso se sustituyó" else "capítulos en curso se sustituyeron"} por uno más reciente" }
+        )
+        return if (parts.isEmpty()) null else "Sincronización de estados: " + parts.joinToString("; ")
     }
 
     /**
@@ -83,9 +104,12 @@ object SyncManager {
             mergeOther = { bytes -> KaizenBackup.decode(String(bytes, Charsets.UTF_8))?.also { incoming += it } != null },
             ownJson = { KaizenBackup.snapshotBytes(outcome?.removed.orEmpty()) },
             finish = {
+                Device.progressReplaced = 0
+                Device.statusesReplaced = 0
                 val done = Removals.step(state, System.currentTimeMillis(), Device, incoming, { it.createdAt }, { it.removed })
                 outcome = done
                 if (done.heldRemote) DebugLog.error("Datos", "Sincronización de estados: otro dispositivo quitó demasiado de una vez; no se aplica lo que quitó (parece un restablecimiento)")
+                syncDetails(done.keptNewer, Device.statusesReplaced, Device.progressReplaced)?.let { DebugLog.info("Datos", it) }
                 Removals.save(done.state)
             },
             // Ni con un borrado masivo retenido, ni una copia con la fecha de un reloj roto (antes de 2020).
