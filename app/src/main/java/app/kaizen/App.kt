@@ -40,6 +40,7 @@ import okhttp3.OkHttp
 import okhttp3.OkHttpClient
 import app.kaizen.commons.runCatchingCoop
 import app.kaizen.commons.AppScope
+import app.kaizen.commons.await
 import kotlin.time.Duration.Companion.seconds
 
 class App : Application(), Configuration.Provider {
@@ -179,7 +180,9 @@ class App : Application(), Configuration.Provider {
             // bloqueo o una caída seguidos lo pausan. Un 404 de una portada no cuenta.
             .addInterceptor(HostGateInterceptor)
             .build()
-        SingletonImageLoader.setSafe { context ->
+        // Los proveedores de contenido (ChannelArtProvider) se publican antes de onCreate: el launcher puede pedir una imagen mientras esto aún no ha corrido y crear el cargador
+        // por defecto; `setSafe` lanzaría entonces y la app no arrancaba (visto en la TV). Con el fallo se sigue con el cargador que ya exista.
+        try { SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
                 .components {
                     // Lo que se sabe que no existe (404, .ico indecodificable) no se vuelve a pedir en una semana.
@@ -193,7 +196,9 @@ class App : Application(), Configuration.Provider {
                 // En segundo plano la caché se recorta (Coil 3.3+; las imágenes aún en uso no se tocan). El valor, como el resto de límites de memoria, sale de MemoryBudget.
                 .memoryCacheMaxSizePercentWhileInBackground(app.kaizen.commons.MemoryBudget.IMAGE_CACHE_BACKGROUND_PERCENT)
                 .build()
-        }
+        } } catch (e: IllegalStateException) {
+            android.util.Log.w("App", "El cargador de imágenes ya existía: se usa el que hay", e)
+        } finally { imageLoaderReady.countDown() }
     }
 
     /** Restos de funciones quitadas (logros, gestor de descargas, copias): una vez por instalación. */
@@ -223,6 +228,15 @@ class App : Application(), Configuration.Provider {
     }
 
     companion object {
+        private val imageLoaderReady = java.util.concurrent.CountDownLatch(1)
+        private val IMAGE_LOADER_WAIT = 5.seconds
+
+        /** El cargador de imágenes de Coil, cuando la app ya lo ha configurado (con un tope de espera): para quien lo pide desde un hilo ajeno al arranque, como un proveedor de contenido. */
+        fun awaitImageLoader(context: Context): ImageLoader {
+            imageLoaderReady.await(IMAGE_LOADER_WAIT)
+            return SingletonImageLoader.get(context)
+        }
+
         private const val LEFTOVERS_DONE = "leftovers_v1"
         private val HOME_READY_MAX = 45.seconds
         private val PROFILE_INSTALL_DELAY = 5.seconds

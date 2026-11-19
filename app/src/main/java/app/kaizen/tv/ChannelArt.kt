@@ -50,7 +50,7 @@ object ChannelArt {
     /** La imagen guardada de [url] (copia abierta al leer); null si no está o no se puede servir. */
     internal fun cachedFile(context: Context, url: String): File? {
         if (!isServable(url, published())) return null
-        val cache = SingletonImageLoader.get(context).diskCache ?: return null
+        val cache = app.kaizen.App.awaitImageLoader(context).diskCache ?: return null
         return cache.openSnapshot(url)?.use { snapshot -> snapshot.data.toFile().takeIf { it.isFile && it.length() > 0 } }
     }
 
@@ -72,7 +72,7 @@ object ChannelArt {
     private fun fetch(context: Context, url: String) {
         runCatching {
             runBlocking {
-                withTimeoutOrNull(FETCH_TIMEOUT) { SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(url).build()) }
+                withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.App.awaitImageLoader(context).execute(ImageRequest.Builder(context).data(url).build()) }
             }
         }
     }
