@@ -52,12 +52,6 @@ object KaizenSettings {
     val COVER_DAYS_OPTIONS = listOf(7, 15, 30, 60, 90, 180, 365, 3650)
     /** Parte de la memoria que ocupan las imágenes ya decodificadas. */
     val IMAGE_MEMORY_OPTIONS = listOf(10, 20, 30)
-
-    /** Con menos RAM que esto (la TV tiene 2 GB; el tvbox, 3) la caché de imágenes de fábrica es la mínima: ahorra unos 19 MB de los 192 MB que da Android a la app. */
-    internal const val LOW_RAM_BYTES = 2_500_000_000L
-
-    /** Porcentaje de memoria para imágenes de fábrica según la RAM total del equipo: 10 con poca RAM, 20 con la normal. */
-    internal fun imageMemoryDefault(totalRamBytes: Long): Int = if (totalRamBytes < LOW_RAM_BYTES) 10 else 20
     /** Días que se guardan las copias automáticas. */
     val BACKUP_DAYS_OPTIONS = listOf(3, 7, 14, 30)
     /** Máximo de ficheros de copia. */
@@ -203,8 +197,8 @@ object KaizenSettings {
         set(value) = prefs.edit { putString("kaizen_warp_mode", value) }
     var patience: Float by floatPref("kaizen_patience", 1f)
     var coverDays: Int by intPref("kaizen_cover_days", 3650)
-    /** Parte de la memoria de la app para la caché de imágenes decodificadas. De fábrica depende de la RAM del equipo ([imageMemoryDefault]); lo elegido a mano manda. */
-    var imageMemoryPercent: Int by intPref("kaizen_image_memory_percent", imageMemoryDefault(totalRamBytes()))
+    /** Parte de la memoria de la app para la caché de imágenes decodificadas. De fábrica depende de la RAM del equipo ([MemoryBudget.imageCachePercent]); lo elegido a mano manda. */
+    var imageMemoryPercent: Int by intPref("kaizen_image_memory_percent", MemoryBudget.imageCachePercent())
     var backupDays: Int by intPref("kaizen_backup_days", 7)
     var backupFiles: Int by intPref("kaizen_backup_files", 30)
     var logKb: Int by intPref("kaizen_log_kb", 512)
@@ -487,13 +481,6 @@ object KaizenSettings {
     private fun trimDecimals(value: Float) = "%.2f".format(value).trimEnd('0').trimEnd('.', ',')
 
     private fun booleanPref(key: String, default: Boolean) = Pref(key, default, SharedPreferences::getBoolean, SharedPreferences.Editor::putBoolean)
-    /** La RAM total del equipo; si no se puede leer, se supone la de un equipo normal (no se baja la caché sin pruebas). */
-    private fun totalRamBytes(): Long = runCatching {
-        val info = android.app.ActivityManager.MemoryInfo()
-        (App.context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(info)
-        info.totalMem
-    }.getOrDefault(Long.MAX_VALUE)
-
     private fun intPref(key: String, default: Int) = Pref(key, default, SharedPreferences::getInt, SharedPreferences.Editor::putInt)
     private fun floatPref(key: String, default: Float) = Pref(key, default, SharedPreferences::getFloat, SharedPreferences.Editor::putFloat)
     private fun longPref(key: String, default: Long) = Pref(key, default, SharedPreferences::getLong, SharedPreferences.Editor::putLong)

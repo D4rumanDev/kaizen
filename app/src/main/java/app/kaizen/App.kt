@@ -33,6 +33,7 @@ import coil3.ImageLoader
 import coil3.request.bitmapConfig
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
+import coil3.memoryCacheMaxSizePercentWhileInBackground
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import okhttp3.Dispatcher
 import okhttp3.OkHttp
@@ -58,6 +59,8 @@ class App : Application(), Configuration.Provider {
     /** El sistema avisa de que va justo de memoria: queda anotado (E16) con lo que usa la app, para saber si el cierre o la lentitud vienen de ahí. */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        // Soltar memoria cuando conviene (interfaz oculta: vaciar las imágenes; sistema justo: recortarlas a la mitad), antes de decidir si se anota el aviso.
+        runCatching { app.kaizen.commons.MemoryBudget.onTrim(this, level) }.onFailure(::logError)
         // Los niveles 20, 40 y 60 saltan cada vez que se pulsa Inicio: no son falta de memoria.
         if (!app.kaizen.commons.AppErrors.isTrimPressure(level)) return
         val rt = Runtime.getRuntime()
@@ -187,6 +190,8 @@ class App : Application(), Configuration.Provider {
                 // Calidad de las portadas (ver ImageQuality): solo la «ligera» fija 16 bits de color; las demás dejan el valor de Coil (bitmaps de hardware donde se puede).
                 .apply { if (app.kaizen.commons.ImageQuality.level(context) == app.kaizen.commons.ImageQuality.Level.LIGHT) bitmapConfig(android.graphics.Bitmap.Config.RGB_565) }
                 .memoryCache { MemoryCache.Builder().maxSizePercent(context, app.kaizen.commons.KaizenSettings.imageMemoryPercent.coerceIn(5, 40) / 100.0).build() }
+                // En segundo plano la caché se recorta (Coil 3.3+; las imágenes aún en uso no se tocan). El valor, como el resto de límites de memoria, sale de MemoryBudget.
+                .memoryCacheMaxSizePercentWhileInBackground(app.kaizen.commons.MemoryBudget.IMAGE_CACHE_BACKGROUND_PERCENT)
                 .build()
         }
     }

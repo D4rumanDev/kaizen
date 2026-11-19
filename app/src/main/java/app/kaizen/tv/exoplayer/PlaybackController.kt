@@ -304,9 +304,12 @@ class PlaybackController(private val activity: TVPlayer) {
      */
     private fun loadControl(): DefaultLoadControl {
         val bufferMs = KaizenSettings.bufferSeconds * 1000
+        // Tope por tamaño según la RAM (equipo justo: 48 MB): el búfer de ExoPlayer vive en el heap de Java y sin tope un vídeo de bitrate alto puede agotar los 192 MB de la TV.
+        val cap = app.kaizen.commons.MemoryBudget.playerBufferBytes()
         return DefaultLoadControl.Builder()
             .setBufferDurationsMs(bufferMs, bufferMs,
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
+            .apply { if (cap != app.kaizen.commons.MemoryBudget.NO_CAP) setTargetBufferBytes(cap) }
             .build()
     }
 

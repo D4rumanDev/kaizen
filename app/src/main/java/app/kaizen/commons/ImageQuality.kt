@@ -10,7 +10,7 @@ import android.net.ConnectivityManager
  *  - [HIGH]: la mejor portada de entre las de las fuentes de la serie (mide varias, lo que baja imágenes enteras), píxeles completos.
  *  - [BALANCED]: la de la propia fuente, ancho suficiente al 75 %; no compara con otras fuentes (red medida o equipo justo).
  *  - [LIGHT]: la de la propia fuente, al 50 % y con 16 bits de color (menos datos y memoria: equipos con poca RAM).
- * La automática elige [LIGHT] con poca memoria, [BALANCED] con red de datos medida y [HIGH] en el resto.
+ * La automática elige [LIGHT] con poca memoria por aplicación, [BALANCED] con red de datos medida o con poca RAM total (equipo justo: la TV, ver [MemoryBudget]) y [HIGH] en el resto.
  */
 object ImageQuality {
     enum class Level(val widthScale: Float, val comparesCovers: Boolean, val config: Bitmap.Config) {
@@ -27,9 +27,10 @@ object ImageQuality {
         else -> automatic(context)
     }
 
-    internal fun automatic(context: Context): Level = pick(lowMemory(context), metered(context))
+    /** Un equipo con poca RAM total (la TV, 2 GB) baja a [Level.BALANCED] aunque no sea «de poca memoria» para Android: 75 % de ancho y no compara portadas entre fuentes. */
+    internal fun automatic(context: Context): Level = pick(lowMemory(context), metered(context) || MemoryBudget.isTight)
 
-    /** La decisión de la automática: poca memoria manda, después la red medida. */
+    /** La decisión de la automática: poca memoria manda, después la red medida o la RAM justa del equipo (ambas dan [Level.BALANCED]). */
     internal fun pick(lowMemory: Boolean, metered: Boolean): Level = when {
         lowMemory -> Level.LIGHT
         metered -> Level.BALANCED

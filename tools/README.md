@@ -249,6 +249,29 @@ python tools/audit/code_graph.py deps <CLASE_O_FUNCION>
 - `unused`: Detecta imports, variables y parámetros sin utilizar.
 - `html`: Genera un visualizador web interactivo de dependencias del proyecto.
 
+### `release.js`
+Automatiza el flujo completo de publicar (comprobar, auditar, commit, push, release en GitHub e instalar) en dos órdenes, sin saltarse ninguna barrera de `ship.js`:
+
+```bash
+node tools/release.js prepare [--add ruta]... [--exclude ruta]... [--prev SHA_ANTERIOR]
+node tools/release.js ship --audited SHA -m "mensaje" [--tag v6.0.8] [--devices IP:5555,IP:5555] [--no-release] [--no-install] [--trailer "Co-Authored-By: …"]
+```
+- `prepare`: `ship.js check` (pruebas, compilación, escaneo de IPs/secretos) y `audit-diff.js` (con delta si pasas `--prev`). Imprime el SHA y la ruta del diff **para un auditor independiente**; la auditoría no se automatiza a propósito (la hace otra instancia que lee el diff y sin su «APROBADO» no se sigue).
+- `ship`: con el SHA aprobado hace `ship.js publish` (commit, push sin force, verificación con `ls-remote`), luego el **release** y por último la **instalación**:
+  - release: comprueba con `apksigner` que el APK está firmado con el **mismo certificado** que el del release (si no, no sube nada), lo sube con `gh release upload --clobber`, sustituye en las notas el SHA-256 del APK y anota el commit, y verifica que el hash que guarda GitHub coincide con el del fichero local. **La etiqueta no se mueve** (sería reescribir una referencia publicada): las notas dicen de qué commit sale el APK.
+  - instalación: en cada equipo de `--devices` (o, sin ello, el de `tools/adb-device/.env`): `adb install -r -f`, abre la app, espera 10 s y comprueba proceso, FATAL y ANR.
+- Las IPs de las teles no se guardan en el repositorio: se pasan con `--devices`. Cada fallo detiene el proceso diciendo qué paso falló y qué quedó ya hecho. Precondiciones: `gh` con sesión, `adb` en el PATH y `apksigner` en el SDK de Android.
+
+### `mem-scenario.js`
+Mide la memoria de la app en una tele (`dumpsys meminfo`) en un escenario repetible, para comparar antes y después de un cambio:
+
+```bash
+node tools/mem-scenario.js --device IP:puerto [--label antes] [--rows 60]
+```
+- Escenario (mando simulado con `input keyevent`, sin pulsar OK sobre ninguna tarjeta: no reproduce nada ni cambia datos): cierra la app, la abre y espera 45 s (**reposo**); Últimos vistos y baja `--rows` filas (**tras scroll**); Inicio y espera 10 s (**segundo plano**); vuelve a abrirla (**al volver**).
+- De cada punto anota PSS total, heap de Java y heap nativo (MB) y el pid (avisa si el proceso se reinició). Guarda `backups/mem-<etiqueta>-<equipo>.json` (carpeta ignorada por git).
+- Si la pantalla está dormida la despierta y la deja dormida al acabar. **Limitaciones:** una pasada es ruidosa (el pico tras el scroll varió de 292 a 405 MB entre pasadas idénticas en el tvbox según cuándo corre el recolector): comparar con varias pasadas; no mide el reproductor; la automatización de Home Assistant puede cerrar la app durante la prueba.
+
 ### `unused_resources.py`
 Inspecciona recursos XML en `res/values*` que no son referenciados en ningún composable o diseño:
 ```bash
