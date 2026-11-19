@@ -229,15 +229,14 @@ private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions)
     val sort = currentSectionSort()
     val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
     // Más tarjetas que «Recientes» (KaizenSettings.recentsCount): se parten en páginas de ese tamaño.
-    val paged = rememberListPage(rememberSorted(visible, sort, statuses), resetKey = sortResetKey(sort))
-    val shown = paged.items
+    val window = rememberListWindow(rememberSorted(visible, sort, statuses), resetKey = sortResetKey(sort))
+    val shown = window.items
     val keys = rememberCardKeys(shown)
     val focus = remember { GridFocus() }
     RefocusOnRemoval(focus, listOf(keys))
-    RefocusFirstCard(paged, focus, 0, keys.firstOrNull())
-    CardGrid(state = paged.gridState) {
+    CardGrid(state = window.gridState) {
         cardItems(shown, keys, actions, focus)
-        fullWidth { PageBar(paged) }
+        fullWidth { WindowFooter(window) }
     }
 }
 
@@ -255,13 +254,12 @@ private fun HistoryPage(model: MainViewModel, actions: CardActions) {
     val allHistory = rememberSorted(remember(rawHistory) { rawHistory.filter { it !== LoadingCard } }, sort, statuses)
     if (started.isEmpty() && allHistory.isEmpty() && (rawContinue + rawHistory).any { it === LoadingCard }) return LoadingGrid(header = true)
     // El historial llega a miles de registros: páginas del tamaño de «Recientes» (Seguir viendo se queda entero, es corto).
-    val paged = rememberListPage(allHistory, resetKey = sortResetKey(sort))
-    val history = paged.items
+    val window = rememberListWindow(allHistory, resetKey = sortResetKey(sort))
+    val history = window.items
     val keys = listOf(rememberCardKeys(started), rememberCardKeys(history))
     val focus = remember { GridFocus() }
     RefocusOnRemoval(focus, keys)
-    RefocusFirstCard(paged, focus, 1, keys[1].firstOrNull())
-    CardGrid(state = paged.gridState) {
+    CardGrid(state = window.gridState) {
         if (started.isNotEmpty()) {
             fullWidth { SectionTitle(appString(R.string.ui_seguir_viendo)) }
             // Las tarjetas horizontales ocupan dos columnas: así caben el título y el capítulo.
@@ -270,7 +268,7 @@ private fun HistoryPage(model: MainViewModel, actions: CardActions) {
         if (history.isNotEmpty()) {
             fullWidth { SectionTitle(appString(R.string.ui_historial)) }
             cardItems(history, keys[1], actions, focus, 1)
-            fullWidth { PageBar(paged) }
+            fullWidth { WindowFooter(window) }
         }
     }
 }
@@ -343,8 +341,8 @@ internal fun PagedGrid(
     val sorted = rememberSorted(loaded, sort, statuses)
     // Una página cada vez (del tamaño de «Recientes»), también en búsquedas y listados: lo cargado se parte y no se pinta de golpe.
     // [items] va en la clave: al cambiar la consulta (otro texto, otro género) llega una lista nueva y se vuelve a la primera página.
-    val paged = rememberListPage(sorted, resetKey = listOf(sortResetKey(sort), items))
-    val shown = paged.items
+    val window = rememberListWindow(sorted, resetKey = listOf(sortResetKey(sort), items))
+    val shown = window.items
     val shownKeys = remember(shown) { uniqueKeys(shown.map { "${it.source}:${it.slug}" }) }
     val endReached = items.loadState.append.endOfPaginationReached
     // Un fallo al pedir más series no se reintenta solo: se avisa y se ofrece reintentar. Una carga que pasa de [LoadLimits.DATA] se avisa igual (límite común, ver LoadState.kt).
@@ -353,17 +351,16 @@ internal fun PagedGrid(
     var attempt by remember(items) { mutableStateOf(0) }
     val stalled = rememberStalled(items.loadState.refresh is LoadState.Loading || items.loadState.append is LoadState.Loading, items to attempt)
     val retryLoad = { attempt++; if (refresh is LoadState.Error || appendFailed) items.retry() else items.refresh() }
-    // Se pide lo que falta para la página en pantalla y una tarjeta más: así «Siguiente» sale solo si de verdad hay otra, y al llegar a ella se sigue pidiendo.
+    // Se pide a Paging lo que falta para tener siempre dos tandas por delante de lo que se muestra: la ventana crece sola al hacer scroll y no se queda sin series que añadir.
     // Ordenando hace falta todo (hasta [SORT_MAX_ITEMS]) para que el orden valga para toda la lista.
-    val wanted = if (sorting) SORT_MAX_ITEMS else (paged.page + 1) * ListPages.size() + 1
+    val wanted = if (sorting) SORT_MAX_ITEMS else shown.size + 2 * ListPages.size()
     LaunchedEffect(items.itemCount, wanted, endReached, appendFailed) {
         if (items.itemCount in 1 until wanted && !endReached && !appendFailed) items[items.itemCount - 1]
     }
     val focus = remember { GridFocus() }
     LaunchedEffect(shownKeys) { focus.retain(listOf(shownKeys)) }
-    RefocusFirstCard(paged, focus, 0, shownKeys.firstOrNull())
     Box(Modifier.fillMaxSize()) {
-        CardGrid(state = paged.gridState) {
+        CardGrid(state = window.gridState) {
             header?.invoke(this)
             items(shown.size, key = { shownKeys[it] }, contentType = { "series" }) { index ->
                 val series = shown[index]
@@ -372,8 +369,8 @@ internal fun PagedGrid(
                         onClick = { onOpen(series) }, onLongClick = actions?.let { { it.menu(series) } })
                 }
             }
-            // Sin saber todavía cuántas hay en total (la lista sigue cargando) solo se dice la página.
-            fullWidth { PageBar(paged, knownTotal = endReached) }
+            // «Mostrando n de total» mientras hay más por enseñar, y «Cargando más…» si ya se enseña todo lo cargado y Paging sigue trayendo.
+            fullWidth { WindowFooter(window, loadingMore = !endReached && !appendFailed && !stalled, totalKnown = endReached) }
             // Falló o se atascó la carga de más series: sin esto el usuario se quedaba sin «Siguiente» ni mensaje.
             if (!empty && (appendFailed || stalled)) fullWidth { LoadProblem(loadProblemMessage(stalled), retryLoad) }
         }
