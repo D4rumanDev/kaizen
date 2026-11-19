@@ -1,3 +1,13 @@
+---
+title: Emparejado con AniList
+type: reference
+tags:
+  - kaizen
+  - anilist
+  - emparejado
+updated: 2026-11-19
+---
+
 # Emparejado con AniList: cómo se decide, qué se aprendió y qué queda
 
 Una explicación única, escrita el 4-nov-2026, de cómo se enlaza cada ficha de las webs con su anime de AniList y por qué. Si difiere del código, manda el código (las pruebas
@@ -122,3 +132,9 @@ Resumen y detalle de los límites conocidos (abajo). Lo que sigue abierto se lle
 - **Límites del criterio por pruebas** (auditoría del 4-nov): solo se reinician los enlaces automáticos «probable»; los «seguro» ya aplicados con una prueba en contra no se reabren (fijado en `AnilistFormatoTest`); la ruta por `idMal` de la web (`matchBatch`) no aplica la regla de episodios; mientras el emparejado rehace los ~800 «probable» (o sin red) esas fichas están sin enlace y sus uniones deshechas. `wordSimilarity` cuesta unas 3 o 4 veces más que antes por llamada (sin medir).
 - **Búsqueda por formato: límites conocidos** (auditoría del 4-nov): `cleanQuery` quita también partículas y ordinales del texto buscado («x ii movie» → «x»); un grupo «x» + «x-ova» solo se beneficia de la búsqueda filtrada si el primer título lleva la marca; OVA/especial frente a ONA resta (clase «corto» frente a «serie»); `format_search.py` no replica `cleanQuery` ni mide cuántas se aplicarían solas (con prueba más).
 - **Enlaces de partida (`AnilistSeed`), menores de la auditoría del 5-nov:** el fichero solo declara `matcherVersion` pero la siembra marca también `anilistEvidence` y `anilistFormatSearch` al día (añadir `evidenceVersion` y `formatVersion` al fichero y a `rows()`); `runCatching` en `startSync` traga la `CancellationException`; `make-links-seed.py` valida menos que la app (slug 1 a 300, id > 0, regex de fuente), no cierra el fichero que abre y no verifica la firma al final; no hay protección contra reponer un fichero antiguo con el mismo `matcherVersion` (bajo: solo actúa con la tabla vacía).
+
+## Relacionado
+
+- [architecture.md](architecture.md): dónde encaja el emparejado (§3 C).
+- [webficha-esquema.md](webficha-esquema.md): el registro de cada ficha.
+- [log.md](log.md): la historia de las decisiones.

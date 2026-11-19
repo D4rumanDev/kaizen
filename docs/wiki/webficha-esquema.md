@@ -1,3 +1,13 @@
+---
+title: WebFicha: esquema de la ficha
+type: reference
+tags:
+  - kaizen
+  - webficha
+  - esquema
+updated: 2026-11-19
+---
+
 # WebFicha: el registro único de cada ficha
 
 Lo que dice cada web de una serie se guarda **siempre igual**, sea cual sea la fuente: un JSON con la estructura de `Media` de AniList, con **todas las
@@ -108,3 +118,9 @@ rechaza la fuente al leerla). Cada clave es un selector, igual que en el resto d
    estructura, tipos y valores válidos que las demás; el segundo fija qué lee de ella.
 
 No hay código por fuente: si una web da un dato que el esquema no tiene, se añade al esquema (y entonces lo reciben todas), no a esa fuente.
+
+## Relacionado
+
+- [emparejado-anilist.md](emparejado-anilist.md): cómo se empareja cada ficha con AniList.
+- [architecture.md](architecture.md): dónde encaja `WebFicha` (§3 C).
+- [CODEBASE-MAP.md](../CODEBASE-MAP.md): ficheros del esquema (`source/`).

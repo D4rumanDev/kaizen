@@ -81,3 +81,9 @@ Repetir A (compilar con la **misma firma**, subir `versionCode` en `app/build.gr
 | `INSTALL_PARSE_FAILED_NO_CERTIFICATES` | APK sin firmar | Compilar con el almacén de claves disponible (A.3) |
 | `adb: device unauthorized` | No se aceptó el aviso | Revocar autorizaciones de depuración en el equipo y repetir C.3 |
 | La descarga da 404 | Versión o nombre de fichero mal escritos | Mirar la lista en `https://github.com/D4rumanDev/kaizen/releases` |
+
+## Relacionado
+
+- [stack.md](stack.md): variantes de compilación y versiones.
+- [CODEBASE-MAP.md](../CODEBASE-MAP.md): herramientas (`tools/`) y comandos de instalación y comprobación.
+- [Constitución de ingeniería](sdd/constitution.md): reglas de instalación (almacenamiento interno con `-f`).

@@ -1,16 +1,16 @@
 ---
-title: Kaizen Architecture Map
+title: Mapa de arquitectura
 type: architecture
 tags:
   - architecture
   - modules
   - data-flow
-updated: 2026-11-14
+updated: 2026-11-19
 ---
 
 # Mapa Arquitectónico de Kaizen
 
-Kaizen es una aplicación de Android TV (probada en un tvbox) para ver anime de varias webs sin depender de ninguna: cada serie se identifica por su **anime de AniList**, y de ahí salen la ficha, las uniones entre fuentes, las recomendaciones y el seguimiento de lo visto. Este mapa dice qué hay y cómo se conecta; lo que se hizo día a día está en [log.md](log.md) y el detalle del emparejado con AniList en [docs/wiki/emparejado-anilist.md](emparejado-anilist.md).
+Kaizen es una aplicación de Android TV (probada en un tvbox) para ver anime de varias webs sin depender de ninguna: cada serie se identifica por su **anime de AniList**, y de ahí salen la ficha, las uniones entre fuentes, las recomendaciones y el seguimiento de lo visto. Este mapa explica cómo funciona Kaizen y por qué, por concepto; dónde está cada cosa (rutas, ficheros y comandos) está en [CODEBASE-MAP.md](../CODEBASE-MAP.md). Lo que se hizo día a día está en [log.md](log.md) y el detalle del emparejado con AniList en [docs/wiki/emparejado-anilist.md](emparejado-anilist.md).
 
 ---
 
@@ -49,7 +49,7 @@ Las uniones de series salen de que dos fichas compartan anime de AniList (más l
 
 ### A. Fuentes (`app.kaizen.source`, `source.spec`)
 
-- **Fuentes por fichero**: `assets/sources/*.json` (animeav1, animeflv, animeflvar, animegratis, jkanime, monoschinos, verani) con un `index.json` y su firma ECDSA P-256 (`SpecBundle`, `SpecSources.PUBLIC_KEY`). `ConfigurableSource` es el único motor; `SourceSpec` describe búsqueda, listados, ficha, capítulos y servidores. `RepoConfig` gestiona las direcciones y claves de los repositorios satélite.
+- **Fuentes por fichero**: `assets/sources/*.json` (las fuentes empaquetadas, en [CODEBASE-MAP §4](../CODEBASE-MAP.md)) con un `index.json` y su firma ECDSA P-256 (`SpecBundle`, `SpecSources.PUBLIC_KEY`). `ConfigurableSource` es el único motor; `SourceSpec` describe búsqueda, listados, ficha, capítulos y servidores. `RepoConfig` gestiona las direcciones y claves de los repositorios satélite.
 - **Peticiones** (`SourceHttp`, `commons/HostGate`): una a la vez por servidor y por turno; tras varios fallos de red seguidos el servidor entra en pausa (2, 5, 10 min y 1 h) y se avisa; los `403` de bloqueo cuentan, los de verificación no. `FallbackDns` usa DNS sobre HTTPS (1.1.1.1) solo si el de la red no consigue conectar. `TlsPolicy` valida TLS con normalidad.
 - **Verificación de seguridad de una web** (`SourceChallenge`, `bypass/`): si una fuente pide verificación (`403` con `challenge`), la app no la resuelve sola: lo anota y delega en el usuario mediante una ventana web; guarda las cookies y el User-Agent de esa sesión para las siguientes peticiones.
 - **Cachés**: `SourceCache` (fichas), `ApiCache`, `CoverStore` y `BestCovers` (portadas), `MemoryCache`, `SingleFlight` (una petición idéntica concurrente).
@@ -100,6 +100,7 @@ Las uniones de series salen de que dos fichas compartan anime de AniList (más l
 - `ServerMemory`: recuerda el último servidor funcional por serie, facilitando la conmutación automática.
 - `PlaybackController` y `PlayerScreen`: ExoPlayer (Media3), progreso milimétrico, cambio dinámico de refresco de pantalla (`FrameRateMatcher` / AFR) y aceleración configurable de salto temporal.
 - **`AniSkip` robusto**: consulta la API de saltos de opening y ending validando que la duración reportada coincida con la duración real del vídeo (`forDuration`). Aplica regla temporal 50/50: un opening debe iniciar en la primera mitad del vídeo y un ending en la segunda mitad para evitar marcadores invertidos o falsos positivos.
+- **Pantalla en pausa**: el reproductor libera la pantalla y cede el paso al protector de pantalla tras 10 minutos en pausa.
 
 ### G. Interfaz de TV (`app.kaizen.tv`)
 
@@ -150,13 +151,19 @@ Las uniones de series salen de que dos fichas compartan anime de AniList (más l
 
 ## 4. Herramientas y Calidad
 
-- **Compilar y probar**: `./gradlew --no-daemon :app:assembleTv` y `:app:testDebugUnitTest`.
-- **Publicación y auditoría**: `node tools/ship.js check` y `ship.js publish` (ver [tools/README.md](../../tools/README.md)).
-- **Hardware real**: `node tools/tv.js deploy` (instalación segura con `-r -f` en memoria interna) y `bench.js` (medición repetible de arranque).
-- **Suite de auditorías**: `tools/audit/audit.py` y `code_graph.py` (análisis estático de dependencias y código muerto).
+Los comandos para compilar, probar, publicar, instalar en la TV y auditar están en [CODEBASE-MAP.md](../CODEBASE-MAP.md) (§5 herramientas y §7 comprobar un cambio) y, con todo el detalle, en [tools/README.md](../../tools/README.md).
 
 ---
 
 ## 5. Preferencias Guardadas: Un Solo Acceso
 
 `commons/KaizenStore` es la única puerta de acceso a `SharedPreferences`: cada archivo pertenece a una categoría estricta (`SETTINGS`, `STATE`, `CACHE`, `SECRET`). Se audita con `node tools/tv.js store` por ADB.
+
+## Relacionado
+
+- [CODEBASE-MAP.md](../CODEBASE-MAP.md): dónde está cada cosa (rutas, ficheros, comandos).
+- [stack.md](stack.md): versiones y entorno de compilación.
+- [Constitución de ingeniería](sdd/constitution.md): las reglas que este diseño respeta.
+- [emparejado-anilist.md](emparejado-anilist.md) y [webficha-esquema.md](webficha-esquema.md): el emparejado y el registro de cada ficha, en detalle.
+- [lecciones-de-octubre.md](lecciones-de-octubre.md): causas y trampas ya resueltas.
+- [log.md](log.md): lo que se hizo día a día.

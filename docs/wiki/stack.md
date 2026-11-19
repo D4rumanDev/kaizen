@@ -1,12 +1,12 @@
 ---
-title: Kaizen Tech Stack Canons
+title: Stack tecnológico
 type: stack
 tags:
   - stack
   - gradle
   - kotlin
   - android
-updated: 2026-10-31
+updated: 2026-11-19
 ---
 
 # Stack Tecnológico Canónico de Kaizen
@@ -60,3 +60,9 @@ Este documento consolida las versiones de compilador, librerías base y configur
 - **Hardware**: tvbox (Android TV).
 - **Dirección estándar ADB**: `<IP_SHIELD>:5555`.
 - **Estrategia de instalación**: Siempre en almacenamiento interno (`-f`) para evitar degradación de lecturas/escrituras en discos USB lentos.
+
+## Relacionado
+
+- [architecture.md](architecture.md): cómo encaja este stack en la app.
+- [CODEBASE-MAP.md](../CODEBASE-MAP.md): dónde está cada cosa y cómo se comprueba un cambio.
+- [Constitución de ingeniería](sdd/constitution.md): las reglas que lo gobiernan.

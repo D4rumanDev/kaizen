@@ -1,6 +1,16 @@
-# Codebase Map: Kaizen (`docs/CODEBASE-MAP.md`)
+---
+title: Mapa del código
+type: reference
+tags:
+  - kaizen
+  - codebase
+  - ubicacion
+updated: 2026-11-19
+---
 
-Orientación rápida para quien llega al proyecto: puntos de entrada, paquetes, dónde vive cada cosa y cómo se comprueba. Actualizado el 2026-11-14.
+# Mapa del código de Kaizen (`docs/CODEBASE-MAP.md`)
+
+Orientación rápida para quien llega al proyecto: puntos de entrada, paquetes, dónde vive cada cosa y cómo se comprueba. Cómo funciona y por qué está en [architecture.md](wiki/architecture.md). Actualizado el 2026-11-19.
 
 ---
 
@@ -54,6 +64,8 @@ app/kaizen/
 
 ## 3. `source/`: Fuentes, Catálogo, Series y AniList
 
+Qué fichero hace qué. El flujo completo y el porqué, en [architecture.md](wiki/architecture.md) §3 A, B y C.
+
 | Tema | Ficheros Clave | Responsabilidad |
 | --- | --- | --- |
 | **Fuentes** (definidas en JSON) | `ConfigurableSource`, `spec/` (`SourceSpec`, `RepoConfig`), `SourceHttp`, `SourceChallenge`, `AnimeSource` | Motor único de extracción basado en especificaciones declarativas (`assets/sources/*.json`). Reintentos, cookies de bypass y pausas automáticas. |
@@ -93,13 +105,12 @@ Ver la guía exhaustiva en [tools/README.md](../tools/README.md):
 
 ## 6. Procesos en Segundo Plano y Sincronización
 
-1. **Recorrido del catálogo** (`CatalogBuilder`): Automático al arrancar si el catálogo tiene más de 14 días o está vacío. Controlable desde Configuración.
-2. **Emparejado con AniList** (`AnilistSyncRunner`): Por lotes en segundo plano respetando las cuotas de AniList y pausas de actividad.
-3. **Sincronización multi-dispositivo** (`commons/sync/SyncManager`): Sincroniza historial, favoritos y progreso contra un servidor WebDAV privado. Algoritmo funcional de convergencia (`Removals.step`), lápidas de borrado y eliminación segura de dispositivos abandonados (>180 días).
-4. **Tareas periódicas WorkManager**:
-   - `RecentsWork`: Actualiza la fila de capítulos recientes.
-   - `BackupWork`: Genera copias de seguridad locales rotativas.
-5. **Wakelock y reposo**: El reproductor libera la pantalla y cede el paso al protector de pantalla tras 10 minutos en pausa.
+Dónde vive cada proceso. Qué hace y por qué está en [architecture.md](wiki/architecture.md) (§3 B catálogo, C emparejado, E sincronización, F reproducción y H segundo plano):
+
+- `source/CatalogBuilder`: recorrido del catálogo; automático al arrancar si tiene más de 14 días o está vacío, y controlable desde Configuración.
+- `source/AnilistSyncRunner`: emparejado con AniList por lotes en segundo plano, respetando las cuotas de AniList y las pausas de actividad.
+- `commons/sync/SyncManager`: sincronización multi-dispositivo (convergencia con `Removals.step`, lápidas de borrado y poda de dispositivos abandonados con más de 180 días).
+- `jobscheduler/`: `RecentsWork` actualiza la fila de capítulos recientes y `BackupWork` genera las copias locales rotativas.
 
 ---
 
@@ -123,3 +134,9 @@ node tools/tv.js deploy
 # 5. Descarga de registros y diagnóstico de errores en la TV
 node tools/tv.js logs
 ```
+
+## Relacionado
+
+- [architecture.md](wiki/architecture.md): cómo funciona y por qué.
+- [stack.md](wiki/stack.md): versiones y entorno.
+- [Índice de la wiki](wiki/index.md).

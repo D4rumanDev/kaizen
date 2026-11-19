@@ -1,48 +1,50 @@
 ---
-title: Kaizen Knowledge Base
+title: Base de conocimiento
 type: index
 tags:
   - rsc
   - memory
   - android-tv
   - kaizen
-updated: 2026-11-14
+updated: 2026-11-19
 ---
 
-# Kaizen Knowledge Base (`docs/wiki`)
+# Base de conocimiento de Kaizen (`docs/wiki`)
 
 Bienvenido a la memoria persistente del proyecto **Kaizen** gestionada a través de [rsc-harness](https://ericrisco.github.io/rsc-harness/). Este wiki proporciona contexto continuo y estructurado entre sesiones de desarrollo para agentes y desarrolladores.
 
-## Estructura de Memoria
+Cómo está ordenada: la **guía** dice cómo es Kaizen y qué reglas sigue; la **referencia** profundiza en un tema; la **operación** recoge lo que se hace y lo que queda; el **registro** guarda la historia. Cada nota termina con una sección «Relacionado» que enlaza con sus vecinas.
 
-   - Estándares obligatorios de plataforma (Android TV / Leanback).
-   - Canons de navegación por D-pad, rendimiento de arranque y ciclo de catálogo.
-   - Guardas contra ANRs en volúmenes ampliados / disco lento (instalación obligatoria con `-f`).
-   - Pautas de depuración del APK y bypass de Cloudflare.
+## 1. Guía: cómo es Kaizen
 
-2. **[Arquitectura y Módulos](architecture.md)**
-   - Visión general del módulo `:app`, el flujo de la web a la pantalla y los subsistemas.
-   - Sincronización multi-dispositivo por WebDAV o carpeta de red SMB (`commons/sync/`), convergencia con lápidas y uniones con AniList que viajan con ella (`AnilistShare`).
-   - Flujo de peticiones de scraping concurrente (`animeav1`, `animegratis`, `jkanime`, etc.).
-   - Gestión de bases de datos (`CatalogDB`, `UserDB`, `CacheDB`) y copias portables (`CatalogSeed`, `SettingsBackup`).
-   - Ciclo del reproductor multimedia (AFR, Media3, AniSkip con validación de duración).
+- **[Mapa de arquitectura](architecture.md)**: cómo funciona y por qué, por concepto.
+  - Módulo `:app`, el flujo de la web a la pantalla y los subsistemas (fuentes, catálogo, emparejado con AniList, bases de datos, copias y sincronización, reproducción, interfaz de TV y segundo plano).
+  - Sincronización multi-dispositivo por WebDAV o carpeta de red SMB (`commons/sync/`), convergencia con lápidas y uniones con AniList que viajan con ella (`AnilistShare`).
+  - Gestión de bases de datos (`CatalogDB`, `UserDB`, `CacheDB`) y copias portables (`CatalogSeed`, `SettingsBackup`).
+  - Ciclo del reproductor multimedia (AFR, Media3, AniSkip con validación de duración).
+- **[Mapa del código](../CODEBASE-MAP.md)**: dónde está cada cosa. Puntos de entrada, paquetes, ficheros clave, actividades, intents de ADB y receptores, herramientas y cómo comprobar un cambio.
+- **[Stack tecnológico](stack.md)**: versiones de Kotlin (`2.4.21`), Java (JDK 17 Adoptium), AGP (`9.4.1`) y KSP; variantes de compilación (tipo `tv` con ABI `arm64-v8a`); entorno de prueba en hardware real (tvbox).
+- **[Constitución de ingeniería](sdd/constitution.md)**: las reglas no negociables.
+  - Estándares obligatorios de plataforma (Android TV / Leanback).
+  - Canons de navegación por D-pad, rendimiento de arranque y ciclo de catálogo.
+  - Guardas contra ANRs en volúmenes ampliados / disco lento (instalación obligatoria con `-f`).
+  - Pautas de depuración del APK y bypass de Cloudflare.
 
-3. **[Stack Tecnológico Canónico](stack.md)**
-   - Versiones de Kotlin (`2.4.21`), Java (JDK 17 Adoptium), AGP (`9.4.1`) y KSP.
-   - Variantes de compilación (especial atención al tipo `tv` con ABI `arm64-v8a`).
-   - Entorno de prueba en hardware real (tvbox).
+## 2. Referencia: un tema a fondo
 
-4. **[Bitácora de Sesiones y Decisiones (`log.md`)](log.md)**
-   - Historial cronológico de cambios, descubrimientos y sesiones de depuración.
+- **[Emparejado con AniList](emparejado-anilist.md)**: decisiones, criterios y límites del emparejado.
+- **[Esquema de la ficha de una web](webficha-esquema.md)**: la forma única que rellenan todas las fuentes (`WebFicha`).
+- **[Lecciones de octubre](lecciones-de-octubre.md)**: causas y trampas ya resueltas, de antes de que empezara el registro.
 
-   - Lo que queda por hacer, comprobar o decidir (tablas, menú, copias, repositorio).
+## 3. Operación: lo que se hace y lo que queda
 
-6. **Referencia** (todo en la wiki):
-   - [Emparejado con AniList](emparejado-anilist.md): decisiones, criterios y límites del emparejado.
-   - [Esquema de la ficha de una web](webficha-esquema.md): la forma única que rellenan todas las fuentes (`WebFicha`).
+- **[Pendientes](pendientes.md)**: lo que queda por hacer, comprobar o decidir (tablas, menú, copias, repositorio).
+- **[Plan de la reorganización de Configuración](plan-configuracion.md)**: el plan de la pantalla de Configuración.
+- **[Instalar Kaizen en otro equipo](instalar-en-otro-equipo.md)**: guion paso a paso para instalar la release del APK.
 
-7. **[Mapa Estructural del Código](../CODEBASE-MAP.md)**
-   - Guía de inicio rápido para ubicar puntos de entrada, actividades, intents de ADB y receptores.
+## 4. Registro: la historia
+
+- **[Bitácora de actividad](log.md)**: historial cronológico de cambios, descubrimientos y sesiones de depuración.
 
 ## Herramientas del Proyecto (`tools/`)
 
