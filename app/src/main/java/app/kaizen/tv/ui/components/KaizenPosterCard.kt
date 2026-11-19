@@ -79,8 +79,8 @@ internal fun FocusCard(
 ) {
     var focused by remember { mutableStateOf(false) }
     val onCardFocus = LocalOnCardFocus.current
-    val zoom = remember { if (KaizenSettings.focusZoom) 1.06f else 1f }
-    val scale by animateFloatAsState(if (focused) zoom else 1f, animationSpec = Motion.spec(150), label = "focusScale")
+    // El ajuste se lee en cada cambio de foco, no una sola vez al crear la tarjeta: con la ventana de Configuración abierta las tarjetas de detrás siguen creadas y conservaban el zoom aunque se apagara.
+    val scale by animateFloatAsState(if (focused && KaizenSettings.focusZoom) 1.06f else 1f, animationSpec = Motion.spec(150), label = "focusScale")
     Column(
         modifier
             // La escala se lee al dibujar: la animación no recompone la tarjeta entera en cada fotograma.

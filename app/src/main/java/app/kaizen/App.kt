@@ -98,9 +98,9 @@ class App : Application(), Configuration.Provider {
             // La base de los datos del usuario se abre aquí, fuera de cualquier transacción de la del catálogo.
             runCatchingCoop { app.kaizen.database.UserDB.INSTANCE.openHelper.writableDatabase }.onFailure(::logError)
             // El progreso guardado por eid (versiones anteriores) pasa a la clave de la ficha, con el historial ya abierto.
-            runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "migrar el progreso por eid") { app.kaizen.commons.KaizenProgress.migrateEidKeys(app.kaizen.database.CacheDB.INSTANCE.recordAV1DAO().all) } }.onFailure(::logError)
+            runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Progreso de reproducción pasado a identificadores de capítulo") { app.kaizen.commons.KaizenProgress.migrateEidKeys(app.kaizen.database.CacheDB.INSTANCE.recordAV1DAO().all) } }.onFailure(::logError)
             repeat(LEDGER_ATTEMPTS) { attempt ->
-                if (runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "cargar el libro de series") { app.kaizen.source.SeriesLedger.load() } }.onFailure(::logError).isSuccess) {
+                if (runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Libro de series cargado en memoria") { app.kaizen.source.SeriesLedger.load() } }.onFailure(::logError).isSuccess) {
                     // El progreso guardado por ficha pasa a la clave de su serie, ya con el libro cargado.
                     app.kaizen.commons.KaizenProgress.migrateFichaKeys { source, slug -> app.kaizen.source.seriesIdOf(source, slug) }
                     // El catálogo (de él dependen unir series y el selector) solo se recorre desde Configuración › Catálogo: a mano, o solo
@@ -109,13 +109,13 @@ class App : Application(), Configuration.Provider {
                     // Reagrupar y recorrer el catálogo es lo más pesado del arranque y no hace falta para ver Inicio: después.
                     awaitHomeReady()
                     // Reagrupar puede llevar decenas de segundos de CPU: a prioridad de fondo, para no frenar la pantalla.
-                    runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "reagrupar el catálogo si hace falta") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
-                    runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "poner solo la nota de AniList en el catálogo") { app.kaizen.source.CatalogBuilder.rescoreIfNeeded() } }.onFailure(::logError)
-                    runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "comprobar si el catálogo está al día") { app.kaizen.source.CatalogBuilder.ensureFresh() } }.onFailure(::logError)
+                    runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "Catálogo reagrupado (une las series repetidas de distintas webs)") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
+                    runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Nota de cada serie del catálogo sustituida por la de AniList (solo si hacía falta)") { app.kaizen.source.CatalogBuilder.rescoreIfNeeded() } }.onFailure(::logError)
+                    runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Catálogo comprobado contra el repositorio (descarga lo que falte)") { app.kaizen.source.CatalogBuilder.ensureFresh() } }.onFailure(::logError)
                     // Emparejar con AniList (encendido de fábrica: da la nota de las series): arranca salvo que el usuario lo apagara. Su primera pasada son ~30 s de CPU y memoria (26.000 fichas: el
                     // GC no paraba y «Últimos vistos» tardaba en salir), así que espera a que la app lleve un rato abierta.
                     delay(ANILIST_START_DELAY)
-                    app.kaizen.commons.DebugLog.timed("Arranque", "encender el emparejado") { app.kaizen.source.AnilistSyncRunner.apply() }
+                    app.kaizen.commons.DebugLog.timed("Arranque", "Emparejado con AniList puesto en marcha") { app.kaizen.source.AnilistSyncRunner.apply() }
                     return@launch
                 }
                 if (attempt < LEDGER_ATTEMPTS - 1) delay(LEDGER_RETRY * (attempt + 1))

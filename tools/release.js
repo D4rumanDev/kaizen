@@ -165,13 +165,13 @@ function ship() {
   const tag = opt('--tag');
   if (!tag && !has('--no-release')) die('falta --tag (por ejemplo v6.1.0): si no existe se crea una release nueva con --notes; si existe se sustituye su APK');
   if (tag && !/^v?\d[\w.\-]*$/.test(tag)) die('--tag tiene un formato no válido (ejemplo: v6.0.8)');
-  const trailer = opt('--trailer', 'Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>');
+  const trailer = opt('--trailer'); // sin línea de coautoría salvo que se pida
   const devices = (opt('--devices', '') || '').split(',').map((d) => d.trim()).filter(Boolean);
   if (devices.some((d) => !/^[\w.\-]+:\d+$/.test(d))) die('--devices lleva IP:puerto separados por comas');
   const done = [];
 
   step('ship.js publish (commit, push sin force, verificación con ls-remote)');
-  const publish = node('ship.js', ['publish', '-m', message, '--audited', sha, '--trailer', trailer]);
+  const publish = node('ship.js', ['publish', '-m', message, '--audited', sha, ...(trailer ? ['--trailer', trailer] : [])]);
   if (publish.status !== 0) die('`ship.js publish` no publicó (nada se ha subido a GitHub); mira el motivo arriba', done);
   const commit = run('git', ['rev-parse', 'HEAD']).stdout.trim();
   const remote = (run('git', ['ls-remote', 'origin', 'main']).stdout || '').split(/\s/)[0];

@@ -17,12 +17,12 @@ object TVRepository {
 
     /**
      * «Mejores en emisión»: primera página, en emisión y por puntuación, de las fuentes activas. Sale de lo guardado si tiene menos de [BestAiringCache.MAX_AGE]
-     * (salvo [force], el botón «Actualizar»); si no hay red o las webs no dan nada, se enseña lo guardado aunque sea viejo.
+     * ; si no hay red o las webs no dan nada, se enseña lo guardado aunque sea viejo.
      */
-    suspend fun bestAiring(force: Boolean = false): List<SeriesSummary> {
+    suspend fun bestAiring(): List<SeriesSummary> {
         val sources = AnimeSources.enabled.map { it.id }
         val stored = BestAiringCache.load(sources)
-        if (!force && stored != null && BestAiringCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
+        if (stored != null && BestAiringCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
         // Tope de tiempo: una web colgada no debe dejar la sección en «cargando»; pasado el tope cuenta como lista incompleta (sale lo guardado, si lo hay).
         val (fresh, complete) = withTimeoutOrNull(LoadLimits.DATA) { SearchEngine.firstChecked(SearchQuery(airing = true, sort = SortBy.RATING)) } ?: (emptyList<SeriesSummary>() to false)
         // Una lista parcial (una web falló) o sin las notas de AniList todavía (catálogo sin listo) no se guarda una semana: se enseña, pero lo bueno guardado no se pisa.

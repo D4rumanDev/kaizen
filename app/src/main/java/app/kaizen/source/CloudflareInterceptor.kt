@@ -100,7 +100,7 @@ internal object CloudflareInterceptor : Interceptor {
         handler.post { handler.removeCallbacks(poll); webView?.stopLoading(); webView?.destroy(); webView = null }
         val clearance = cookie.get()
         if (clearance == null) {
-            DebugLog.info("Verificación", "$host: el reto de Cloudflare no se superó solo en ${WAIT.inWholeSeconds}s")
+            DebugLog.info("Verificación", "El sitio $host: el reto de Cloudflare no se superó solo en ${WAIT.inWholeSeconds} s")
             return false
         }
         val saved = SourceChallenge.save(host, clearance, agent)

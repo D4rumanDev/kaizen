@@ -92,4 +92,32 @@ class SyncConvergenceTest {
         a.sync(); b.sync()
         assertTrue("f/a:y" in a.items) // a lo añadió después: no estaba en su base, no se le quita
     }
+
+    @Test fun `un capitulo quitado de Seguir viendo no vuelve desde el otro dispositivo`() = runTest {
+        var time = 1_000L
+        val clock = { time += 10; time }
+        val server = Server()
+        val a = Sim("a", server, clock); val b = Sim("b", server, clock)
+        val key = Removals.progressKey("animeflv:serie", 3.0)
+        a.items += key; b.items += key; a.sync(); b.sync(); a.sync() // los dos lo tienen en curso y lo saben
+        a.items -= key; a.sync() // se quita de «Seguir viendo» en a
+        b.sync() // b aún lo tiene y sube su copia
+        a.sync()
+        assertFalse("volvió a a desde b", key in a.items)
+        b.sync(); a.sync()
+        assertFalse("sigue en b", key in b.items)
+        assertFalse("volvió a a", key in a.items)
+    }
+
+    @Test fun `las claves de capitulos en curso se leen y se cuentan aparte`() {
+        val parsed = Removals.parse(Removals.progressKey("animeflv:serie", 3.0))!!
+        assertTrue(parsed.progress); assertFalse(parsed.favorite)
+        assertEquals("animeflv", parsed.source); assertEquals("serie", parsed.slug); assertEquals(3.0, parsed.number!!, 0.0)
+        assertFalse(Removals.parse(Removals.recordKey("animeflv:serie", 3.0))!!.progress)
+        // Quitar casi todo lo que está en curso es un borrado masivo aunque haya miles de capítulos vistos.
+        val inProgress = (1..20).map { Removals.progressKey("a:s$it", 1.0) }
+        val seen = (1..5000).map { Removals.recordKey("a:s$it", 1.0) }
+        assertTrue(Removals.massiveAny(inProgress.take(15), inProgress + seen))
+        assertFalse(Removals.massiveAny(inProgress.take(3), inProgress + seen))
+    }
 }

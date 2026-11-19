@@ -40,8 +40,8 @@ object DeviceSync {
 
     /** Qué pasó en una sincronización. */
     class Report(val merged: Int, val skipped: Int, val uploadedBytes: Int, val removed: Int = 0, val heldBack: Boolean = false, val deleted: Int = 0) {
-        override fun toString() = "fundidos $merged dispositivo(s)" + (if (skipped > 0) ", $skipped copia(s) ajena(s) no válida(s) omitida(s)" else "") +
-            (if (removed > 0) ", $removed quitado(s) por otro dispositivo" else "") + (if (heldBack) ", borrado masivo retenido (no se propaga)" else "") + (if (deleted > 0) ", $deleted copia(s) de dispositivos abandonados borrada(s)" else "") + ", subida la propia ($uploadedBytes bytes)"
+        override fun toString() = "Datos de $merged dispositivo(s) combinados con los de este" + (if (skipped > 0) "; $skipped copia(s) de otros dispositivos no válida(s) ignorada(s)" else "") +
+            (if (removed > 0) "; $removed elemento(s) quitado(s) aquí porque otro dispositivo los quitó" else "") + (if (heldBack) "; borrado masivo retenido (no se propaga)" else "") + (if (deleted > 0) "; $deleted copia(s) de dispositivos abandonados borrada(s) del servidor" else "") + "; copia propia subida (${uploadedBytes / 1024} KB)"
     }
 
     /**

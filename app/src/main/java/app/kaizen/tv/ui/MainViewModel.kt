@@ -54,17 +54,6 @@ class MainViewModel : ViewModel() {
     // Una sola instancia: así la sección no cambia (ni se repinta) en cada emisión.
     private val retryRecents = RetryCard("No se pudieron cargar. Reintentar") { Repository.reloadRecents() }
 
-    // «Actualizar» de «Mejores en emisión»: cada pulsación sube el contador y la lista se rehace sin mirar lo guardado.
-    private val bestRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
-    private var bestForcedTick = 0
-    private val bestRefreshingState = kotlinx.coroutines.flow.MutableStateFlow(false)
-
-    /** Si «Mejores en emisión» se está pidiendo a las webs ahora mismo. */
-    val bestRefreshing: StateFlow<Boolean> = bestRefreshingState
-
-    /** Pide «Mejores en emisión» a las webs. Con una petición en marcha no hace nada: cada pulsación cancelaría y repetiría la red. */
-    fun refreshBest() { if (!bestRefreshingState.value) bestRefresh.value += 1 }
-
     // «Recomendados»: cada pulsación de la tarjeta «Reintentar» (que sale si la carga pasa de [LoadLimits.DATA]) la pide otra vez.
     private val staffRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
     private val retryStaff = RetryCard(app.kaizen.commons.appString(app.kaizen.R.string.ui_tarda_mas_de_lo_normal) + " " + app.kaizen.commons.appString(app.kaizen.R.string.ui_reintentar)) { staffRefresh.value += 1 }
@@ -103,13 +92,10 @@ class MainViewModel : ViewModel() {
             emit(withTimeoutOrNull(LoadLimits.DATA) { Recommendations.forHome() } ?: listOf(retryStaff))
         }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard)),
 
-        // Guardado una semana (BestAiringCache): abrir la sección no pide nada a las webs mientras valga; «Actualizar» lo rehace.
-        BEST to combine(enabled, bestRefresh) { _, tick -> tick }.mapLatest { tick ->
-            val force = tick > bestForcedTick
-            bestForcedTick = tick
-            bestRefreshingState.value = true
-            // El fallo se recoge aquí y no en el `.catch` de abajo: ese termina el flujo y «Actualizar» dejaría de tener efecto hasta reiniciar la app.
-            try { TVRepository.bestAiring(force) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { logError(e); emptyList() } finally { bestRefreshingState.value = false }
+        // Guardado una semana (BestAiringCache): abrir la sección no pide nada a las webs mientras valga.
+        BEST to enabled.mapLatest { _ ->
+            // El fallo se recoge aquí y no en el `.catch` de abajo: ese termina el flujo y la lista no se rehace al cambiar las fuentes activas.
+            try { TVRepository.bestAiring() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { logError(e); emptyList() }
         }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf(LoadingCard)),
     )
 
@@ -122,7 +108,7 @@ class MainViewModel : ViewModel() {
         val start = android.os.SystemClock.elapsedRealtime()
         return block().also {
             val now = android.os.SystemClock.elapsedRealtime()
-            app.kaizen.commons.DebugLog.info("Arranque", "sección «$name»: $size registros, ${now - start} ms de cálculo, lista a los ${now - android.os.Process.getStartElapsedRealtime()} ms del arranque")
+            app.kaizen.commons.DebugLog.info("Arranque", "Sección «$name» lista: $size registros, calculada en ${now - start} ms y visible a los ${now - android.os.Process.getStartElapsedRealtime()} ms de arrancar la app")
         }
     }
 

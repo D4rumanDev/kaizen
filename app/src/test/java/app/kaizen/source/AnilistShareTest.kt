@@ -10,8 +10,17 @@ import org.junit.Test
 
 /** Las uniones con AniList que viajan entre equipos con el catálogo: qué enlaces se toman, el formato de los ficheros y los nombres de los tramos de fichas, sin red. */
 class AnilistShareTest {
-    private fun row(slug: String, id: Long?, estado: String = AnimeFuente.APLICADO, origen: String = AnimeFuente.AUTO) =
-        AnimeFuente("animeflv", slug, id, estado, origen, "seguro", 1.0, 1L)
+    private fun row(slug: String, id: Long?, estado: String = AnimeFuente.APLICADO, origen: String = AnimeFuente.AUTO, fecha: Long = 1L) =
+        AnimeFuente("animeflv", slug, id, estado, origen, "seguro", 1.0, fecha)
+
+    @Test
+    fun `un enlace propio caducado por un criterio nuevo se sustituye por el vigente de otro equipo`() {
+        val local = listOf(row("a", 1, fecha = 0L), row("b", 2, fecha = 0L), row("c", 3, fecha = 5L), row("d", 4, origen = AnimeFuente.USUARIO, fecha = 0L)).associateBy { it.fuente to it.slug }
+        val remote = listOf(row("a", 10, fecha = 9L), row("b", 20, fecha = 0L), row("c", 30, fecha = 9L), row("d", 40, fecha = 9L))
+        val take = AnilistShare.linksToTake(remote, local).associate { it.slug to it.anilistId }
+        // a: caducado aquí y vigente allí, se toma; b: caducado en los dos, no; c: vigente aquí, no se pisa; d: del usuario, nunca.
+        assertEquals(mapOf<String, Long?>("a" to 10L), take)
+    }
 
     @Test
     fun `toma los enlaces aplicados que faltan y no pisa los que ya hay`() {

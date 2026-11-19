@@ -216,7 +216,7 @@ class ConfigurableSource(private val spec: SourceSpec) : AnimeSource {
             // La API puede pedir una verificación de seguridad (403, ocurre con animegratis) mientras el directorio HTML sigue abierto: sin
             // texto que buscar se recorre ese. El cursor de la API (solo la página) lo entiende igual el del sitio.
             if (e.statusCode != 403 || query.text.isNotBlank()) throw e
-            DebugLog.info("Catálogo", "${spec.name}: la API pide verificación (403); se recorre el directorio HTML")
+            DebugLog.info("Catálogo", "Fuente ${spec.name}: la API pide verificación (403); se recorre el directorio HTML")
             null
         }
     }

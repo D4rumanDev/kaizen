@@ -226,7 +226,7 @@ object SeriesLedger {
         // Las reglas del usuario sin ninguna ficha viva no tienen efecto: se cuentan para el registro.
         runCatching {
             val dead = UserTitles.rules.idKeys().count { key -> key.toLongOrNull()?.let { next.bySeries[it].isNullOrEmpty() } == true }
-            if (dead > 0) DebugLog.info("Series", "Reglas del usuario con $dead ids sin ninguna ficha (sin efecto)")
+            if (dead > 0) DebugLog.info("Series", "Reglas manuales de series: $dead identificadores no tienen ninguna ficha en el catálogo y no se aplican")
         }.onFailure { runCatching { app.kaizen.commons.logError(it) } }
     }
 
@@ -239,7 +239,7 @@ object SeriesLedger {
         runCatching { app.kaizen.commons.KaizenProgress.rekey { id -> moves.resolve(id) } }.onFailure { runCatching { app.kaizen.commons.logError(it) } }
         runCatching {
             val moved = UserTitles.followLedger { id -> moves.resolve(id) }
-            DebugLog.info("Series", "Uniones: ${moves.size} ids absorbidos; $moved ids de reglas del usuario pasados a la serie vigente")
+            DebugLog.info("Series", "Series unidas: ${moves.size} identificadores absorbidos por otra serie; $moved identificadores de reglas manuales pasados a la serie vigente")
         }.onFailure { runCatching { app.kaizen.commons.logError(it) } }
     }
 

@@ -35,8 +35,8 @@ internal object SourceChallenge {
     fun note(host: String) {
         // Si ya había una verificación guardada y la web la vuelve a pedir, la copia no le vale (otra IP, otra cookie, un token que no se guarda): queda en el registro.
         val had = runCatching { prefs.getString("cookie|$host", null) }.getOrNull()
-        if (had != null) DebugLog.info("Verificación", "$host vuelve a pedir verificación pese a la guardada (cookies: ${cookieNames(had)})")
-        else DebugLog.info("Verificación", "$host pide verificación")
+        if (had != null) DebugLog.info("Verificación", "El sitio $host vuelve a pedir verificación pese a la guardada (cookies: ${cookieNames(had)})")
+        else DebugLog.info("Verificación", "El sitio $host pide verificación")
         runCatching { prefs.edit { remove("cookie|$host"); remove("ua|$host") } }
         _pending.update { it + host }
     }
@@ -51,7 +51,7 @@ internal object SourceChallenge {
     fun save(host: String, cookie: String, userAgent: String): Boolean {
         if (!isHeaderValue(cookie) || !isHeaderValue(userAgent)) return false
         prefs.edit { putString("cookie|$host", cookie); putString("ua|$host", userAgent) }
-        DebugLog.info("Verificación", "$host: verificación guardada (cookies: ${cookieNames(cookie)})")
+        DebugLog.info("Verificación", "El sitio $host: verificación superada y guardada (cookies: ${cookieNames(cookie)})")
         _pending.update { it - host }
         // Con la verificación hecha el servidor vuelve a responder: si HostGate lo había pausado por los 403 previos, se levanta.
         app.kaizen.commons.HostGate.resume(host)

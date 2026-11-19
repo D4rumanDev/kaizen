@@ -135,7 +135,7 @@ object KaizenBackup {
         val db = CacheDB.INSTANCE
         val favorites = db.favoriteAV1DAO().allRaw.size
         val records = db.recordAV1DAO().all.size
-        DebugLog.info("Datos", "Al abrir la app: $favorites favoritos y $records capítulos vistos")
+        DebugLog.info("Datos", "Datos al abrir la app: $favorites favoritos y $records capítulos vistos")
         val best = best()?.let { file -> decode(file.readText())?.let { Summary(it.favorites.size, it.records.size, it.progress.size) } }
         warning = best?.let { lossMessage(favorites, records, it) }
         warning?.let { DebugLog.error("Datos", it); KaizenToast.toastLong(it) }
@@ -176,11 +176,17 @@ object KaizenBackup {
     suspend fun snapshotBytes(removed: Map<String, Long> = emptyMap()): ByteArray = withContext(Dispatchers.IO) { encode(buildData().copy(removed = removed)).toByteArray(Charsets.UTF_8) }
 
     /** Lo que hay ahora, por claves portables, para saber qué se quitó entre dos sincronizaciones ([app.kaizen.commons.sync.Removals]). */
-    class Presence internal constructor(private val favoriteIds: Set<Long>, private val records: Set<Pair<Long, Double>>, override val keys: Set<String>) : app.kaizen.commons.sync.Removals.Presence {
+    class Presence internal constructor(private val favoriteIds: Set<Long>, private val records: Set<Pair<Long, Double>>, override val keys: Set<String>, private val progress: Set<Pair<Long, Double>> = emptySet(), private val progressByFicha: Set<Pair<String, Double>> = emptySet()) : app.kaizen.commons.sync.Removals.Presence {
         /** ¿Sigue [key] (un favorito o un capítulo visto)? null si no se sabe (la ficha no es conocida). */
         override fun isPresent(key: String): Boolean? {
             val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
-            val id = SeriesLedger.peek(parsed.source, parsed.slug) ?: return null
+            val id = SeriesLedger.peek(parsed.source, parsed.slug)
+            if (parsed.progress) {
+                val byFicha = ("${parsed.source}:${parsed.slug}" to parsed.number!!) in progressByFicha
+                // Sin serie conocida solo cuenta la ficha de versiones anteriores; si tampoco está, no se sabe.
+                return if (id == null) byFicha.takeIf { it } else (id to parsed.number) in progress || byFicha
+            }
+            if (id == null) return null
             return if (parsed.favorite) id in favoriteIds else (id to parsed.number!!) in records
         }
     }
@@ -189,7 +195,7 @@ object KaizenBackup {
     fun canon(key: String): String? {
         val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: return null
         val id = SeriesLedger.peek(parsed.source, parsed.slug) ?: return null
-        return if (parsed.favorite) "f/$id" else "r/$id#${parsed.number}"
+        return if (parsed.favorite) "f/$id" else if (parsed.progress) "c/$id#${parsed.number}" else "r/$id#${parsed.number}"
     }
 
     suspend fun presence(): Presence = withContext(Dispatchers.IO) {
@@ -201,7 +207,11 @@ object KaizenBackup {
         val keys = HashSet<String>()
         favorites.forEach { fav -> ficha(fav.seriesId)?.let { keys += app.kaizen.commons.sync.Removals.favoriteKey(it) } }
         records.forEach { rec -> ficha(rec.seriesId)?.let { keys += app.kaizen.commons.sync.Removals.recordKey(it, rec.number) } }
-        Presence(favorites.map { it.seriesId }.toSet(), records.map { it.seriesId to it.number }.toSet(), keys)
+        // «Seguir viendo»: el progreso por serie («s:») y el de fichas de versiones anteriores («p:»).
+        val (bySeries, byFicha) = KaizenProgress.chapters()
+        bySeries.forEach { (id, number) -> ficha(id)?.let { keys += app.kaizen.commons.sync.Removals.progressKey(it, number) } }
+        byFicha.forEach { (fichaKey, number) -> keys += app.kaizen.commons.sync.Removals.progressKey(fichaKey, number) }
+        Presence(favorites.map { it.seriesId }.toSet(), records.map { it.seriesId to it.number }.toSet(), keys, bySeries.toSet(), byFicha.toSet())
     }
 
     /** Quita lo que dicen estas claves (favoritos y capítulos vistos); devuelve cuántas filas había. */
@@ -213,6 +223,8 @@ object KaizenBackup {
             val parsed = app.kaizen.commons.sync.Removals.parse(key) ?: continue
             if (parsed.favorite) {
                 if (db.favoriteAV1DAO().isFav(parsed.source, parsed.slug)) { db.favoriteAV1DAO().removeFav(parsed.source, parsed.slug); count++ }
+            } else if (parsed.progress) {
+                if (KaizenProgress.removeChapter(SeriesLedger.peek(parsed.source, parsed.slug), listOf("${parsed.source}:${parsed.slug}"), parsed.number!!)) count++
             } else if (db.recordAV1DAO().chapterIsSeen(parsed.source, parsed.slug, parsed.number!!)) {
                 db.recordAV1DAO().deleteChapter(parsed.source, parsed.slug, parsed.number); count++
             }
@@ -281,7 +293,13 @@ object KaizenBackup {
         dao.addAll(newFavorites)
         db.recordAV1DAO().addAllIgnore(data.records.map { it.copy(seriesId = 0L) }
             .filter { !skip(app.kaizen.commons.sync.Removals.recordKey("${it.source}:${it.slug}", it.number)) })
-        val newProgress = KaizenProgress.importMissing(data.progress.filterKeys { !it.startsWith("s:") }) // los ids de serie son locales
+        // El progreso de otro dispositivo no vuelve si una lápida más nueva que su copia dice que aquí se quitó de «Seguir viendo».
+        val newProgress = KaizenProgress.importMissing(data.progress.filterKeys { key ->
+            if (key.startsWith("s:")) return@filterKeys false // los ids de serie son locales
+            val body = key.removePrefix("p:")
+            val number = body.substringAfterLast('#', "").toDoubleOrNull()
+            !(key.startsWith("p:") && number != null && skip(app.kaizen.commons.sync.Removals.progressKey(body.substringBeforeLast('#'), number)))
+        })
         KaizenProgress.migrateFichaKeys { source, slug -> app.kaizen.source.seriesIdOf(source, slug) }
         if (data.titles.isNotEmpty()) UserTitles.import(data.titles)
         if (data.statuses.isNotEmpty()) SeriesStatuses.importMissing(data.statuses)

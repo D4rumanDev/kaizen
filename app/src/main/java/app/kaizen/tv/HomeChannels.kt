@@ -139,7 +139,7 @@ object HomeChannels {
         // Sin TvProvider (dispositivo sin Leanback) no hay filas que mantener.
         if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return
         // Los recientes los renueva RecentsWork; aquí solo una vez al arrancar.
-        runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "filas de la pantalla de inicio") { syncRecents(context) } }.onFailure(::logError)
+        runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Filas de la pantalla de inicio de Android TV actualizadas") { syncRecents(context) } }.onFailure(::logError)
         KaizenProgress.changes.debounce(2.seconds).collect {
             runCatchingCoop { syncWatchNext(context) }.onFailure(::logError)
         }

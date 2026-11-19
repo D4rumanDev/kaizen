@@ -26,7 +26,7 @@ internal object AnilistShare {
 
     /** Qué se hizo: enlaces nuevos aquí, fichas nuevas aquí y lo subido para los demás. */
     class Result(val linksIn: Int, val fichasIn: Int, val linksOut: Int, val fichasOut: Int) {
-        override fun toString() = "AniList compartido: $linksIn enlaces y $fichasIn fichas recibidos, $linksOut enlaces y $fichasOut fichas enviados"
+        override fun toString() = "Enlaces y fichas de AniList compartidos por la carpeta de red: $linksIn enlaces y $fichasIn fichas recibidos de otros dispositivos, $linksOut enlaces y $fichasOut fichas enviados"
     }
 
     fun bucketName(bucket: Long, count: Int) = "$PREFIX$bucket-$count.jsonl.gz"
@@ -49,12 +49,14 @@ internal object AnilistShare {
     }.getOrNull()?.takeIf { it.usable() }?.rows()
 
     /**
-     * Los enlaces ajenos que valen aquí: aplicados y con anime, y solo de fichas sin enlace o con uno automático que no estaba aplicado. Nunca sustituye uno aplicado ni uno del usuario.
+     * Los enlaces ajenos que valen aquí: aplicados y con anime, y solo de fichas sin enlace, con uno automático que no estaba aplicado o con uno automático **caducado** (fecha 0, lo deja
+     * así un criterio de emparejado nuevo) cuando el ajeno está vigente (fecha mayor que 0): sin esto, tras subir el criterio cada equipo repetía por su cuenta todo el emparejado con AniList
+     * aunque otro ya lo hubiera rehecho. Nunca sustituye un enlace vigente ni uno del usuario.
      */
     internal fun linksToTake(remote: List<AnimeFuente>, local: Map<Pair<String, String>, AnimeFuente>): List<AnimeFuente> = remote.filter { r ->
         if (r.estado != AnimeFuente.APLICADO || r.anilistId == null) return@filter false
         val mine = local[r.fuente to r.slug]
-        mine == null || (mine.origen == AnimeFuente.AUTO && mine.estado != AnimeFuente.APLICADO)
+        mine == null || (mine.origen == AnimeFuente.AUTO && (mine.estado != AnimeFuente.APLICADO || (mine.fecha == 0L && r.fecha > 0L)))
     }.distinctBy { it.fuente to it.slug }
 
     /** Sincroniza enlaces y fichas con [store]; las dos partes son independientes (si una falla, la otra se hace). */
@@ -67,7 +69,8 @@ internal object AnilistShare {
             val remote = if (names.any { it.substringAfterLast('/') == LINKS }) store.read(LINKS)?.let(::decodeLinks).orEmpty() else emptyList()
             val take = linksToTake(remote, local.associateBy { it.fuente to it.slug })
             if (take.isNotEmpty()) { links.put(take.map { it.copy(fecha = now) }); linksIn = take.size }
-            val mine = links.all().filter { it.estado == AnimeFuente.APLICADO && it.anilistId != null }
+            // Los caducados (fecha 0) no se suben: no son una decisión vigente y no deben pisar la de otro equipo.
+            val mine = links.all().filter { it.estado == AnimeFuente.APLICADO && it.anilistId != null && it.fecha > 0L }
             // Se sube solo si lo local trae algo que el servidor no tiene (otro tramo de enlaces o uno distinto), para no reescribirlo en cada sincronización.
             val have = remote.filter { it.estado == AnimeFuente.APLICADO }.associate { (it.fuente to it.slug) to it.anilistId }
             if (mine.any { have[it.fuente to it.slug] != it.anilistId }) { store.write(LINKS, encodeLinks(mine, now)); linksOut = mine.size }

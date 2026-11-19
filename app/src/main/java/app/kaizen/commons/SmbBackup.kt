@@ -45,7 +45,7 @@ object SmbBackup {
         val send = missing.filter { it.name !in prune }
         send.forEach { remote.upload(it) }
         prune.filter { name -> have.any { it.name == name } }.forEach { remote.delete(it) }
-        DebugLog.info("Carpeta de red", "Copias subidas: ${send.size}; podadas en la carpeta: ${prune.size}")
+        DebugLog.info("Carpeta de red", "Copias de seguridad en la carpeta de red: ${send.size} subidas y ${prune.size} antiguas borradas")
         send.size
     }
 
@@ -54,7 +54,7 @@ object SmbBackup {
         local.mkdirs()
         val get = toDownload(remote.list(), local.listFiles().orEmpty().toList())
         get.forEach { entry -> File(local, entry.name).also { remote.download(entry.name, it); if (entry.modified > 0) it.setLastModified(entry.modified) } }
-        DebugLog.info("Carpeta de red", "Copias bajadas: ${get.size}")
+        DebugLog.info("Carpeta de red", "Copias de seguridad bajadas de la carpeta de red: ${get.size}")
         get.size
     }
 

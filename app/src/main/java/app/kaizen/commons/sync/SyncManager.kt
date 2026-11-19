@@ -72,6 +72,7 @@ object SyncManager {
      * abandonados (más de [ABANDONED] sin actualizar) se funden y se borran del servidor.
      */
     suspend fun now(): DeviceSync.Report = lock.withLock { withContext(Dispatchers.IO) {
+        DebugLog.info("Datos", "Sincronización de estados iniciada con ${if (viaSmb) "la carpeta de red" else "el servidor"}")
         val state = Removals.load()
         val incoming = mutableListOf<KaizenBackup.Data>()
         var outcome: Removals.Outcome? = null
@@ -83,7 +84,7 @@ object SyncManager {
             finish = {
                 val done = Removals.step(state, System.currentTimeMillis(), Device, incoming, { it.createdAt }, { it.removed })
                 outcome = done
-                if (done.heldRemote) DebugLog.error("Datos", "Sincronización: otro dispositivo quitó demasiado de una vez; no se aplica (parece un restablecer)")
+                if (done.heldRemote) DebugLog.error("Datos", "Sincronización de estados: otro dispositivo quitó demasiado de una vez; no se aplica lo que quitó (parece un restablecimiento)")
                 Removals.save(done.state)
             },
             // Ni con un borrado masivo retenido, ni una copia con la fecha de un reloj roto (antes de 2020).
@@ -92,7 +93,7 @@ object SyncManager {
         )
         val done = outcome
         val full = DeviceSync.Report(report.merged, report.skipped, report.uploadedBytes, done?.removedHere ?: 0, (done?.heldBack ?: false) || (done?.heldRemote ?: false), report.deleted)
-        DebugLog.info("Datos", "Sincronización: $full")
+        DebugLog.info("Datos", "Sincronización de estados (favoritos, vistos y estados) con ${if (viaSmb) "la carpeta de red" else "el servidor"}: $full")
         // Las uniones con AniList viajan con el catálogo; un fallo aquí no invalida la sincronización de estados.
         runCatchingCoop {
             val share = AnilistShare.run(store(), UserDB.INSTANCE.animeFuenteDao(), CatalogDB.INSTANCE.animeFichaDao(), CatalogDB.INSTANCE.fichaExportDao())

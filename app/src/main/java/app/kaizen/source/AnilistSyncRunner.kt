@@ -105,7 +105,7 @@ internal object AnilistSyncRunner {
                     DebugLog.info("AniList", "Criterio de emparejado v${AnilistMatcher.VERSION}: se vuelve a emparejar todo lo automático")
                 }
             }
-            if (migrating || System.currentTimeMillis() - KaizenSettings.anilistLastClean >= CLEAN_EVERY.inWholeMilliseconds) { DebugLog.timed("Arranque", "limpieza de enlaces del emparejado") { cleanInconsistent() }; KaizenSettings.anilistLastClean = System.currentTimeMillis() }
+            if (migrating || System.currentTimeMillis() - KaizenSettings.anilistLastClean >= CLEAN_EVERY.inWholeMilliseconds) { DebugLog.timed("Arranque", "Enlaces de AniList revisados y limpiados") { cleanInconsistent() }; KaizenSettings.anilistLastClean = System.currentTimeMillis() }
             loop()
         }
     }
@@ -186,7 +186,7 @@ internal object AnilistSyncRunner {
             if (markFormat) DebugLog.info("AniList", "Búsqueda por formato: ${redo.format} fichas de película, OVA o especial sin resultado se vuelven a buscar")
             bad.forEach { dao.deleteAuto(it.fuente, it.slug) }
             // Las uniones hechas con esos enlaces se deshacen ya, no en el próximo recorrido.
-            if (bad.isNotEmpty()) runCatching { DebugLog.timed("Arranque", "reagrupar tras quitar ${bad.size} enlaces") { CatalogBuilder.regroup() } }.onFailure { logError(it) }
+            if (bad.isNotEmpty()) runCatching { DebugLog.timed("Arranque", "Catálogo reagrupado tras quitar ${bad.size} enlaces de AniList dudosos") { CatalogBuilder.regroup() } }.onFailure { logError(it) }
             // Las marcas se ponen al final: si el proceso muere antes de borrar, se revisan en el próximo arranque.
             if (markEvidence) KaizenSettings.anilistEvidence = ANILIST_EVIDENCE_VERSION
             if (markFormat) KaizenSettings.anilistFormatSearch = ANILIST_FORMAT_SEARCH_VERSION
@@ -232,7 +232,7 @@ internal object AnilistSyncRunner {
             // Una línea en el registro cada ~50 series: una pasada entera dura horas y hasta ahora no decía nada hasta el final.
             if (report.series / LOG_EVERY != lastLogged) {
                 lastLogged = report.series / LOG_EVERY
-                DebugLog.info("AniList", "Avance: ${report.series} de ${report.total} fichas (${report.applied} enlazadas, ${report.pending} por revisar, ${report.none} sin resultado)")
+                DebugLog.info("AniList", "Emparejado con AniList, avance: ${report.series} de ${report.total} fichas (${report.applied} enlazadas, ${report.pending} por revisar, ${report.none} sin resultado)")
             }
             _activity.value = if (report.series > 0 || report.total > 0) "Emparejando… ${report.series} de ${report.total} fichas en esta pasada" +
                 (if (report.fichasDownloaded > 0) " · ${report.fichasDownloaded} fichas descargadas" else "")

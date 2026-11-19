@@ -61,13 +61,13 @@ object DebugLog {
 
     fun info(tag: String, message: String) = write(INFO, "I", tag, null) { message }
 
-    /** Ejecuta [block] y anota en el registro cuánto tardó (para saber qué pesa en el arranque sin adivinar). Deja pasar la excepción, anotando el tiempo igualmente. */
+    /** Ejecuta [block] y anota en el registro cuánto tardó (para saber qué pesa en el arranque sin adivinar). [what] es una frase con mayúscula inicial que dice qué se hizo. Deja pasar la excepción, anotando el tiempo igualmente. */
     inline fun <T> timed(tag: String, what: String, block: () -> T): T {
         val start = System.nanoTime()
         try {
             return block()
         } finally {
-            info(tag, what + ": " + (System.nanoTime() - start) / 1_000_000 + " ms")
+            info(tag, what + " (" + (System.nanoTime() - start) / 1_000_000 + " ms)")
         }
     }
 

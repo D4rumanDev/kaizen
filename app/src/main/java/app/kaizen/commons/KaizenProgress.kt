@@ -46,7 +46,7 @@ object KaizenProgress {
         }
     }
 
-    private fun numberText(number: Double) = if (number % 1.0 == 0.0) number.toLong().toString() else number.toString()
+    internal fun numberText(number: Double) = if (number % 1.0 == 0.0) number.toLong().toString() else number.toString()
 
     private val prefs get() = app.kaizen.commons.KaizenStore.prefs("kaizen_progress")
 
@@ -167,6 +167,27 @@ object KaizenProgress {
     fun remove(key: Key, eid: Int) {
         forgetAll(key.text, eid)
         _changes.value = System.currentTimeMillis()
+    }
+
+    /** Los capítulos con progreso: (id de serie, número) de las claves «s:» y (ficha «fuente:slug», número) de las «p:» de versiones anteriores, para la sincronización. */
+    fun chapters(): Pair<List<Pair<Long, Double>>, List<Pair<String, Double>>> {
+        val series = entries.keys.mapNotNull { Key.parse(it) }.map { it.seriesId to it.number }
+        val fichas = entries.keys.filter { it.startsWith(FICHA_PREFIX) }.mapNotNull { text ->
+            val body = text.removePrefix(FICHA_PREFIX)
+            val number = body.substringAfterLast('#', "").toDoubleOrNull() ?: return@mapNotNull null
+            body.substringBeforeLast('#') to number
+        }
+        return series to fichas
+    }
+
+    /** Quita el progreso de un capítulo por lo que dice la sincronización (una lápida de otro dispositivo); false si aquí no había. */
+    fun removeChapter(seriesId: Long?, fichas: Collection<String>, number: Double): Boolean {
+        val texts = listOfNotNull(seriesId?.takeIf { it > 0 }?.let { Key(it, number).text }) + fichas.map { "$FICHA_PREFIX$it#${numberText(number)}" }
+        val present = texts.filter { entries.containsKey(it) }
+        if (present.isEmpty()) return false
+        present.forEach(::forget)
+        _changes.value = System.currentTimeMillis()
+        return true
     }
 
     /** El progreso del capítulo [key]; si solo existe el guardado por [eid] (versiones anteriores), ese. */

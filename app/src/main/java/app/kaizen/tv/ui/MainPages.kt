@@ -38,6 +38,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -220,7 +221,7 @@ private fun rememberCardKeys(items: List<Any>): List<String> = remember(items) {
 
 /** Sección de tarjetas (Favoritos, Recomendados...) en rejilla. */
 @Composable
-private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions) {
+private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions, header: (LazyGridScope.() -> Unit)? = null) {
     val flow = model.section(id) ?: return
     val items by flow.collectAsStateWithLifecycle()
     val visible = remember(items) { items.filter { it !== LoadingCard } }
@@ -235,6 +236,7 @@ private fun SectionGridPage(id: Int, model: MainViewModel, actions: CardActions)
     val focus = remember { GridFocus() }
     RefocusOnRemoval(focus, listOf(keys))
     CardGrid(state = window.gridState) {
+        header?.invoke(this)
         cardItems(shown, keys, actions, focus)
         fullWidth { WindowFooter(window) }
     }
@@ -386,30 +388,38 @@ internal fun PagedGrid(
 /** Tope de series que se cargan para ordenar una lista paginada. */
 private const val SORT_MAX_ITEMS = 600
 
-/** «Mejores»: un conmutador «En emisión / De siempre» sobre la lista que toque. */
+/** «Mejores»: un conmutador «En emisión / De siempre» al principio de la rejilla (se desplaza con las tarjetas, como el título de «Recientes») sobre la lista que toque. */
 @Composable
 private fun BestPage(model: MainViewModel, actions: CardActions) {
     var global by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize()) {
-        androidx.compose.foundation.layout.Row(Modifier.padding(start = ContentPaddingHorizontal, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            KaizenButton("En emisión", { global = false }, container = if (!global) White60 else White20, fontSize = Text14)
-            KaizenButton("De siempre", { global = true }, container = if (global) White60 else White20, fontSize = Text14)
-            // «En emisión» se guarda una semana: el botón lo pide ahora a las webs.
-            if (!global) {
-                val refreshing by model.bestRefreshing.collectAsStateWithLifecycle()
-                KaizenButton(if (refreshing) appString(R.string.ui_actualizando) else appString(R.string.ui_actualizar), onClick = { model.refreshBest() }, fontSize = Text14)
+    val onNow = remember { FocusRequester() }
+    val always = remember { FocusRequester() }
+    var switched by remember { mutableStateOf(false) }
+    // Cambiar de lista cambia de rejilla y el botón pulsado se destruye: el foco vuelve al botón nuevo en cuanto existe.
+    LaunchedEffect(global) {
+        if (!switched) return@LaunchedEffect
+        repeat(20) {
+            if (runCatching { (if (global) always else onNow).requestFocus() }.isSuccess) return@LaunchedEffect
+            kotlinx.coroutines.delay(50.milliseconds)
+        }
+    }
+    val toggle: LazyGridScope.() -> Unit = {
+        fullWidth {
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KaizenButton("En emisión", { switched = true; global = false }, Modifier.focusRequester(onNow), container = if (!global) White60 else White20, fontSize = Text14)
+                KaizenButton("De siempre", { switched = true; global = true }, Modifier.focusRequester(always), container = if (global) White60 else White20, fontSize = Text14)
             }
         }
-        Box(Modifier.weight(1f)) { if (global) BestGlobalPage(actions) else SectionGridPage(MainSections.BEST, model, actions) }
     }
+    if (global) BestGlobalPage(actions, toggle) else SectionGridPage(MainSections.BEST, model, actions, toggle)
 }
 
 /** «Mejores de siempre»: el catálogo interno ordenado por puntuación. */
 @Composable
-private fun BestGlobalPage(actions: CardActions) {
+private fun BestGlobalPage(actions: CardActions, header: LazyGridScope.() -> Unit) {
     val items = remember { TVRepository.paged(SearchQuery(sort = SortBy.RATING)) }.collectAsLazyPagingItems()
     // El catálogo no se recorre desde aquí: se gestiona en Configuración › Biblioteca; esta sección solo lo lee.
-    PagedGrid(items, actions, onOpen = { actions.open(it) })
+    PagedGrid(items, actions, onOpen = { actions.open(it) }, header = header)
 }
 
 /**

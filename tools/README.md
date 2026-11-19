@@ -42,7 +42,7 @@ Carpeta unificada de utilidades, scripts de mantenimiento, herramientas de audit
 
 ## 1. Control y Despliegue en Android TV (`tv.js`)
 
-Herramienta principal de interacción directa con la **tvbox** (u otro Android TV) a través de ADB. Conecta automáticamente usando `ADB_DEVICE` configurado en `tools/adb-device/.env` o la variable de entorno del sistema.
+Herramienta principal de interacción directa con el **tvbox** (u otro Android TV) a través de ADB. Conecta automáticamente usando `ADB_DEVICE` configurado en `tools/adb-device/.env` o la variable de entorno del sistema.
 
 ```bash
 node tools/tv.js SUBCOMANDO [OPCIONES]

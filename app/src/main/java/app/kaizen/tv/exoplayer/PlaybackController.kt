@@ -717,7 +717,7 @@ class PlaybackController(private val activity: TVPlayer) {
         skipTimesEid = current.eid
         val eid = current.eid
         fun unavailable(reason: String) {
-            DebugLog.info("AniSkip", "${current.slug}: $reason")
+            DebugLog.info("AniSkip", "Saltar opening/cierre de «${current.slug}»: $reason")
             if (video?.eid != eid) return
             skipLookupFailedEid = eid
             showManualOpeningPrompt(current)
@@ -747,7 +747,7 @@ class PlaybackController(private val activity: TVPlayer) {
                     skipLookupFailedEid = eid
                     showManualOpeningPrompt(current)
                 }
-                DebugLog.info("AniSkip", "${current.slug} MAL $mal cap. $episode: tiempos aplicados (opening ${usable.openingStartMs}–${usable.openingEndMs} ms, cierre ${usable.endingStartMs}–${usable.endingEndMs} ms; vídeo $duration ms)")
+                DebugLog.info("AniSkip", "Saltar opening/cierre de «${current.slug}» (MAL $mal, capítulo $episode): tiempos aplicados (opening ${usable.openingStartMs}–${usable.openingEndMs} ms, cierre ${usable.endingStartMs}–${usable.endingEndMs} ms; vídeo $duration ms)")
             } else unavailable("MAL $mal cap. $episode: la duración no cuadra (AniSkip opening ${times.openingLengthMs} ms, cierre ${times.endingLengthMs} ms; vídeo $duration ms), tiempos descartados")
         }
     }
