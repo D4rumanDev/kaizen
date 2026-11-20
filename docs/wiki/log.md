@@ -5,7 +5,7 @@ tags:
   - rsc
   - activity
   - decisions
-updated: 2026-11-18
+updated: 2026-11-20
 ---
 
 # Registro de Actividad y Decisiones (`log.md`)
@@ -13,6 +13,11 @@ updated: 2026-11-18
 Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, hitos y decisiones técnicas del proyecto Kaizen.
 
 ---
+
+## 2026-11-20 · Limpieza de documentos innecesarios
+- Retirados `docs/wiki/plan-configuracion.md` (plan ya implementado; ver la entrada de la reorganización de Configuración), `tools/audit/dead-code.txt` (informe generado y regenerable) y `01-TOOLS/_TEMPLATE/` (plantilla vacía del scaffold de rsc). Se conserva `01-TOOLS/.gitignore`.
+- Copia previa con manifiesto sha256 en `backups/limpieza-2026-11-20/` (ignorada por git). Auditoría previa independiente sin bloqueantes. Quitado el enlace de `index.md` y reescrito el de esta bitácora.
+- Pendiente: `.rsc.json` sigue listando `01-TOOLS/_TEMPLATE/` en `floorPaths`; si rsc avisa de que falta, es por eso. La nota `plan-configuracion` puede seguir existiendo en Basic Memory (el sync no borra notas).
 
 ## 2026-11-18 · Animeoteca: se mantiene el lector de la página y se endurece
 - Decisión: los PHP de Animeoteca (`anilist.php`, `translate.php`, `img.php`) no entran en la app; su web es una fuente de la que extraer, no una API a integrar. Comprobado con pruebas en la consola: `anilist.php` es un proxy de AniList (mismo cuerpo `query`/`variables` y mismos ids, pero responde `{"Media":…}` sin `data`, en inglés y con HTML), y `translate.php` es un envoltorio de Google Translate (`{"text"}` → `{"text","engine":"google"}`). Su página trae una traducción parecida pero no idéntica (en Death Note: «que cree» frente a «que él cree»). Scripts de prueba en `tools/animeoteca-*.console.js`.
@@ -39,7 +44,7 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 - E26 se anota al abrir cada pausa de `HostGate` (`markDown`) y E27 al pausar el bypass (`BypassStatus`). Tests en `NetworkStateTest`; 1123 tests y `assembleTv` en verde.
 
 ## 2026-11-17 · Configuración reorganizada (nueve tarjetas) y Biblioteca
-- Plan en [plan-configuracion.md](plan-configuracion.md) (dos revisiones de un auditor de UI). Implementado: nueve tarjetas (Reproductor, Pantalla, Biblioteca, Fuentes y red, Datos y caché, Copia de seguridad, Estadísticas, Acerca de, Depuración), un submenú de un nivel, miga de pan en el título del panel y foco que vuelve a la tarjeta de origen. `SettingsPage.kt` queda partido en un fichero por categoría.
+- Plan (retirado de la wiki el 20-nov-2026; copia en `backups/limpieza-2026-11-20/`) con dos revisiones de un auditor de UI. Implementado: nueve tarjetas (Reproductor, Pantalla, Biblioteca, Fuentes y red, Datos y caché, Copia de seguridad, Estadísticas, Acerca de, Depuración), un submenú de un nivel, miga de pan en el título del panel y foco que vuelve a la tarjeta de origen. `SettingsPage.kt` queda partido en un fichero por categoría.
 - AniSkip pasa a submenú de Reproductor. Copia de seguridad se divide en Local, Remota, Mis ajustes (guardar y volver a los predeterminados, `kaizen-predeterminados.json` fuera de la rotación) y Restablecer.
 - **Biblioteca** sustituye a «Catálogo» y «Series»: Resumen (acciones con foco), Por revisar (dudas de AniList y series unidas, con contadores), Fuentes y Avanzado (AniList y mantenimiento con confirmación). Nombres sin jerga («Volver a agrupar las series», «Rehacer todas las uniones»).
 - Preparado y oculto tras `SettingsFlags` (sin lógica): «Contenido sensible» (modo parental: géneros ecchi/hentai y marca manual, claves `sensitive*`) y «Actualizaciones» (`updateMode`).

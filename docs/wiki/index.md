@@ -39,7 +39,6 @@ Cómo está ordenada: la **guía** dice cómo es Kaizen y qué reglas sigue; la 
 ## 3. Operación: lo que se hace y lo que queda
 
 - **[Pendientes](pendientes.md)**: lo que queda por hacer, comprobar o decidir (tablas, menú, copias, repositorio).
-- **[Plan de la reorganización de Configuración](plan-configuracion.md)**: el plan de la pantalla de Configuración.
 - **[Instalar Kaizen en otro equipo](instalar-en-otro-equipo.md)**: guion paso a paso para instalar la release del APK.
 
 ## 4. Registro: la historia
