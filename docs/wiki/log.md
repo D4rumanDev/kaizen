@@ -14,6 +14,16 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-20 · Revisión de código como diseñador Android: seis mejoras (commit `c0bccca`)
+- **Scrapers sin `!!`** (`FireServer`, `MangoServer`, `OkruServer`, `VoeServer`): un cambio en la web lanza `error()`/`check()` con lo que faltaba, en vez de un NPE sin pista. `Server.verified()` sigue siendo el único sitio que captura.
+- **`ChannelArt.publish`** (suspend) sustituye al `runBlocking`: registra lo publicado y baja en paralelo las miniaturas que faltan, cada una con 8 s máximo y sin cortar las demás. `HomeChannels` usa un `Mutex` en lugar de `@Synchronized`; antes, con 20 filas y una web lenta, podía retener el hilo y el cerrojo minutos. `forLauncher` ya no descarga.
+- **`CancellationException` relanzada** en `noCrashSuspend`, `StaffRecommendations.createList`, `RecentsWork.doWork` y `JsExtractor.fetchUrl` (se tragaba y la corrutina seguía tras cancelarla).
+- **14 `collectAsState` → `collectAsStateWithLifecycle`.** Quedan dos importes sin usar (`PlayerScreen`, `KaizenEpisodeCard`).
+- **KDoc de `AdbControlReceiver` → [control-por-adb.md](control-por-adb.md)**, única lista de las 24 acciones (contrastada con el código por el auditor).
+- **22 textos sin argumentos a `ui_strings.xml`** (diálogos de registro, carpeta de red, estadísticas, notificaciones…).
+- Comprobado: `ship.js check` (SHA `7a27b0a3`), 1220 pruebas, 0 fallos; auditoría independiente del SHA `7d179b6b` aprobada con recomendaciones (ya aplicadas). No auditados: `wiki-graph.js`, `tools/README.md` y `.gitignore`, que entraron en el mismo commit.
+- Fuera de alcance, pendiente: trocear `PlaybackController`, `ConfigurableSource`, `TVServersFactory` y `SeriesDetailScreen` (necesita plan) y unos 13 textos con interpolación (`PlayerScreen`, `AnilistReviewTabs`, `SmbPickerDialog`, `StatsPage`…).
+
 ## 2026-11-20 · Limpieza de documentos innecesarios
 - Retirados `docs/wiki/plan-configuracion.md` (plan ya implementado; ver la entrada de la reorganización de Configuración), `tools/audit/dead-code.txt` (informe generado y regenerable) y `01-TOOLS/_TEMPLATE/` (plantilla vacía del scaffold de rsc). Se conserva `01-TOOLS/.gitignore`.
 - Copia previa con manifiesto sha256 en `backups/limpieza-2026-11-20/` (ignorada por git). Auditoría previa independiente sin bloqueantes. Quitado el enlace de `index.md` y reescrito el de esta bitácora.
