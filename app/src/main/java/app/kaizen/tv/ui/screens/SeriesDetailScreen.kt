@@ -2,6 +2,7 @@
 
 package app.kaizen.tv.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.tv.ui.valueOrNull
 import app.kaizen.tv.ui.rememberLoadable
 import app.kaizen.tv.details.*
@@ -61,7 +62,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -152,7 +152,7 @@ fun SeriesDetailScreen(state: FichaViewModel.State.Ready, actions: FichaActions)
     var menuItem by remember { mutableStateOf<Any?>(null) }
     val openMenu = { item: Any -> menuItem = item }
     // Las otras fichas de esta misma serie (otras fuentes): salen al final, como las precuelas y secuelas.
-    val titleChanges by UserTitles.changes.collectAsState()
+    val titleChanges by UserTitles.changes.collectAsStateWithLifecycle()
     val firstChanges = remember { UserTitles.changes.value }
     val loadedJoined by produceState(emptyList<Catalog.JoinedFicha>(), state.series.slug, state.series.source, titleChanges) {
         suspend fun load() = runCatchingCoop { Catalog.joinedFichas(state.series.source, state.series.slug) }.onFailure(::logError).getOrDefault(emptyList())
@@ -319,7 +319,7 @@ private fun NotRecommendedChip(name: String, source: String, slug: String, refoc
     var blocked by remember(name, source, slug) { mutableStateOf(!NotRecommended.allows(name, source, slug)) }
     if (!blocked) return
     var focused by remember { mutableStateOf(false) }
-    Text("No recomendada  ·  OK para permitir", color = if (focused) Color.Black else Color.White,
+    Text(appString(R.string.ui_no_recomendada_ok_permitir), color = if (focused) Color.Black else Color.White,
         fontSize = Text14, maxLines = 1, overflow = TextOverflow.Ellipsis,
         modifier = Modifier.onFocusChanged { focused = it.isFocused }.clip(ShapePill)
             .background(if (focused) Color.White else White20)
@@ -443,7 +443,7 @@ private fun Buttons(state: FichaViewModel.State.Ready, actions: FichaActions, pl
     var confirmUnseen by remember { mutableStateOf(false) }
     var trailerOpen by remember { mutableStateOf(false) }
     var moreOpen by remember { mutableStateOf(false) }
-    val statuses by SeriesStatuses.all.collectAsState()
+    val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
     val status = SeriesStatuses.statusIn(statuses, state.series.name, state.series.source, state.series.slug)
     // El tráiler solo sale si la serie está enlazada con AniList y este lo tiene.
     val anilistId = state.anilist?.media?.optLong("id", 0L) ?: 0L

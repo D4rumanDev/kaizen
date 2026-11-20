@@ -2,6 +2,7 @@
 
 package app.kaizen.tv.ui.components
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.commons.KaizenProgress
 import app.kaizen.source.seriesIdOf
 import app.kaizen.tv.ui.theme.*
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -292,10 +292,10 @@ internal fun ContinueCard(record: Record, onClick: () -> Unit, onLongClick: (() 
 @Composable
 internal fun RecentCard(data: RecentEpisode, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
     // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a mirar el visto.
-    val ledger by SeriesLedger.version.collectAsState()
+    val ledger by SeriesLedger.version.collectAsStateWithLifecycle()
     val seen = app.kaizen.tv.ui.rememberSeen(data.source, data.slug, data.number)
     // Empezado y sin acabar: la barra de lo visto y el triángulo azul, no el check verde. Se relee cuando cambia el progreso guardado (al salir del reproductor).
-    val changes by KaizenProgress.changes.collectAsState()
+    val changes by KaizenProgress.changes.collectAsStateWithLifecycle()
     val started = remember(data, ledger, changes) { KaizenProgress.startedOf(KaizenProgress.Key(seriesIdOf(data.source, data.slug), data.number), data.eid) }
     val watch = cardWatchOf(seen, started)
     val covers = rememberCovers(data.source, data.slug, remember(data.aid, data.slug) { coverCandidates(data.aid, data.slug, data.animeImageUrl) })

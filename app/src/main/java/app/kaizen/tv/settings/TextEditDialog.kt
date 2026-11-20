@@ -1,5 +1,7 @@
 package app.kaizen.tv.settings
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,9 +60,9 @@ internal fun TextEditDialog(item: TextItem, onClose: () -> Unit) {
                 Button(onClick = {
                     val problem = item.validate(text.trim())
                     if (problem == null) { item.set(text.trim()); onClose() } else error = problem
-                }) { Text("Guardar") }
+                }) { Text(appString(R.string.ui_guardar_texto)) }
                 if (item.masked) Button(onClick = { reveal = !reveal }) { Text(if (reveal) "Ocultar" else "Mostrar") }
-                Button(onClick = onClose) { Text("Cancelar") }
+                Button(onClick = onClose) { Text(appString(R.string.ui_cancelar_texto)) }
             }
         }
     }

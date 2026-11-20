@@ -7,11 +7,16 @@ import android.net.Uri
 import app.kaizen.commons.AppErrors
 import app.kaizen.commons.KaizenStore
 import app.kaizen.commons.NetworkState
+import app.kaizen.commons.runCatchingCoop
 import app.kaizen.domain.ConnectionStats.Cause
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.request.ImageRequest
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
@@ -55,12 +60,11 @@ object ChannelArt {
     }
 
     /**
-     * Lo que se le da al launcher para la imagen [url] de una fila. Con conexión, si la imagen no está guardada se baja ahora (una vez); sin
-     * ella, se anota E28 y se deja la dirección web (no hay otra cosa que dar). Hilo de fondo.
+     * Lo que se le da al launcher para la imagen [url] de una fila. No descarga nada (la fila ya llamó a [publish]): si la imagen no está
+     * guardada se anota E28 y se deja la dirección web (no hay otra cosa que dar).
      */
     fun forLauncher(context: Context, url: String): String {
         if (url.isBlank() || !url.startsWith("https://")) return url
-        if (!NetworkState.isOffline && cachedFile(context, url) == null) fetch(context, url)
         val available = cachedFile(context, url) != null
         if (!available) {
             runCatching { AppErrors.record(Cause.HOME_CHANNEL, AppErrors.Area.IMAGE, "Miniatura sin guardar", context = url.substringAfter("://").substringBefore('/')) }
@@ -69,11 +73,26 @@ object ChannelArt {
         return uriFor(context, url).toString()
     }
 
-    private fun fetch(context: Context, url: String) {
-        runCatching {
-            runBlocking {
-                withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.App.awaitImageLoader(context).execute(ImageRequest.Builder(context).data(url).build()) }
-            }
+    /** Las de [urls] por https que no están ya guardadas según [isCached], sin repetir. */
+    internal fun missing(urls: Collection<String>, isCached: (String) -> Boolean): List<String> =
+        urls.asSequence().filter { it.startsWith("https://") }.distinct().filterNot(isCached).toList()
+
+    /**
+     * Publica qué imágenes de la fila [kind] se pueden servir (sustituye lo anterior de esa fila) y, con conexión, baja a la vez las que
+     * faltan, cada una con su propio tiempo máximo ([FETCH_TIMEOUT]). Antes se bajaban una a una bloqueando el hilo: con 20 filas, hasta
+     * minutos en una web lenta, con el cerrojo de la sincronización cogido. Un fallo de una imagen no corta las demás.
+     */
+    suspend fun publish(context: Context, kind: String, urls: Collection<String>) {
+        register(kind, urls)
+        if (NetworkState.isOffline) return
+        val todo = missing(urls) { cachedFile(context, it) != null }
+        if (todo.isEmpty()) return
+        // awaitImageLoader espera con un tope a que la app configure Coil: se hace una vez y fuera del hilo del llamante.
+        val loader = withContext(Dispatchers.IO) { app.kaizen.App.awaitImageLoader(context) }
+        coroutineScope {
+            todo.map { url ->
+                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { loader.execute(ImageRequest.Builder(context).data(url).build()) } } }
+            }.awaitAll()
         }
     }
 }

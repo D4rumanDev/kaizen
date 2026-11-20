@@ -101,6 +101,7 @@ object JsExtractor {
                 }.ignoreContentType(true).execute().body()
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             if (e is HttpStatusException && e.statusCode == 404) throw e
             if (e is HostGate.HostDownException || e is HostGate.HostBusyException) throw e
             if (tries < 3) {

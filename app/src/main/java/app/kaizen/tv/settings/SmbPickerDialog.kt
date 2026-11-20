@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.settings
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -153,7 +155,7 @@ internal fun SmbPickerDialog(onDismiss: () -> Unit) {
 
     Dialog(onDismissRequest = ::back, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Background).padding(horizontal = 48.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Carpeta de red", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(appString(R.string.ui_carpeta_de_red), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             if (!browsing) {
                 SmbForm(
                     host = host, guest = guest, user = user, password = password, hasSavedPassword = hasSavedPassword, path = path, hasSaved = saved != null,
@@ -214,7 +216,7 @@ private fun SmbForm(
     LaunchedEffect(Unit) { runCatching { (if (hasSaved) verify else firstRow).requestFocus() } }
     Text("1. Servidor, usuario y contraseña; pulsa «Conectar» para comprobarlos. 2. Elige la carpeta compartida donde guardar las copias.", color = White70, fontSize = Text16)
     if (suggestions.isNotEmpty()) {
-        Text("Servidores encontrados en la red", color = White60, fontSize = Text14)
+        Text(appString(R.string.ui_servidores_encontrados_en_la_red), color = White60, fontSize = Text14)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             suggestions.take(4).forEach { s -> KaizenButton("${s.name} · ${s.address}", onClick = { onHost(s.address) }, fontSize = Text14) }
         }
@@ -287,7 +289,7 @@ private fun ColumnScope.SmbBrowser(
         KaizenButton("Usar esta carpeta", onClick = onUse, enabled = path.isNotEmpty() && !loading && error == null)
         KaizenButton("Nueva carpeta", onClick = onNewFolder, enabled = path.isNotEmpty() && !loading && error == null)
         KaizenButton("Volver al formulario", onClick = onChangeServer)
-        if (path.isEmpty() && !loading && error == null) Text("Entra en un recurso compartido para poder usarlo.", color = White60, fontSize = Text14, modifier = Modifier.padding(start = 8.dp))
+        if (path.isEmpty() && !loading && error == null) Text(appString(R.string.ui_entra_en_un_recurso_compartido), color = White60, fontSize = Text14, modifier = Modifier.padding(start = 8.dp))
     }
 }
 

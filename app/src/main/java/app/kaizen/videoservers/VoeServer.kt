@@ -37,7 +37,7 @@ class VoeServer(context: Context, baseLink: String) : Server(context, baseLink) 
 
         /** HLS (`source`) de la página final de VOE, o null si no trae los datos esperados. */
         fun streamUrl(html: String): String? = runCatching {
-            val raw = JSONArray(JSON_SCRIPT.find(html)!!.groupValues[1]).getString(0)
+            val raw = JSONArray(JSON_SCRIPT.find(html)?.groupValues?.get(1) ?: return null).getString(0)
             JSONObject(decode(raw)).optString("source").takeIf { it.startsWith("http") }
         }.getOrNull()
 

@@ -29,7 +29,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +82,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun SearchPage(actions: CardActions) {
     var text by rememberSaveable { mutableStateOf("") }
     val sort = SortBy.TITLE
-    val query by remember { snapshotFlow { text }.debounce(QUERY_DELAY) }.collectAsState(initial = text)
+    val query by remember { snapshotFlow { text }.debounce(QUERY_DELAY) }.collectAsStateWithLifecycle(initialValue = text)
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current

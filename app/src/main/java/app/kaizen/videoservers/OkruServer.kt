@@ -19,7 +19,9 @@ class OkruServer(context: Context, baseLink: String) : Server(context, baseLink)
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)
-        val (source) = Regex("data-options=\"(.*?)\"").find(HostGate.call(downLink) { SourceHttp.execute(downLink).parse().html() })?.destructured!!
+        val page = HostGate.call(downLink) { SourceHttp.execute(downLink).parse().html() }
+        val source = Regex("data-options=\"(.*?)\"").find(page)?.groupValues?.get(1)
+            ?: error("OkruServer: sin data-options en la página (¿cambió o devolvió una verificación?)")
         val jsonText = Parser.unescapeEntities(source, false)
         val videos = JSONObject(JSONObject(jsonText).getJSONObject("flashvars").getString("metadata")).getJSONArray("videos")
         val options = mutableListOf<Option>()

@@ -1,5 +1,6 @@
 package app.kaizen.jobscheduler
 
+import app.kaizen.commons.appString
 import app.kaizen.commons.logError
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -57,6 +58,9 @@ class RecentsWork(val context: Context, workerParameters: WorkerParameters) :
             recentsDAO.setCache(recents)
             app.kaizen.commons.runCatchingCoop { app.kaizen.tv.HomeChannels.syncRecents(context) }.onFailure(::logError)
             return Result.success()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // WorkManager cancela el trabajo (p. ej. al parar el worker): se relanza para que lo trate como cancelado, no como fallo.
+            throw e
         } catch (e: Exception) {
             logError(e)
             return Result.failure()
@@ -134,7 +138,7 @@ class RecentsWork(val context: Context, workerParameters: WorkerParameters) :
             .setSmallIcon(R.drawable.ic_recents_group)
             .setColor(ContextCompat.getColor(context, R.color.colorAccent))
             .setContentTitle("Nuevos capítulos")
-            .setContentText("Hay nuevos capítulos recientes")
+            .setContentText(appString(R.string.ui_hay_nuevos_capitulos_recientes))
             .setGroupSummary(true)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setGroup(RECENTS_GROUP)

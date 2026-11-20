@@ -161,6 +161,13 @@ class NetworkStateTest {
     }
 
     @Test
+    fun `al publicar una fila solo se bajan las imagenes https que faltan y sin repetir`() {
+        val urls = listOf("https://cdn.example/a.jpg", "https://cdn.example/b.jpg", "https://cdn.example/a.jpg", "http://cdn.example/c.jpg", "")
+        assertEquals(listOf("https://cdn.example/b.jpg"), app.kaizen.tv.ChannelArt.missing(urls) { it.endsWith("a.jpg") })
+        assertTrue(app.kaizen.tv.ChannelArt.missing(emptyList()) { false }.isEmpty())
+    }
+
+    @Test
     fun `solo se sirven al launcher las imagenes publicadas y por https`() {
         val published = setOf("https://cdn.example/a.jpg")
         assertTrue(app.kaizen.tv.ChannelArt.isServable("https://cdn.example/a.jpg", published))

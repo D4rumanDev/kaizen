@@ -18,9 +18,12 @@ class FireServer internal constructor(context: Context, baseLink: String) : Serv
 
     override suspend fun videoServer(): VideoServer? {
         val frame = PatternUtil.extractLink(baseLink)
-        val mediaFunc = jsoupCookies(frame).getGated().select("script").last()!!.outerHtml()
+        // Sin coincidencia se dice qué faltaba (un NPE no lo diría): `verified()` lo captura y lo anota.
+        val mediaFunc = jsoupCookies(frame).getGated().select("script").last()?.outerHtml()
+            ?: error("FireServer: la página no trae ningún script (¿cambió o devolvió una verificación?)")
         val mediaLink = PatternUtil.extractMediaLink(mediaFunc)
-        val download = HostGate.call(mediaLink) { SourceHttp.execute(mediaLink).parse() }.select("a[href~=http://download.*]").first()!!.attr("href")
+        val download = HostGate.call(mediaLink) { SourceHttp.execute(mediaLink).parse() }.select("a[href~=http://download.*]").first()?.attr("href")
+            ?: error("FireServer: sin enlace de descarga en la página de Mediafire (¿cambió?)")
         return VideoServer(FIRE, Option(name, null, download))
 
     }

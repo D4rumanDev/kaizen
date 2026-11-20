@@ -34,6 +34,7 @@ Cómo está ordenada: la **guía** dice cómo es Kaizen y qué reglas sigue; la 
 
 - **[Emparejado con AniList](emparejado-anilist.md)**: decisiones, criterios y límites del emparejado.
 - **[Esquema de la ficha de una web](webficha-esquema.md)**: la forma única que rellenan todas las fuentes (`WebFicha`).
+- **[Control por ADB](control-por-adb.md)**: las veinticuatro acciones del receptor, qué leen y qué escriben.
 - **[Lecciones de octubre](lecciones-de-octubre.md)**: causas y trampas ya resueltas, de antes de que empezara el registro.
 
 ## 3. Operación: lo que se hace y lo que queda

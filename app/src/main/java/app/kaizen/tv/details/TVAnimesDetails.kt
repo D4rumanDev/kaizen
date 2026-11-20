@@ -1,5 +1,6 @@
 package app.kaizen.tv.details
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.tv.ui.screens.*
 import app.kaizen.tv.ui.theme.*
 
@@ -13,7 +14,6 @@ import androidx.compose.runtime.key
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import app.kaizen.commons.HostGate
 import app.kaizen.pojos.av1.Chapter
@@ -93,7 +93,7 @@ class TVAnimesDetails : TVBaseActivity(), TVServersFactory.ServersInterface {
             KaizenTheme {
                 val url = urls.last()
                 key(url) {
-                    val state by modelFor(url).state.collectAsState()
+                    val state by modelFor(url).state.collectAsStateWithLifecycle()
                     FichaMenu(onSection = { TVMain.openSection(this, it); finish() }, loading = state !is FichaViewModel.State.Ready) { when (val ficha = state) {
                         is FichaViewModel.State.Ready -> ProvideSeriesMarks { SeriesDetailScreen(ficha, actions) }
                         // Hueco con la forma de la ficha, no una pantalla negra.

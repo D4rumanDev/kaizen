@@ -21,6 +21,8 @@ import app.kaizen.source.AnimeSources
 import app.kaizen.source.seriesKeyOf
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -29,6 +31,9 @@ import kotlin.time.Duration.Companion.seconds
  */
 object HomeChannels {
     private const val MAX_ROWS = 20
+
+    /** Una sincronización de filas a la vez (sustituye a @Synchronized, que no admite esperar imágenes sin bloquear el hilo). */
+    private val lock = Mutex()
 
     // Si Kaizen ya está abierto, el TVMain existente recibe el enlace (onNewIntent) en vez de apilarse otro encima.
     private const val OPEN_FLAGS = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -49,7 +54,7 @@ object HomeChannels {
             .addFlags(OPEN_FLAGS)
 
     /** Vuelca «Seguir viendo» a Watch Next; lo que ya no está en curso se quita. Hilo de fondo. */
-    @Synchronized fun syncWatchNext(context: Context) {
+    suspend fun syncWatchNext(context: Context) = lock.withLock {
         val helper = PreviewChannelHelper(context)
         val history = Library.historyNow().sortedByDescending { it.date }
         KaizenProgress.migrateEidKeys(history)
@@ -57,7 +62,7 @@ object HomeChannels {
         val existing = existingWatchNext(context)
         val wantedIds = wanted.map { it.first.eid.toString() }.toSet()
         // Primero se publica qué imágenes se pueden servir; después se dan al launcher como content:// (ver ChannelArt).
-        ChannelArt.register("continue", wanted.map { episodeImage(it.first) })
+        ChannelArt.publish(context, "continue", wanted.map { episodeImage(it.first) })
         existing.filterKeys { it !in wantedIds }.values.forEach { context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
         wanted.forEach { (record, progress) ->
             val program = WatchNextProgram.Builder()
@@ -78,7 +83,7 @@ object HomeChannels {
     }
 
     /** Vuelca los recientes al canal «Capítulos recientes» (lo crea la primera vez). Hilo de fondo. */
-    @Synchronized fun syncRecents(context: Context) {
+    suspend fun syncRecents(context: Context) = lock.withLock {
         val helper = PreviewChannelHelper(context)
         val prefs = app.kaizen.commons.KaizenStore.prefs(PREFS)
         var channelId = prefs.getLong(KEY_CHANNEL, -1L)
@@ -92,7 +97,7 @@ object HomeChannels {
             prefs.edit().putLong(KEY_CHANNEL, channelId).putInt(KEY_LOGO, LOGO_VERSION).apply()
         }
         val recents = RecentsArchive.merge(Library.recentsNow()).take(MAX_ROWS)
-        ChannelArt.register("recents", recents.map { it.episodeImageUrl })
+        ChannelArt.publish(context, "recents", recents.map { it.episodeImageUrl })
         context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(channelId), null, null)
         recents.forEach { recent ->
             helper.publishPreviewProgram(

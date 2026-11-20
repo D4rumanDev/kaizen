@@ -102,6 +102,9 @@ suspend fun noCrashSuspend(enableLog: Boolean = true, func: suspend () -> Unit):
     return try {
         func()
         null
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        // Cancelar no es un fallo: si se tragara, la corrutina seguiría trabajando tras cancelarla.
+        throw e
     } catch (e: Exception) {
         if (enableLog)
             logError(e)

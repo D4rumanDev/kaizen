@@ -19,9 +19,10 @@ class MangoServer(context: Context, baseLink: String) : Server(context, baseLink
         val downLink = PatternUtil.extractLink(baseLink)
         val html = HostGate.call(downLink) { SourceHttp.execute(downLink).parse().html() }
         val matcher = Pattern.compile("type:\"video/mp4\",src:d\\('([^']+)',(\\d+)\\)").matcher(html)
-        matcher.find()
-        val hash = matcher.group(1)!!
-        val key = Integer.parseInt(matcher.group(2)!!)
+        // Sin coincidencia, `group` lanzaría «No match found» sin decir de qué servidor ni por qué.
+        check(matcher.find()) { "MangoServer: sin vídeo en la página (¿cambió o devolvió una verificación?)" }
+        val hash: String = matcher.group(1)
+        val key = Integer.parseInt(matcher.group(2))
         var file = KDecoder.decodeMango(hash, key)
         if (file.isNullOrBlank())
             return null

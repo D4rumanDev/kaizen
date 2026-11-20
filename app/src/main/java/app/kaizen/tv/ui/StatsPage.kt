@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.ui
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import app.kaizen.tv.ui.theme.*
 
 import androidx.compose.foundation.BorderStroke
@@ -304,7 +306,7 @@ private fun dayLabel(day: Long): String =
 private fun StatsFailed(error: Throwable) {
     LaunchedEffect(error) { app.kaizen.commons.logError(error) }
     Column(Modifier.fillMaxSize().padding(start = ContentPaddingHorizontal, end = ContentPaddingHorizontal, top = 8.dp)) {
-        Text("No se pudieron calcular las estadísticas (mira el registro de depuración).", color = White80, fontSize = Text15)
+        Text(appString(R.string.ui_estadisticas_no_calculadas), color = White80, fontSize = Text15)
     }
 }
 
@@ -312,7 +314,7 @@ private fun StatsFailed(error: Throwable) {
 @Composable
 private fun StatsLoading() {
     Column(Modifier.fillMaxSize().padding(start = ContentPaddingHorizontal, end = ContentPaddingHorizontal, top = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Calculando tus estadísticas…", color = White80, fontSize = Text15)
+        Text(appString(R.string.ui_calculando_estadisticas), color = White80, fontSize = Text15)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             repeat(STATS_PLACEHOLDERS) { Box(Modifier.width(190.dp).height(72.dp).clip(ShapeMd).background(TileColor.copy(alpha = 0.5f))) }
         }

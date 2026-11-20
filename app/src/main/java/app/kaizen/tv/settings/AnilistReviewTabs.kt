@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.settings
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import app.kaizen.tv.ui.components.*
 
 import app.kaizen.tv.ui.theme.*
@@ -286,7 +288,7 @@ private fun PendingView(series: PendingSeries, index: Int, total: Int, canUndo: 
                 if (localNames.isNotEmpty()) CompareRow("Otros nombres", localNames.take(2).joinToString(" · "), compared.sharedName ?: candidate?.nombres?.filter { it != candidate.romaji }?.take(2)?.joinToString(" · ")?.ifEmpty { null } ?: if (loading) "…" else "—",
                     if (compared.sharedName != null) Match.SAME else Match.UNKNOWN)
                 CompareRow("Géneros", localGenres.joinToString(", ").ifEmpty { "—" }, candidate?.generos?.take(5)?.joinToString(", ")?.ifEmpty { null } ?: "—", compared.genres)
-                if (asked != null && raw == null) Text("AniList no ha respondido con este anime. Puedes saltarla y volver más tarde.", color = StatusWarn, fontSize = Text14)
+                if (asked != null && raw == null) Text(appString(R.string.ui_anilist_sin_respuesta_saltar), color = StatusWarn, fontSize = Text14)
             }
             Cover(listOfNotNull(candidate?.portada), Modifier.size(PreviewPosterWidth, PreviewPosterHeight).clip(PreviewPosterShape))
         }

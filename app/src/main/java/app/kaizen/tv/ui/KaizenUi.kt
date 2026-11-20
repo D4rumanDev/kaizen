@@ -43,7 +43,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.foundation.lazy.grid.LazyGridScope
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -315,7 +314,7 @@ internal val LocalStatuses = androidx.compose.runtime.compositionLocalOf<Map<Str
 internal fun statusOfSeries(name: String, source: String? = null, slug: String? = null): app.kaizen.domain.SeriesStatus {
     val statuses = LocalStatuses.current
     // El libro de ids de serie carga después de arrancar: al cargar se vuelve a resolver (ver SeriesLedger.version).
-    val ledger by SeriesLedger.version.collectAsState()
+    val ledger by SeriesLedger.version.collectAsStateWithLifecycle()
     return remember(name, source, slug, statuses, ledger) { app.kaizen.domain.SeriesStatuses.statusIn(statuses, name, source, slug) }
 }
 
@@ -364,7 +363,7 @@ internal fun matchesFavorite(keys: Set<String>, name: String, aid: Int, seriesId
 internal fun isFavoriteSeries(name: String, aid: Int = 0, source: String? = null, slug: String? = null): Boolean {
     val favorites = LocalFavorites.current
     // El libro de ids de serie carga después de arrancar: al cargar se vuelve a resolver (ver SeriesLedger.version).
-    val ledger by SeriesLedger.version.collectAsState()
+    val ledger by SeriesLedger.version.collectAsStateWithLifecycle()
     return remember(name, aid, source, slug, favorites, ledger) {
         val seriesId = if (source != null && slug != null) app.kaizen.source.seriesIdOf(source, slug) else 0L
         matchesFavorite(favorites, name, aid, seriesId, slug)

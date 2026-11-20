@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.ui
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import androidx.compose.ui.text.style.TextOverflow
 import app.kaizen.tv.ui.components.*
 
@@ -82,7 +84,7 @@ internal fun MyListPage(actions: CardActions) {
     val sort = currentSectionSort()
     val shown = rememberSorted(unique, sort, all)
     CardGrid {
-        if (shown.isEmpty()) fullWidth { Text("Sin series en este estado. Ponles estado desde su ficha o con una pulsación larga.", color = White70, fontSize = Text16) }
+        if (shown.isEmpty()) fullWidth { Text(appString(R.string.ui_sin_series_en_este_estado), color = White70, fontSize = Text16) }
         items(shown.size, key = { "${shown[it].source}:${shown[it].slug}" }) { index ->
             val entry = shown[index]
             val favorite = FavoriteAV1(entry.aid, entry.name, entry.slug, "", FavoriteAV1.CATEGORY_NONE, entry.source)

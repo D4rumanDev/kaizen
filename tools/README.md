@@ -329,6 +329,16 @@ node tools/test-count.js
 # Salida: pruebas=N saltadas=N fallos=N
 ```
 
+### `wiki-graph.js`
+Grafo de la documentación: une las notas de `docs/` por sus enlaces markdown y lo guarda en un solo HTML.
+```bash
+node tools/wiki-graph.js [--root docs] [--out build/wiki-graph.html]
+```
+- Solo lee: no modifica ninguna nota. Sin dependencias.
+- Saca título, tipo y etiquetas del frontmatter; el tamaño del nodo sigue las palabras de la nota. Busca por título o etiqueta y filtra por tipo.
+- Lista los enlaces rotos (los que apuntan a ficheros que ya no existen). Los enlaces a ficheros fuera de `--root` no cuentan como rotos.
+- El HTML carga Cytoscape.js 3.30.2 desde unpkg con hash SRI: hace falta internet al abrirlo.
+
 ### `vscode-java.js`
 Valida la configuración del JDK en Visual Studio Code:
 ```bash

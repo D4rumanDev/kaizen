@@ -1,7 +1,7 @@
 package app.kaizen.tv.ui
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.pojos.av1.Record
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -51,8 +51,8 @@ internal object SeenChapters {
 @androidx.compose.runtime.Composable
 internal fun rememberSeen(source: String, slug: String, number: Double): Boolean {
     // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a mirar.
-    val ledger = app.kaizen.source.SeriesLedger.version.collectAsState().value
-    val seen = SeenChapters.all.collectAsState().value
+    val ledger = app.kaizen.source.SeriesLedger.version.collectAsStateWithLifecycle().value
+    val seen = SeenChapters.all.collectAsStateWithLifecycle().value
     return remember(source, slug, number, ledger, seen) { seen?.contains(app.kaizen.source.seriesIdOf(source, slug) to number) == true }
 }
 

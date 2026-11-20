@@ -476,7 +476,7 @@ private fun EmissionPage(actions: CardActions) {
                     androidx.compose.foundation.layout.Row(Modifier.padding(start = ContentPaddingHorizontal, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(DAY_NAMES[day - 1], color = Color.White, fontSize = SectionTitleText, fontWeight = FontWeight.Bold)
                         if (day == today) {
-                            Text("Hoy", color = Color.White, fontSize = Text14, fontWeight = FontWeight.Bold,
+                            Text(appString(R.string.ui_hoy_marca), color = Color.White, fontSize = Text14, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 12.dp).background(Accent, androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 2.dp))
                         }
                     }

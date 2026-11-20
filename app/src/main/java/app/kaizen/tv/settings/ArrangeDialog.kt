@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.settings
 
+import app.kaizen.commons.appString
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.tv.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -22,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,7 +87,7 @@ internal fun ArrangeDialog(
 ) {
     var order by remember { mutableStateOf(entries.map { it.key }) }
     // KaizenSettings avisa de cada cambio con la clave; se cuentan los avisos (no se compara la clave: dos cambios seguidos de la misma no recompondrían).
-    val settings by remember { KaizenSettings.changes.scan(0) { n, _ -> n + 1 } }.collectAsState(0)
+    val settings by remember { KaizenSettings.changes.scan(0) { n, _ -> n + 1 } }.collectAsStateWithLifecycle(0)
     var organizing by remember { mutableStateOf(false) }
     var grabbed by remember { mutableStateOf<String?>(null) }
     val byKey = remember(entries) { entries.associateBy { it.key } }
@@ -218,13 +219,13 @@ private fun sectionIcon(id: Int): Int = if (id == MainSections.SOURCES) R.drawab
 private fun PlayerPreview(buttons: List<PlayerButton>, marked: PlayerButton?) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val remainingWidth = with(density) { measurer.measure("Restante: 16:47", TextStyle(fontSize = PlayerTimeText)).size.width.toDp() }
+    val remainingWidth = with(density) { measurer.measure(appString(R.string.ui_restante_ejemplo), TextStyle(fontSize = PlayerTimeText)).size.width.toDp() }
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp).clip(ShapeXl)
             .background(Brush.verticalGradient(listOf(Color(0xFF202020), Color(0xFF080808)))).padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("Así se verá en el reproductor", color = White70, fontSize = Text14, modifier = Modifier.padding(start = 24.dp))
+        Text(appString(R.string.ui_asi_se_vera_en_el_reproductor), color = White70, fontSize = Text14, modifier = Modifier.padding(start = 24.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // Los mismos márgenes que los controles reales (48 dp a cada lado) menos los 24 dp de este recuadro, y «Restante» con su margen.
             val available = maxWidth - 24.dp * 2 - remainingWidth - 16.dp
@@ -234,12 +235,12 @@ private fun PlayerPreview(buttons: List<PlayerButton>, marked: PlayerButton?) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(PlayerButton.SPACING_DP.dp)) {
                         fits.forEach { PreviewCircle(it, 1f, it == marked) }
                     }
-                    Text("Restante: 16:47", color = White80, fontSize = PlayerTimeText, maxLines = 1, modifier = Modifier.padding(start = 16.dp))
+                    Text(appString(R.string.ui_restante_ejemplo), color = White80, fontSize = PlayerTimeText, maxLines = 1, modifier = Modifier.padding(start = 16.dp))
                 }
                 val cut = buttons.filter { it !in fits }
                 if (cut.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(PlayerButton.SPACING_DP.dp)) {
-                        Text("No caben:", color = White50, fontSize = Text14, modifier = Modifier.padding(end = 4.dp))
+                        Text(appString(R.string.ui_no_caben), color = White50, fontSize = Text14, modifier = Modifier.padding(end = 4.dp))
                         cut.forEach { PreviewCircle(it, 0.5f, it == marked) }
                     }
                 }
@@ -297,7 +298,7 @@ private fun playerIconRes(button: PlayerButton): Int? = when (button) {
 @Composable
 private fun MenuPreview(rows: List<Pair<Int, String>>, marked: Int?) {
     Column(Modifier.width(260.dp).clip(ShapeLg).background(SurfaceDark).padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("Así se verá en el menú", color = White70, fontSize = Text14, modifier = Modifier.padding(bottom = 6.dp))
+        Text(appString(R.string.ui_asi_se_vera_en_el_menu), color = White70, fontSize = Text14, modifier = Modifier.padding(bottom = 6.dp))
         rows.filter { it.first != MainSections.SEARCH }.forEachIndexed { index, (id, label) ->
             Row(
                 Modifier.fillMaxWidth().clip(ShapeLg).background(if (id == marked) GrabbedCard else if (index == 0) ActiveCard else Color.Transparent).padding(horizontal = 10.dp, vertical = 6.dp),

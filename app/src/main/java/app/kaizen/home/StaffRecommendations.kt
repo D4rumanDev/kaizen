@@ -18,6 +18,8 @@ object StaffRecommendations {
             val suggestions = Gson().fromJson(json, Array<Recommended>::class.java)
             // La nota no se pide aquí: cada tarjeta la pide al pintarse (RecommendedCard en KaizenUi.kt).
             return suggestions.toList().shuffled().take(count)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             logError(e)
             return emptyList()

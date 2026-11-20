@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.streaming
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import app.kaizen.tv.ui.theme.*
 
 import android.os.Handler
@@ -144,7 +146,7 @@ private fun ProgressScreen(title: String, subtitle: String, rows: List<StepRow>)
             Text(title, color = Color.White, fontSize = Text22, fontWeight = FontWeight.Bold)
             if (subtitle.isNotEmpty()) Text(subtitle, color = White70, fontSize = Text15, maxLines = 1)
             rows.forEachIndexed { index, row -> StepLine(index + 1, row) }
-            Text("Atrás para cancelar", color = White50, fontSize = Text14, modifier = Modifier.padding(top = 6.dp))
+            Text(appString(R.string.ui_atras_para_cancelar), color = White50, fontSize = Text14, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

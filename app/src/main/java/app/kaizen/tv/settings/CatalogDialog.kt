@@ -2,6 +2,7 @@
 
 package app.kaizen.tv.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.tv.ui.components.*
 
 import app.kaizen.tv.ui.theme.*
@@ -21,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -112,7 +112,7 @@ internal fun SourcesTab(browsing: SourceCatalog?, onBrowse: (SourceCatalog?) -> 
     }
     val first = rememberAutoFocus()
     // Webs que han pedido una verificación de seguridad (la API de animegratis, por ejemplo): se hace aquí mismo, sin ir a Recientes.
-    val challenged by SourceChallenge.pending.collectAsState()
+    val challenged by SourceChallenge.pending.collectAsStateWithLifecycle()
     var verifyHost by remember { mutableStateOf<String?>(null) }
     verifyHost?.let { host -> VerifySourceDialog(host) { verifyHost = null } }
     val busy = walking != null || CatalogBuilder.isWalking

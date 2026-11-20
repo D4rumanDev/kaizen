@@ -467,7 +467,7 @@ private fun ChaptersRow(controller: PlaybackController) {
     val listState = rememberLazyListState()
     val current = remember { FocusRequester() }
     val currentIndex = chapters.indexOfFirst(controller::isCurrent).coerceAtLeast(0)
-    if (chapters.isEmpty()) Text("Cargando…", color = White80, fontSize = Text17)
+    if (chapters.isEmpty()) Text(appString(R.string.ui_cargando_capitulos), color = White80, fontSize = Text17)
     // El foco se pide cuando la fila ya está desplazada al capítulo actual (si no, la tarjeta aún no existe).
     LaunchedEffect(chapters, controller.chaptersOpen) {
         if (chapters.isEmpty() || !controller.chaptersOpen) return@LaunchedEffect

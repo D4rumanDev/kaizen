@@ -220,4 +220,27 @@
     <string name="ui_desmarcar_todos_titulo">¿Desmarcar todos los capítulos?</string>
     <string name="ui_desmarcar_todos_aviso">Se borra el historial de vistos de esta serie.</string>
     <string name="ui_desmarcar_todos">Desmarcar todos</string>
+    <!-- Textos que estaban escritos en el código (revisión de código del 20-nov-2026). -->
+    <string name="ui_proxy_sirviendo_video">Sirviendo vídeo al reproductor externo</string>
+    <string name="ui_hay_nuevos_capitulos_recientes">Hay nuevos capítulos recientes</string>
+    <string name="ui_cargando_capitulos">Cargando…</string>
+    <string name="ui_anilist_sin_respuesta_saltar">AniList no ha respondido con este anime. Puedes saltarla y volver más tarde.</string>
+    <string name="ui_asi_se_vera_en_el_reproductor">Así se verá en el reproductor</string>
+    <string name="ui_restante_ejemplo">Restante: 16:47</string>
+    <string name="ui_no_caben">No caben:</string>
+    <string name="ui_asi_se_vera_en_el_menu">Así se verá en el menú</string>
+    <string name="ui_registro_se_actualiza_solo">Se actualiza solo. Una línea por anotación; su origen, qué hacer y lo técnico se leen enteros abajo.</string>
+    <string name="ui_leyendo_el_registro">Leyendo el registro…</string>
+    <string name="ui_registro_vacio_sube_nivel">No hay nada escrito. Sube el nivel en Configuración › Depuración para que se anote más.</string>
+    <string name="ui_carpeta_de_red">Carpeta de red</string>
+    <string name="ui_servidores_encontrados_en_la_red">Servidores encontrados en la red</string>
+    <string name="ui_entra_en_un_recurso_compartido">Entra en un recurso compartido para poder usarlo.</string>
+    <string name="ui_guardar_texto">Guardar</string>
+    <string name="ui_cancelar_texto">Cancelar</string>
+    <string name="ui_atras_para_cancelar">Atrás para cancelar</string>
+    <string name="ui_hoy_marca">Hoy</string>
+    <string name="ui_no_recomendada_ok_permitir">No recomendada  ·  OK para permitir</string>
+    <string name="ui_estadisticas_no_calculadas">No se pudieron calcular las estadísticas (mira el registro de depuración).</string>
+    <string name="ui_calculando_estadisticas">Calculando tus estadísticas…</string>
+    <string name="ui_sin_series_en_este_estado">Sin series en este estado. Ponles estado desde su ficha o con una pulsación larga.</string>
 </resources>

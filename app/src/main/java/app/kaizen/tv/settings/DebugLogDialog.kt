@@ -2,6 +2,8 @@
 
 package app.kaizen.tv.settings
 
+import app.kaizen.R
+import app.kaizen.commons.appString
 import app.kaizen.tv.ui.theme.*
 
 import androidx.compose.foundation.background
@@ -112,12 +114,12 @@ internal fun DebugLogDialog(onDismiss: () -> Unit) {
                 fontWeight = if (health?.diskProblem != null) FontWeight.Bold else null, modifier = Modifier.padding(top = 4.dp))
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Legend(LogLegend)
-                Text("Se actualiza solo. Una línea por anotación; su origen, qué hacer y lo técnico se leen enteros abajo.", color = White70, fontSize = Text14, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(appString(R.string.ui_registro_se_actualiza_solo), color = White70, fontSize = Text14, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
             if (!loaded) {
-                Text("Leyendo el registro…", color = White70, fontSize = Text14, modifier = Modifier.padding(top = 16.dp))
+                Text(appString(R.string.ui_leyendo_el_registro), color = White70, fontSize = Text14, modifier = Modifier.padding(top = 16.dp))
             } else if (lines.isEmpty()) {
-                Text("No hay nada escrito. Sube el nivel en Configuración › Depuración para que se anote más.", color = White70, fontSize = Text14,
+                Text(appString(R.string.ui_registro_vacio_sube_nivel), color = White70, fontSize = Text14,
                     modifier = Modifier.padding(top = 16.dp))
             } else {
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp).padding(vertical = 4.dp)) {

@@ -1,5 +1,6 @@
 package app.kaizen.tv.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +50,7 @@ internal fun SettingsPage() {
     var showStats by remember { mutableStateOf(false) }
     var library by remember { mutableStateOf<LibraryScreen?>(null) }
     // Abrir una pantalla desde fuera (adb: `node tools/tv.js series`): TVMain deja el pedido y aquí se consume. «Series» abre la Biblioteca en «Por revisar».
-    val request by OpenRequest.dialog.collectAsState()
+    val request by OpenRequest.dialog.collectAsStateWithLifecycle()
     LaunchedEffect(request) { if (request == "series") { library = LibraryScreen.REVIEW; OpenRequest.dialog.value = null } }
 
     // Biblioteca: panel lateral con las cifras en sus filas; las pantallas que necesitan altura (dudas, series unidas, fuentes) se abren encima del panel.

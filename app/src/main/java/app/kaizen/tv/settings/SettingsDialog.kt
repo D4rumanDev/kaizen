@@ -1,5 +1,6 @@
 package app.kaizen.tv.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.tv.ui.theme.*
 
 import app.kaizen.tv.ui.IconTextItem
@@ -21,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import app.kaizen.commons.KaizenSettings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.animation.AnimatedVisibility
@@ -119,7 +119,7 @@ fun SettingsPanel(root: SettingsCategory, refresh: Int = 0, onDismiss: () -> Uni
     val context = androidx.compose.ui.platform.LocalContext.current
     var openChoice by remember { mutableStateOf<SettingItem?>(null) }
     // Los ajustes de KaizenSettings avisan solos de cada cambio; este contador solo cubre lo que no es un ajuste (acciones que cambian un resumen, la validación TLS).
-    val settings by KaizenSettings.changes.collectAsState("")
+    val settings by KaizenSettings.changes.collectAsStateWithLifecycle("")
     var version by remember { mutableIntStateOf(0) }
     var focusTitle by remember { mutableStateOf<String?>(null) }
     // Elemento reordenado que conserva el foco; vive aquí porque las filas se reconstruyen en cada recomposición.

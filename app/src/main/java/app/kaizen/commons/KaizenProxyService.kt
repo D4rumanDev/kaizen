@@ -1,5 +1,6 @@
 package app.kaizen.commons
 
+import app.kaizen.commons.appString
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -43,7 +44,7 @@ class KaizenProxyService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_player_white)
             .setContentTitle("KAIZEN")
-            .setContentText("Sirviendo vídeo al reproductor externo")
+            .setContentText(appString(R.string.ui_proxy_sirviendo_video))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification,
