@@ -14,9 +14,9 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
-## 2026-11-20 · LeakCanary, segunda sesión: 0 fugas
+## 2026-11-20 · LeakCanary, segunda sesión: 0 fugas (SHIELD y BRAVIA)
 - Compilación `assembleDebug` (`app.kaizen.debug`, datos propios, con LeakCanary 2.14) instalada en la SHIELD a petición del usuario y lanzada con `am start … app.kaizen.tv.ui.TVMain` (el icono del launcher abre el lanzador de LeakCanary, no la app). Recorrido con D-pad: 3 ciclos de elegir tarjeta de Recientes, idioma, servidor (VOE) y reproducir (`TVPlayer`, el vídeo se vio) y salir; una búsqueda («naruto») y 3 aperturas de ficha desde los resultados (`TVAnimesDetails`).
-- Resultado: la pantalla «Leaks» marca **0 Distinct Leaks**. Límite: LeakCanary solo vigila objetos destruidos de Android (actividades, fragmentos, `ViewModel`, vistas); un `ExoPlayer` retenido por otro objeto o el crecimiento de memoria nativa no se detectan con él (haría falta un volcado de memoria en el Profiler).
+- Resultado: la pantalla «Leaks» marca **0 Distinct Leaks**. Repetido en la BRAVIA (2 ciclos de reproductor llegaron a `TVPlayer`, uno se quedó en el inicio por la lentitud de la red; 1 búsqueda y 3 fichas): también **0 Distinct Leaks**. Límite: LeakCanary solo vigila objetos destruidos de Android (actividades, fragmentos, `ViewModel`, vistas); un `ExoPlayer` retenido por otro objeto o el crecimiento de memoria nativa no se detectan con él (haría falta un volcado de memoria en el Profiler).
 - **Pendiente:** la desinstalación de `app.kaizen.debug` (`pm uninstall`) quedó bloqueada por el clasificador de permisos; sigue instalada junto a la app real, que está intacta (283 favoritos, 6458 vistos, 7004 fichas, 0 FATAL/ANR).
 
 ## 2026-11-20 · Red: cliente estricto, proxy sin redes privadas y revisión de optimización
