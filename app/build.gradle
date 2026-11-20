@@ -166,6 +166,8 @@ dependencies {
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
     // org.json real en los tests de JVM (el de android.jar es un stub que lanza excepción)
     testImplementation 'org.json:json:20240303'
+    // Certificado autofirmado real para probar el rechazo TLS con un handshake de verdad (misma versión que okhttp)
+    testImplementation 'com.squareup.okhttp3:okhttp-tls:5.5.0'
     //Kotlin
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'

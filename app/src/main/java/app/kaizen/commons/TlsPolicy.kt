@@ -32,7 +32,7 @@ object TlsPolicy {
     /** Hosts cuyo certificado no ha pasado la validación en esta sesión. */
     val rejectedHosts: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
-    private val systemTrustManager: X509TrustManager by lazy {
+    internal val systemTrustManager: X509TrustManager by lazy {
         val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         factory.init(null as KeyStore?)
         factory.trustManagers.filterIsInstance<X509TrustManager>().first()

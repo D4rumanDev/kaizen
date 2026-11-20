@@ -94,7 +94,7 @@ internal object AniSkip {
     private val misses = ConcurrentHashMap.newKeySet<String>()
 
     private val client: OkHttpClient by lazy {
-        AppHttpClient.streaming().newBuilder().connectTimeout(8.seconds).readTimeout(15.seconds).dns(FallbackDns).build()
+        AppHttpClient.strict().newBuilder().connectTimeout(8.seconds).readTimeout(15.seconds).dns(FallbackDns).build()
     }
 
     /** Los tiempos del capítulo [episode] del anime [malId], o null si AniSkip no los tiene (o no responde: entonces no se recuerda y se vuelve a intentar). */

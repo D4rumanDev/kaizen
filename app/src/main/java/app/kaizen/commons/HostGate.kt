@@ -401,6 +401,8 @@ object HostGate {
     private fun isServerDown(e: IOException): Boolean = when (e) {
         // Un enlace vacío o mal formado es un fallo de quien lo dio, no del servidor.
         is java.net.MalformedURLException -> false
+        // Un destino que la app misma se niega a tocar (red privada, ver PrivateAddress) no es un servidor caído.
+        is PrivateDestinationException -> false
         is ForbiddenException -> true
         is HttpStatusException -> e.statusCode >= 500 && e.statusCode != 503
         else -> true

@@ -44,7 +44,7 @@ internal object AnilistHttp {
 
     @Volatile internal var clientOverride: OkHttpClient? = null
     private val defaultClient: OkHttpClient by lazy {
-        AppHttpClient.streaming().newBuilder().connectTimeout(8.seconds).readTimeout(30.seconds).dns(FallbackDns).build()
+        AppHttpClient.strict().newBuilder().connectTimeout(8.seconds).readTimeout(30.seconds).dns(FallbackDns).build()
     }
     internal val client: OkHttpClient get() = clientOverride ?: defaultClient
 

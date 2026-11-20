@@ -19,7 +19,8 @@ import kotlin.time.Duration.Companion.hours
  * listas HLS, reescribe cada URL para que los segmentos también pasen por él.
  *
  * Cada sesión solo puede pedir los hosts de su vídeo (el original y los que aparezcan en sus
- * listas o redirecciones), y caduca tras [SESSION_TTL] sin uso.
+ * listas o redirecciones), y caduca tras [SESSION_TTL] sin uso. Ninguna petición sale hacia
+ * direcciones privadas (ver [PrivateAddress]), ni siquiera por una redirección.
  */
 object KaizenProxy {
     private const val FIRST_PORT = 6992
@@ -35,8 +36,21 @@ object KaizenProxy {
         var lastUsed = System.currentTimeMillis()
     }
 
-    /** El cliente de la app más HostGate: se sabe si falla un servidor de vídeo y, en pausa, no se le pide nada. */
-    private val client by lazy { AppHttpClient.streaming().newBuilder().addInterceptor(HostGateInterceptor).build() }
+    /**
+     * El cliente de la app más HostGate: se sabe si falla un servidor de vídeo y, en pausa, no se le pide nada. No llega a direcciones privadas
+     * ([GuardedSocketFactory]) y resuelve con el DNS de las fuentes ([FallbackDns]), así que un nombre que la red filtra pero el relevo ya resuelve
+     * también funciona aquí.
+     */
+    private val client by lazy {
+        AppHttpClient.streaming().newBuilder()
+            // Sin el proxy del sistema (un SOCKS crea su propio socket y se saltaría el guardián) y con su propio pool (una conexión que abrió otro cliente sin guardián no se reutiliza aquí).
+            .proxy(java.net.Proxy.NO_PROXY)
+            .connectionPool(okhttp3.ConnectionPool())
+            .socketFactory(GuardedSocketFactory())
+            .dns(FallbackDns)
+            .addInterceptor(HostGateInterceptor)
+            .build()
+    }
 
     private val sessions = LinkedHashMap<String, Session>(16, 0.75f, true)
     private var server: ProxyServer? = null
