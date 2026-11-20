@@ -14,6 +14,22 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-20 · Red: cliente estricto, proxy sin redes privadas y revisión de optimización
+- **Revisión de red (ingeniero de redes/IT), dos hallazgos de seguridad cerrados en `91582e9`:**
+  - `AppHttpClient.strict()`: AniList y AniSkip validan el certificado con el sistema **siempre**; el modo permisivo (`TlsPolicy.isPermissive`) ya no les afecta. Comparte dispatcher y pool con el cliente base, así que `shutdown()` los cancela también.
+  - El proxy local (`KaizenProxy`) no sale a redes privadas: `GuardedSocketFactory` comprueba el destino en `connect()` (cubre nombres, IP literales, redirecciones y DNS rebinding), sin proxy de sistema, con pool propio y con `FallbackDns`. `HostGate` no cuenta `PrivateDestinationException` como servidor caído.
+  - Pruebas con handshake TLS real (`okhttp-tls` 5.5.0 solo en tests): `StrictClientTest`, `PrivateDestinationTest`. Referencia nueva: [red-dns-tls-proxy.md](red-dns-tls-proxy.md) (qué cliente valida qué, DNS, reglas del proxy y límites conocidos: sin AAAA en el relevo, sin NAT64, sin fijar certificados, clave de WARP en preferencias, dominios en claro).
+- **Auditoría independiente en dos pasadas** (SHA `fea97b99` y delta a `9dee2209`): aprobada con recomendaciones, sin bloqueantes.
+- **Recomendaciones del auditor aplicadas después** (SHA `c2531ae5`): `KaizenProxy.stop()` vacía el pool propio en un hilo demonio aparte y solo si el cliente ya existe; prueba `HostGateTest.unDestinoPrivadoBloqueadoNoPausaElServidor` (control malo: `ConnectException` pausa; bueno: diez bloqueos privados no pausan). `ship.js check`: 1230 pruebas, 0 fallos. No se aplican los bloques opcionales 192.0.0.0/24, 192.0.2.0/24 y 240.0.0.0/4 (decisión: sin uso real que los justifique; queda anotado como opcional).
+- **Instalado** en SHIELD y BRAVIA con copia previa verificada (`backups/tv-2026-11-20-1305/` y `-1306/`, manifiestos sha256): 0 `FATAL`/ANR, datos intactos (282 favoritos, 6457 vistos, 7004 fichas). Instalado el APK de `91582e9`, no el de `c2531ae5`.
+- **No verificado:** que AniList responda con datos por el cliente estricto en una TV real. `anilist-auto --start --limit 3` en la SHIELD terminó con `sin_datos=3` y sin errores TLS, pero `tv.js calls` no cuenta la API de AniList. La prueba llegará con una pasada normal de emparejado (un fallo saldría como error TLS en `tv.js errors`). El proxy solo está probado con pruebas unitarias.
+- **Revisión de optimización** (lectura estática) y **plan aplicado** (SHA `9187751e`, 1236 pruebas, 0 fallos, 2 saltadas; auditoría independiente del SHA `93b79ce6`: aprobada con recomendaciones, ya aplicadas):
+  - F1 `DebugLog.encode`: `DateTimeFormatter` constante en lugar de un `SimpleDateFormat` por línea (zona leída en cada línea; mismo texto).
+  - F2 `Regex` a constantes en `shortChapter`, `longestWord` y `relativeDate`. `searchWords` y `slugFragment` se probaron y se revirtieron: la mejora quedaba dentro del ruido.
+  - F3 `SharedGson` (un `Gson` por defecto) en los convertidores de Room (`BaseConverter`, `DirectoryConverter`), `SeriesStatus`, `Removals` y `KaizenBackup`: Headers a JSON de 13.462 a 937 ns.
+  - F4 (`asSequence`) descartada: ninguna medida la señaló.
+  - Cifras de una microprueba JVM en el PC con ruido de ±30 %; solo F3 sale claramente del ruido. No medido en la TV. Pruebas de caracterización en `OptimizationTest` (la de medidas está con `@Ignore`). Sin commit ni instalar.
+
 ## 2026-11-20 · Revisión de código como diseñador Android: seis mejoras (commit `c0bccca`)
 - **Scrapers sin `!!`** (`FireServer`, `MangoServer`, `OkruServer`, `VoeServer`): un cambio en la web lanza `error()`/`check()` con lo que faltaba, en vez de un NPE sin pista. `Server.verified()` sigue siendo el único sitio que captura.
 - **`ChannelArt.publish`** (suspend) sustituye al `runBlocking`: registra lo publicado y baja en paralelo las miniaturas que faltan, cada una con 8 s máximo y sin cortar las demás. `HomeChannels` usa un `Mutex` en lugar de `@Synchronized`; antes, con 20 filas y una web lenta, podía retener el hilo y el cerrojo minutos. `forLauncher` ya no descarga.
