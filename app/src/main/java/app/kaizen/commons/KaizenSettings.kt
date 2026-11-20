@@ -187,10 +187,20 @@ object KaizenSettings {
         get() = prefs.getStringSet(KEY_SENSITIVE_MARKED, emptySet()).orEmpty().toSet()
         set(value) = prefs.edit { putStringSet(KEY_SENSITIVE_MARKED, value) }
 
-    /** Cómo avisar de versiones nuevas: `off` (no mirar), `notice` (aviso discreto) o `dialog` (diálogo). Apagado de fábrica: el repositorio del proyecto es privado. */
+    /** Avisar de versiones nuevas: `notice` (mira GitHub al abrir, como mucho cada 24 h, y avisa) u `off` (no mirar). De fábrica `notice`; con `off` no hay peticiones ni etiqueta. Instalar solo ocurre si el usuario lo pide en el diálogo (ver [UpdateChecker] y [UpdateFlow]). */
     var updateMode: String
-        get() = prefs.getString("kaizen_update_mode", null) ?: "off"
-        set(value) = prefs.edit { putString("kaizen_update_mode", value) }
+        get() = prefs.getString("kaizen_update_mode", null)?.takeIf { it == "off" } ?: "notice"
+        set(value) = prefs.edit { putString("kaizen_update_mode", if (value == "off") "off" else "notice") }
+    /** Última vez que se miró GitHub con éxito (ms). */
+    var updateCheckedAt: Long by longPref("kaizen_update_checked_at", 0L)
+    /** Último intento de mirar GitHub, con éxito o no (ms): tras un fallo no se reintenta hasta pasadas unas horas. */
+    var updateAttemptedAt: Long by longPref("kaizen_update_attempted_at", 0L)
+    /** Etiqueta de la última release vista (p. ej. `v6.3.0`), o null si no hay una más nueva que la instalada. */
+    var updateLatestTag: String? by stringPref("kaizen_update_latest_tag", null)
+    /** Etiqueta que el usuario eligió «Omitir» (la etiqueta de Inicio no vuelve hasta que salga una mayor). */
+    var updateSkippedTag: String? by stringPref("kaizen_update_skipped_tag", null)
+    /** Etiqueta de la release de la que ya se avisó, para no repetir el aviso. */
+    var updateNotifiedTag: String? by stringPref("kaizen_update_notified_tag", null)
     /** Cuándo se usa el túnel WARP solo para Kaizen (ver [app.kaizen.commons.warp.WarpMode]); apagado de fábrica. */
     var warpMode: String
         get() = prefs.getString("kaizen_warp_mode", null) ?: app.kaizen.commons.warp.WarpMode.OFF.label

@@ -15,8 +15,8 @@ internal object SettingsFlags {
     /** «Contenido sensible» (modo parental con carátulas en blur), en Pantalla. */
     const val SENSITIVE = true
 
-    /** «Actualizaciones» (comprobar y avisar de versiones nuevas), en Acerca de. */
-    const val UPDATES = false
+    /** «Actualizaciones» (avisar de versiones nuevas de GitHub; no instala), en Acerca de. */
+    const val UPDATES = true
 }
 
 /** Elección de un ajuste de medida: al cambiarla se reparte a los módulos que no leen preferencias ([Tuning]). */

@@ -243,4 +243,18 @@
     <string name="ui_estadisticas_no_calculadas">No se pudieron calcular las estadísticas (mira el registro de depuración).</string>
     <string name="ui_calculando_estadisticas">Calculando tus estadísticas…</string>
     <string name="ui_sin_series_en_este_estado">Sin series en este estado. Ponles estado desde su ficha o con una pulsación larga.</string>
+    <string name="ui_update_badge">Nueva versión</string>
+    <string name="ui_update_body">Hay una versión nueva. Se baja de GitHub, se comprueba su huella y su firma y el sistema te pide confirmar la instalación. Tus datos no se tocan.</string>
+    <string name="ui_update_install">Descargar e instalar</string>
+    <string name="ui_update_later">Más tarde</string>
+    <string name="ui_update_skip">Omitir esta versión</string>
+    <string name="ui_update_preparing">Preparando…</string>
+    <string name="ui_update_downloading">Descargando…</string>
+    <string name="ui_update_verifying">Comprobando la huella y la firma…</string>
+    <string name="ui_update_permission">Android necesita que permitas a Kaizen instalar apps desconocidas. Concédelo en el ajuste que se abre y vuelve a pulsar «Descargar e instalar».</string>
+    <string name="ui_update_open_settings">Abrir el ajuste del sistema</string>
+    <string name="ui_update_no_settings">Esta TV no tiene la pantalla de «instalar apps desconocidas». Instala con la dirección de la release (Configuración › Acerca de › Actualizaciones).</string>
+    <string name="ui_update_confirm">Confirma la instalación en la pantalla del sistema. Al terminar, Kaizen se reinicia.</string>
+    <string name="ui_update_retry">Reintentar</string>
+    <string name="ui_update_close">Cerrar</string>
 </resources>

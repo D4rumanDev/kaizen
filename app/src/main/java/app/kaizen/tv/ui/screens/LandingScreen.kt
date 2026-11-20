@@ -123,6 +123,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
     var menuItem by remember { mutableStateOf<Any?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var verifyHost by remember { mutableStateOf<String?>(null) }
+    var updateRelease by remember { mutableStateOf<app.kaizen.commons.UpdateChecker.Release?>(null) }
 
     // Se abre con el foco en el menú lateral, en la sección de inicio: el contenido (que tarda en cargar) no lo reclama ni abre paneles.
     LaunchedEffect(Unit) {
@@ -184,7 +185,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
             // «menú cerrado» y solo se recorta, así que al pasar del menú al contenido nada se redimensiona ni se mueve.
             FixedContentArea {
             Column(Modifier.fillMaxSize().background(Background)) {
-                TopBar(current, searchVisible, settingsChanges) {
+                TopBar(current, searchVisible, settingsChanges, onUpdate = { updateRelease = it }) {
                     selected = it
                     // La página nueva tarda un instante en componerse: pedir el foco ya, sin nada enfocable dentro, lo dejaba sin dueño y caía en el menú lateral (que se abría en «Inicio»).
                     scope.launch {
@@ -228,6 +229,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
         }
     }
     verifyHost?.let { host -> VerifySourceDialog(host) { verifyHost = null } }
+    updateRelease?.let { release -> UpdateDialog(release) { updateRelease = null } }
     UiScaleConfirm(activity)
 }
 
@@ -276,10 +278,13 @@ private fun TopIconButton(@androidx.annotation.DrawableRes icon: Int, descriptio
 
 /** Arriba: a la derecha, «Buscar» y «Configuración» (iconos; el de la sección en uso, en azul) y la hora y la fecha, según «Pantalla». */
 @Composable
-private fun TopBar(current: Int, searchVisible: Boolean, @Suppress("UNUSED_PARAMETER") settingsChanges: Int, onSelect: (Int) -> Unit) {
+private fun TopBar(current: Int, searchVisible: Boolean, @Suppress("UNUSED_PARAMETER") settingsChanges: Int, onUpdate: (app.kaizen.commons.UpdateChecker.Release) -> Unit, onSelect: (Int) -> Unit) {
+    val update by app.kaizen.commons.UpdateChecker.available.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxWidth().padding(start = ContentPaddingHorizontal, end = ContentPaddingHorizontal, top = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Spacer(Modifier.weight(1f))
+            // Solo si hay una versión nueva (y el ajuste está en «Avisar»): pulsarla abre el diálogo de actualizar.
+            update?.let { release -> UpdateBadge(release, onClick = { onUpdate(release) }) }
             if (searchVisible) TopIconButton(R.drawable.header_ic_search, "Buscar", current == MainSections.SEARCH) { onSelect(MainSections.SEARCH) }
             TopIconButton(R.drawable.header_bottom_settings, "Configuración", current == MainSections.TOOLS) { onSelect(MainSections.TOOLS) }
             Spacer(Modifier.width(8.dp))

@@ -15,8 +15,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <!-- Kaizen: sin actualizador de la app oficial, no hace falta instalar APKs -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
+    <!-- Kaizen: instalar la versión nueva que avisa Configuración › Acerca de (solo el APK de nuestra release, tras comprobar su huella y su firma; ver UpdateFlow). Android pide además conceder «instalar apps desconocidas». -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
 
@@ -52,6 +52,9 @@
 
 
         <receiver android:name=".recents.RecentsNotReceiver"/>
+
+        <!-- Resultado de la sesión de instalación (UpdateInstall): solo el sistema lo llama. -->
+        <receiver android:name=".commons.UpdateInstallReceiver" android:exported="false"/>
 
 
         <service

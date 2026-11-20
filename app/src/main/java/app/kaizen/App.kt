@@ -134,6 +134,14 @@ class App : Application(), Configuration.Provider {
             delay(LAZY_START_DELAY)
             SpecSources.refresh()
         }
+        // Aviso de versiones nuevas (solo avisa, como mucho cada 24 h y si el ajuste está en «Avisar»): lejos del arranque, en segundo plano.
+        AppScope.launch(Dispatchers.IO) {
+            // Lo guardado de la última vez (la etiqueta de Inicio) y lo que dejara una instalación a medias, antes de esperar.
+            app.kaizen.commons.UpdateChecker.refreshAvailable()
+            app.kaizen.commons.UpdateFlow.cleanup(this@App)
+            delay(UPDATE_CHECK_DELAY)
+            runCatchingCoop { app.kaizen.commons.UpdateChecker.check(force = false) { app.kaizen.tv.ui.KaizenToast.toastLong(it) } }.onFailure(::logError)
+        }
         // El InitializationProvider de androidx.startup está quitado del manifiesto, así que el perfil de arranque
         // (assets/dexopt/baseline.prof) se instala a mano; ART lo compila en la próxima optimización en reposo.
         AppScope.launch {
@@ -243,6 +251,8 @@ class App : Application(), Configuration.Provider {
 
         /** Cuánto espera el trabajo de segundo plano que no hace falta para pintar Inicio (también lo usa TVMain: una sola definición). */
         internal val LAZY_START_DELAY = 8.seconds
+        /** Espera antes de mirar si hay una versión nueva: no compite con el arranque. */
+        internal val UPDATE_CHECK_DELAY = 20.seconds
         /** Espera extra del emparejado con AniList tras el resto del arranque diferido. */
         private val ANILIST_START_DELAY = 60.seconds
         private const val LEDGER_ATTEMPTS = 3

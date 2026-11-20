@@ -5,6 +5,7 @@ import app.kaizen.R
 import app.kaizen.commons.AppScope
 import app.kaizen.commons.DebugLog
 import app.kaizen.commons.KaizenSettings
+import app.kaizen.commons.UpdateChecker
 import app.kaizen.commons.appString
 import app.kaizen.commons.logError
 import app.kaizen.commons.runCatchingCoop
@@ -40,14 +41,27 @@ internal class AboutSettingsItems {
         ActionItem(appString(R.string.ui_nanohttpd_proxy_local), { appString(R.string.ui_bsd_de_3_clausulas_github_com_nanohttpd_nanohttp) }) { }
     )
 
-    private val updateModes = listOf("off", "notice", "dialog")
-    private val updateModeLabels = listOf("No mirar", "Aviso discreto", "Diálogo")
+    private val updateModes = listOf("notice", "off")
+    private val updateModeLabels = listOf("Avisar", "No mirar")
 
-    /** Preparado, sin lógica: solo se enseña con [SettingsFlags.UPDATES] encendido. */
+    /** Avisar de versiones nuevas y dónde bajarlas; instalar se hace desde la etiqueta de Inicio ([app.kaizen.tv.ui.UpdateDialog]). */
     private fun updateItems() = listOf(
         ChoiceItem("Avisar de versiones nuevas", updateModeLabels,
-            { updateModes.indexOf(KaizenSettings.updateMode).coerceAtLeast(0) }, { KaizenSettings.updateMode = updateModes[it] }),
-        ActionItem("Comprobar ahora", { "Mira si hay versiones nuevas de la app y de las fuentes" }) { KaizenToast.toast("Aún no disponible") }
+            { updateModes.indexOf(KaizenSettings.updateMode).coerceAtLeast(0) }, { KaizenSettings.updateMode = updateModes[it]; UpdateChecker.refreshAvailable() }),
+        ActionItem("Versión instalada", { UpdateChecker.summary(BuildConfig.VERSION_NAME, KaizenSettings.updateLatestTag) }) { },
+        ActionItem("Comprobar ahora", { "Mira en GitHub si hay una release más nueva (solo revela tu IP a GitHub)" }) {
+            KaizenToast.toast("Mirando GitHub…")
+            // Una comprobación a mano trae de vuelta la etiqueta de Inicio aunque se hubiera omitido esa versión.
+            UpdateChecker.state.skippedTag = null
+            AppScope.launch(Dispatchers.IO) {
+                val outcome = runCatchingCoop { UpdateChecker.check(force = true) { } }.onFailure(::logError).getOrNull()
+                KaizenToast.toastLong(when (outcome) {
+                    is UpdateChecker.Outcome.Available -> "Kaizen ${outcome.release.version} disponible: ${outcome.release.url.removePrefix("https://")}"
+                    UpdateChecker.Outcome.UpToDate -> "Estás al día (${BuildConfig.VERSION_NAME})"
+                    else -> "No se pudo mirar GitHub"
+                })
+            }
+        }
     )
 
     /**
