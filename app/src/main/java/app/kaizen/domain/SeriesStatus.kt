@@ -6,7 +6,7 @@ import app.kaizen.source.SeriesLedger
 import app.kaizen.source.normalizeTitle
 import app.kaizen.source.seriesIdOf
 import app.kaizen.source.seriesKeyOf
-import com.google.gson.Gson
+import app.kaizen.commons.SharedGson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +42,7 @@ object SeriesStatuses {
 
     // «Siguiendo» se retiró: lo guardado con ese estado pasa a «Viendo» (así también lo cuentan los filtros de «Mi lista»).
     private fun load(): Map<String, StatusEntry> =
-        runCatching { Gson().fromJson<Map<String, StatusEntry>>(KaizenSettings.seriesStatuses.orEmpty(), type) }.getOrNull().orEmpty()
+        runCatching { SharedGson.gson.fromJson<Map<String, StatusEntry>>(KaizenSettings.seriesStatuses.orEmpty(), type) }.getOrNull().orEmpty()
             .mapValues { (_, entry) -> if (entry.status == "following") entry.copy(status = SeriesStatus.WATCHING.id) else entry }
 
     /**
@@ -156,12 +156,12 @@ object SeriesStatuses {
         if (of(name, source, slug) in setOf(SeriesStatus.WATCHING, SeriesStatus.PLAN)) set(name, SeriesStatus.COMPLETED, source, slug, aid)
     }
 
-    fun export(): String = Gson().toJson(state.value)
+    fun export(): String = SharedGson.gson.toJson(state.value)
 
     /** Añade los estados de una copia que esta instalación no tiene; devuelve cuántos. */
     @Synchronized
     fun importMissing(json: String): Int {
-        val incoming = runCatching { Gson().fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
+        val incoming = runCatching { SharedGson.gson.fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
         // Lo que ya está (por título o porque es la misma serie con otro título) no se duplica.
         val missing = StatusMerge.missing(state.value, incoming, ::seriesKey)
         if (missing.isNotEmpty()) save(state.value + missing)
@@ -174,7 +174,7 @@ object SeriesStatuses {
      */
     @Synchronized
     internal fun importNewer(json: String, skip: (StatusEntry) -> Boolean = { false }): StatusMerge.Result {
-        val incoming = runCatching { Gson().fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
+        val incoming = runCatching { SharedGson.gson.fromJson<Map<String, StatusEntry>>(json, type) }.getOrNull().orEmpty()
             .filterValues { (it as StatusEntry?) != null && !(it.source as String?).isNullOrBlank() && !(it.slug as String?).isNullOrBlank() }
         val before = state.value
         val result = StatusMerge.mergeCounted(before, incoming, ::seriesKey, skip)
@@ -214,7 +214,7 @@ object SeriesStatuses {
         if (pendingWrite.compareAndSet(false, true)) writer.execute {
             pendingWrite.set(false)
             // commit() avisa de un fallo de escritura (disco lleno…) devolviendo false, sin excepción: también se anota.
-            runCatching { check(KaizenSettings.commitSeriesStatuses(Gson().toJson(state.value))) { "commit() devolvió false" } }
+            runCatching { check(KaizenSettings.commitSeriesStatuses(SharedGson.gson.toJson(state.value))) { "commit() devolvió false" } }
                 .onFailure { app.kaizen.commons.DebugLog.error("Estados", "No se pudieron guardar los estados de serie en el disco (siguen en memoria hasta cerrar la app)", it) }
         }
     }

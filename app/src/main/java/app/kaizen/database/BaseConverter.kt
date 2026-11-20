@@ -2,7 +2,7 @@ package app.kaizen.database
 
 import android.net.Uri
 import androidx.room.TypeConverter
-import com.google.gson.Gson
+import app.kaizen.commons.SharedGson
 import com.google.gson.reflect.TypeToken
 import app.kaizen.videoservers.Headers
 
@@ -29,13 +29,15 @@ class BaseConverter {
 
     @TypeConverter
     fun headersToString(headers: Headers?): String {
-        return Gson().toJson(headers, object : TypeToken<Headers>() {
-        }.type)
+        return SharedGson.gson.toJson(headers, HEADERS_TYPE)
     }
 
     @TypeConverter
     fun stringToHeader(json: String?): Headers? {
-        return Gson().fromJson<Headers>(json, object : TypeToken<Headers>() {
-        }.type)
+        return SharedGson.gson.fromJson<Headers>(json, HEADERS_TYPE)
+    }
+
+    private companion object {
+        val HEADERS_TYPE: java.lang.reflect.Type = object : TypeToken<Headers>() {}.type
     }
 }

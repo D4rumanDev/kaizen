@@ -272,8 +272,10 @@ internal fun MediaCard(
     }
 }
 
+private val CHAPTER_LABEL = Regex("^(?:Episodio|Ep\\.?|Capítulo|Cap\\.?)\\s*(\\d+(?:[.,]\\d+)?)\\s*$", RegexOption.IGNORE_CASE)
+
 /** "Episodio 5" y "Ep. 5" pasan a "E5"; lo demás queda igual. */
-internal fun shortChapter(text: String): String = Regex("^(?:Episodio|Ep\\.?|Capítulo|Cap\\.?)\\s*(\\d+(?:[.,]\\d+)?)\\s*$", RegexOption.IGNORE_CASE).find(text.trim())?.let { "E${it.groupValues[1]}" } ?: text
+internal fun shortChapter(text: String): String = CHAPTER_LABEL.find(text.trim())?.let { "E${it.groupValues[1]}" } ?: text
 
 @Composable
 internal fun RecordCard(record: Record, onClick: () -> Unit, onLongClick: (() -> Unit)?, line: String = record.chapter(), progress: Float? = null) {

@@ -348,15 +348,19 @@ internal fun siteDate(day: Int, monthAbbr: String, now: Long = System.currentTim
     return calendar.timeInMillis
 }
 
+/** Las expresiones de [relativeDate], compiladas una vez (la de cantidad lleva la unidad: el mapa crece una entrada por unidad distinta, y `relativeDate` solo usa cinco literales). */
+private val RELATIVE_UNITS = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+private val WEEKDAY_AND_DAY = Regex("""(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s+(\d{1,2})""")
+
 /**
  * Fecha relativa de jkanime: «Hoy», «Ayer», «hace N minutos/horas/días/semanas/meses». 0 si el texto no la tiene.
  * Minutos y horas son exactos; de un día en adelante se toma el mediodía de ese día.
  */
 internal fun relativeDate(text: String, now: Long = System.currentTimeMillis()): Long {
     val lower = text.lowercase()
-    fun amount(unit: String): Int? = Regex("""(\d+)\s+$unit""").find(lower)?.groupValues?.get(1)?.toIntOrNull()
+    fun amount(unit: String): Int? = RELATIVE_UNITS.getOrPut(unit) { Regex("""(\d+)\s+$unit""") }.find(lower)?.groupValues?.get(1)?.toIntOrNull()
     // «Miércoles 07»: día de la semana y del mes (jkanime lo usa a partir de dos días).
-    Regex("""(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s+(\d{1,2})""").find(lower)?.groupValues?.get(2)?.toIntOrNull()?.let { day ->
+    WEEKDAY_AND_DAY.find(lower)?.groupValues?.get(2)?.toIntOrNull()?.let { day ->
         val calendar = java.util.Calendar.getInstance()
         calendar.timeInMillis = now
         calendar.set(java.util.Calendar.HOUR_OF_DAY, 12)

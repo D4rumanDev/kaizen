@@ -26,7 +26,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
-import com.google.gson.Gson
+import app.kaizen.commons.SharedGson
 import com.google.gson.annotations.SerializedName
 import app.kaizen.commons.roundedString
 import kotlinx.coroutines.Dispatchers
@@ -468,12 +468,12 @@ class DirectoryConverter {
     }
     @TypeConverter
     fun relationsToString(relations: List<Relation>?): String {
-        return Gson().toJson(relations?:emptyList<Relation>())
+        return SharedGson.gson.toJson(relations?:emptyList<Relation>())
     }
 
     @TypeConverter
     fun stringToRelations(string: String): List<Relation> {
-        return Gson().fromJson(string, Array<Relation>::class.java).toList()
+        return SharedGson.gson.fromJson(string, Array<Relation>::class.java).toList()
     }
 
 }

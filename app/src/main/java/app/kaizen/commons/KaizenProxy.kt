@@ -41,7 +41,7 @@ object KaizenProxy {
      * ([GuardedSocketFactory]) y resuelve con el DNS de las fuentes ([FallbackDns]), así que un nombre que la red filtra pero el relevo ya resuelve
      * también funciona aquí.
      */
-    private val client by lazy {
+    private val clientLazy = lazy {
         AppHttpClient.streaming().newBuilder()
             // Sin el proxy del sistema (un SOCKS crea su propio socket y se saltaría el guardián) y con su propio pool (una conexión que abrió otro cliente sin guardián no se reutiliza aquí).
             .proxy(java.net.Proxy.NO_PROXY)
@@ -51,6 +51,7 @@ object KaizenProxy {
             .addInterceptor(HostGateInterceptor)
             .build()
     }
+    private val client: okhttp3.OkHttpClient get() = clientLazy.value
 
     private val sessions = LinkedHashMap<String, Session>(16, 0.75f, true)
     private var server: ProxyServer? = null
@@ -61,6 +62,12 @@ object KaizenProxy {
         server?.stop()
         server = null
         sessions.clear()
+        // El pool es propio del proxy (ver `client`): se vacía al parar para no dejar sockets abiertos. Cerrar un socket puede bloquear, así que va en un hilo aparte
+        // (stop() se llama desde el hilo principal) y solo si el cliente ya se creó, para no construirlo al parar.
+        if (clientLazy.isInitialized()) {
+            val pool = client.connectionPool
+            Thread({ runCatching { pool.evictAll() } }, "kaizen-proxy-evict").apply { isDaemon = true }.start()
+        }
     }
 
     /** Momento del último uso de cualquier sesión (para que el servicio sepa cuándo parar). */

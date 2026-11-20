@@ -520,6 +520,17 @@ class HostGateTest {
     }
 
     @Test
+    fun unDestinoPrivadoBloqueadoNoPausaElServidor() {
+        // Control malo: un ConnectException (servidor que no acepta) pausa a la primera, así que la prueba sí puede fallar.
+        runCatching { HostGate.call("https://mal.example/") { throw java.net.ConnectException("refused") } }
+        assertTrue(HostGate.downUntil("mal.example") > 0)
+        // Control bueno: la app misma se niega a tocar una red privada; da igual cuántas veces, no es un servidor caído.
+        repeat(10) { runCatching { HostGate.call("https://privado.example/") { throw PrivateDestinationException("Destino privado bloqueado") } } }
+        assertEquals(0L, HostGate.downUntil("privado.example"))
+        assertEquals(1, warnings.size)
+    }
+
+    @Test
     fun cadaPausaSeguidaEsMasLargaYUnFalloBastaTrasUnaPausa() {
         val host = "e.example"
         fun fail() = runCatching { HostGate.call("https://$host/") { throw IOException("timeout") } }

@@ -63,7 +63,7 @@ internal fun searchSeed(name: String): String =
 
 /** La palabra más larga de [text] (la primera si hay empate): la más selectiva para pedirla a una web que busca mal con varias. */
 internal fun longestWord(text: String): String =
-    Regex("[\\p{L}\\p{N}\\p{Mn}]+").findAll(text).map { it.value }.fold("") { best, word -> if (word.length > best.length) word else best }
+    WORD_RUN.findAll(text).map { it.value }.fold("") { best, word -> if (word.length > best.length) word else best }
 
 private fun computeNormalizedTitle(name: String): String =
     normalizedBase(name)
@@ -86,6 +86,7 @@ private val HOMOGLYPHS: Map<Char, Char> = mapOf(
 
 
 // «2nd», «3ra», «2nda», «1era»... -> el número.
+private val WORD_RUN = Regex("[\\p{L}\\p{N}\\p{Mn}]+")
 private val ORDINAL = Regex("^(\\d+)(st|nd|rd|th|ra|da|nda|era|ta)$")
 
 /** Número romano de 2 a 4 letras (II, III, IV, VIII, XII...) en dígitos; null si el texto no lo es. */

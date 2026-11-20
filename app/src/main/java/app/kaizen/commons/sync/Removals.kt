@@ -2,7 +2,7 @@ package app.kaizen.commons.sync
 
 import androidx.annotation.Keep
 import app.kaizen.App
-import com.google.gson.Gson
+import app.kaizen.commons.SharedGson
 import java.io.File
 import kotlin.time.Duration.Companion.days
 
@@ -136,14 +136,14 @@ object Removals {
     private val file: File get() = File(App.context.filesDir, "sync-state.json")
 
     fun load(): State {
-        val read = runCatching { Gson().fromJson(file.readText(), State::class.java) }.getOrNull() ?: return State()
+        val read = runCatching { SharedGson.gson.fromJson(file.readText(), State::class.java) }.getOrNull() ?: return State()
         // Gson puede dejar a null lo que falte en un fichero dañado.
         @Suppress("USELESS_ELVIS") return State(read.base, read.removed ?: emptyMap(), read.seen ?: emptyList())
     }
 
     fun save(state: State) {
         val temp = File(file.parentFile, "sync-state.json.tmp")
-        temp.writeText(Gson().toJson(state))
+        temp.writeText(SharedGson.gson.toJson(state))
         if (!temp.renameTo(file)) { file.delete(); check(temp.renameTo(file)) { "no se pudo guardar el estado de la sincronización" } }
     }
 }

@@ -4,7 +4,10 @@ import app.kaizen.App
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
-import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -84,12 +87,15 @@ object DebugLog {
 
     // ------------------------------------------------------------------------------------------------ Escribir
 
+    /** Formato de la hora de cada línea: no guarda estado y se comparte entre hilos (antes se creaba un `SimpleDateFormat` por línea). La zona se lee en cada línea, como antes. */
+    private val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
+
     /** Una línea JSON: la primera línea del mensaje es `m`; el resto del mensaje y el rastro técnico van en `d`. */
     internal fun encode(letter: String, tag: String, text: String, fields: Fields?, now: Long = System.currentTimeMillis()): String {
         // Sin direcciones completas ni en el mensaje ni en el rastro técnico (los mensajes de jsoup y OkHttp llevan la URL con sus parámetros).
         val lines = AppErrors.redact(text).lines()
         val json = JsonObject()
-        json.addProperty("t", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(now))
+        json.addProperty("t", TIME.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(now), ZoneId.systemDefault())))
         json.addProperty("l", letter)
         json.addProperty("a", tag)
         json.addProperty("m", lines.first())

@@ -10,7 +10,6 @@ import app.kaizen.pojos.av1.Record
 import app.kaizen.source.ApiCache
 import app.kaizen.source.SeriesLedger
 import app.kaizen.source.UserTitles
-import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,11 +73,11 @@ object KaizenBackup {
         override fun toString() = "$favorites favoritos, $records capítulos vistos, $progress en curso"
     }
 
-    fun encode(data: Data): String = Gson().toJson(data)
+    fun encode(data: Data): String = SharedGson.gson.toJson(data)
 
     /** null si no es un JSON válido o es de una versión posterior. */
     fun decode(json: String): Data? {
-        val raw = runCatching { Gson().fromJson(json, Raw::class.java) }.getOrNull() ?: return null
+        val raw = runCatching { SharedGson.gson.fromJson(json, Raw::class.java) }.getOrNull() ?: return null
         val version = raw.version ?: return null
         if (version !in 2..VERSION) return null
         return Data(version, raw.createdAt ?: 0L, raw.favorites.orEmpty().filter { (it as FavoriteAV1?)?.isValid() == true },
