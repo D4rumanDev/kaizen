@@ -52,9 +52,13 @@ object LaLigaBlock {
         }.getOrNull()?.also { cached = System.currentTimeMillis() to it }
     }
 
-    /** De [hosts], los que hoy resuelven a alguna IP bloqueada. Vacío si no hay bloqueo o no se pudo saber. */
-    suspend fun blockedHosts(hosts: Collection<String>): Set<String> {
-        val blocked = blockedIps()?.takeIf { it.isNotEmpty() } ?: return emptySet()
+    /** ¿Se está mirando el bloqueo? Con el aviso apagado y el túnel fuera del modo «solo con bloqueo» no se consulta nada. */
+    fun isWatching(): Boolean = KaizenSettings.laLigaWarning || app.kaizen.commons.warp.WarpMode.of(KaizenSettings.warpMode) == app.kaizen.commons.warp.WarpMode.ON_BLOCK
+
+    /** De [hosts], los que hoy resuelven a alguna IP bloqueada: vacío si no hay bloqueo; null si no se pudo saber (aviso apagado, o `hayahora.futbol` no responde o está filtrado). */
+    suspend fun blockedHostsOrNull(hosts: Collection<String>): Set<String>? {
+        val blocked = blockedIps() ?: return null
+        if (blocked.isEmpty()) return emptySet()
         return withContext(Dispatchers.IO) {
             hosts.filter { host ->
                 val ips = runCatching { InetAddress.getAllByName(host).mapNotNull { it.hostAddress } }.getOrDefault(emptyList())
@@ -62,4 +66,7 @@ object LaLigaBlock {
             }.toSet()
         }
     }
+
+    /** Como [blockedHostsOrNull], pero vacío también si no se pudo saber. */
+    suspend fun blockedHosts(hosts: Collection<String>): Set<String> = blockedHostsOrNull(hosts).orEmpty()
 }

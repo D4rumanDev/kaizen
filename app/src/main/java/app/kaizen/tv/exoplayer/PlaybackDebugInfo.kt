@@ -24,6 +24,20 @@ import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 
 /**
+ * La causa de un fallo del reproductor. Si lo que falló fue pedir algo a un servidor que ya estaba en pausa ([HostGate.HostDownException]: no se llegó a hacer la petición)
+ * es [Cause.PAUSED] (E26), o sin conexión [Cause.NO_NETWORK]; en el resto manda [ConnectionStats.causeOfPlayback]. Solo para el reproductor: las estadísticas de
+ * fuentes siguen clasificando estas excepciones como siempre.
+ */
+internal fun causeOfFailure(errorCode: Int, e: Throwable?): Cause {
+    val chain = generateSequence(e) { it.cause }.take(8).toList()
+    return when {
+        chain.any { it is app.kaizen.commons.HostGate.OfflineException } -> Cause.NO_NETWORK
+        chain.any { it is app.kaizen.commons.HostGate.HostDownException } -> Cause.PAUSED
+        else -> ConnectionStats.causeOfPlayback(errorCode, e)
+    }
+}
+
+/**
  * Kaizen: datos para el panel de depuración y la ventana de información del capítulo.
  *
  * Escucha al reproductor y apunta **qué ha pasado, cuándo y por qué** (registro de sucesos con la hora y el punto del vídeo) y
@@ -54,7 +68,8 @@ class PlaybackDebugInfo : AnalyticsListener {
     private fun fail(eventTime: AnalyticsListener.EventTime, issue: Cause, text: String, detail: String) {
         session = session.on(SessionEvent.Failure(issue, detail, now()))
         record(eventTime, "ERROR", text, issue)
-        AppErrors.record(issue, AppErrors.Area.PLAYER, detail)
+        // Un servidor en pausa ya se anotó (E26) cuando se pausó: reintentar contra él no es un error nuevo.
+        if (issue != Cause.PAUSED) AppErrors.record(issue, AppErrors.Area.PLAYER, detail)
     }
 
     override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
@@ -127,13 +142,13 @@ class PlaybackDebugInfo : AnalyticsListener {
     override fun onLoadError(eventTime: AnalyticsListener.EventTime, loadEventInfo: LoadEventInfo, mediaLoadData: MediaLoadData, error: IOException, wasCanceled: Boolean) {
         // Una descarga cancelada (el reproductor cambió de calidad o saltó) no es un fallo.
         if (wasCanceled) return
-        val issue = ConnectionStats.causeOfPlayback(PlaybackException.ERROR_CODE_UNSPECIFIED, error)
+        val issue = causeOfFailure(PlaybackException.ERROR_CODE_UNSPECIFIED, error)
         fail(eventTime, issue, "Falló una descarga (${loadEventInfo.uri.host ?: "?"}): ${issue.label}",
             "${error.javaClass.simpleName}: ${error.message ?: ""}".trim())
     }
 
     override fun onPlayerError(eventTime: AnalyticsListener.EventTime, error: PlaybackException) {
-        val issue = ConnectionStats.causeOfPlayback(error.errorCode, error.cause)
+        val issue = causeOfFailure(error.errorCode, error.cause)
         fail(eventTime, issue, "El reproductor se detuvo: ${issue.label}", "${error.errorCodeName}${error.message?.let { ": $it" } ?: ""}")
     }
 

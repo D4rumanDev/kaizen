@@ -221,6 +221,7 @@ object DebugLog {
         "Carpeta de red" to "La carpeta compartida de la red donde se guardan las copias y se sincroniza el estado.",
         "Catálogo" to "La lista interna de series de todas las webs.",
         "Error de la app" to "Un fallo inesperado de la propia app; el rastro técnico de abajo es lo que hay que enseñar para arreglarlo.",
+        "Red" to "Cortes de Internet que detecta la app (cuándo empezó, qué vio Android y cuánto duró). Si se repiten a la misma hora, mira el router o el DNS.",
         "Actualizaciones" to "La comprobación de versiones nuevas de la app."
     )
 

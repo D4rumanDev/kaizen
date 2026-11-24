@@ -938,3 +938,13 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 - **Lo que no cambia:** la caché de disco de Coil sigue para fotogramas y como respaldo si falla la conversión (sin red); no se ha vaciado. Las portadas ya guardadas por Coil se irán sustituyendo al verse.
 - **Registro:** `DebugLog` calla lo informativo repetido (misma etiqueta y texto con los números enmascarados, 60 s) y la siguiente vez lo anota como «×N»; los errores nunca se callan. El panel del pie explica cada parte de la app («Qué es …»).
 - **Pendiente de verificar en la TV:** tamaño real en disco, tiempos de pintado de una rejilla fría y que el nivel «ninguna» no frene. No instalado todavía.
+
+## 2026-11-24 · Cortes de Internet, E99, pantalla Fuentes y vigilantes de red
+
+- **Cortes medidos:** el vigilante de la TV (`tools/net-watch.js`) cazó dos cortes de la salida a Internet de menos de 1 minuto (14:56:50 y 15:11:18, separados ~14,5 min; el segundo coincide con el timeout del reproductor a las 15:10:28). En los dos, router y AdGuard respondían y `1.1.1.1` y las webs no. El Wi-Fi de la TV (5 GHz, −52 dBm) y LaLiga (0 IPs bloqueadas el 23 y el 24; 1.800–2.200 el 22) quedan descartados. Hipótesis sin confirmar: corte periódico de ~14 min del router u operador. `tools/pc-ping.js` compara desde el PC.
+- **`hayahora.futbol` está filtrado por AdGuard** («Abused TLDs», por ser `.futbol`): la app no puede saber si LaLiga bloquea. La tarjeta nueva de Fuentes lo dice («No se pudo consultar»). Regla para AdGuard: `@@||hayahora.futbol^`.
+- **E99 → E26:** un reintento del reproductor contra un servidor ya pausado (`HostDownException`) salía como «Otro». Ahora es E26 (o «sin red») y no se vuelve a anotar (ya se anotó al pausar). Solo en el reproductor: las estadísticas de fuentes no cambian.
+- **Registro de cortes:** `NetworkState` anota una línea al detectar un corte de Internet (qué vio Android, qué webs fallaron) y otra al volver con la duración (área «Red»).
+- **Pantalla Fuentes:** primera fila de diagnóstico (Comprobar todas · Internet · Bypass Cloudflare · WARP · LaLiga) y debajo, solo las fuentes. WARP enseña si el túnel está activo (pulsar aplica el modo elegido); LaLiga distingue «sin bloqueo», «N de M bloqueadas», «aviso apagado» y «no se pudo consultar».
+- **Herramientas nuevas:** `tools/net-watch.js`, `tools/pc-ping.js` y `tools/lib/adb-device.js` (la lectura del dispositivo que antes duplicaba `tv.js`). Documentadas en `tools/README.md`.
+- **Defectos propios que encontró la auditoría y están corregidos:** la IP del dispositivo podía acabar en los datos del vigilante en un fallo de ADB; `--hosts` se pasaba sin validar al shell de la TV; el vigilante calculaba mal el tiempo de las conexiones fallidas (salían negativas).

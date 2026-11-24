@@ -154,10 +154,15 @@ object WarpTunnel {
         DebugLog.info("WARP", "Túnel bajado")
     }
 
+    /** Cómo está el túnel ahora: el modo elegido, el permiso de VPN, si hay cuenta de WARP registrada y si el túnel está subido. */
+    data class Snapshot(val mode: WarpMode, val consent: Boolean, val account: Boolean, val up: Boolean)
+
+    /** Lee el estado (toca el disco y el sistema: fuera del hilo principal). */
+    fun snapshot(context: Context) = Snapshot(WarpMode.of(KaizenSettings.warpMode), hasConsent(context), savedAccount() != null, isUp())
+
     /** Estado para el menú y para ADB. */
-    fun status(context: Context): String {
-        val mode = WarpMode.of(KaizenSettings.warpMode)
-        return "modo=${mode.label} | permiso_vpn=${if (hasConsent(context)) "concedido" else "falta"} | cuenta=${if (savedAccount() != null) "registrada" else "sin registrar"} | tunel=${if (isUp()) "subido" else "bajado"}"
+    fun status(context: Context): String = snapshot(context).let { s ->
+        "modo=${s.mode.label} | permiso_vpn=${if (s.consent) "concedido" else "falta"} | cuenta=${if (s.account) "registrada" else "sin registrar"} | tunel=${if (s.up) "subido" else "bajado"}"
     }
 
     /**

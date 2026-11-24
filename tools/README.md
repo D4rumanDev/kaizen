@@ -18,6 +18,7 @@ Carpeta unificada de utilidades, scripts de mantenimiento, herramientas de audit
    - [`ficha-preview.sh`](#ficha-previewsh)
 6. [Depuración y Registro](#6-depuración-y-registro)
    - [`retrace.js`](#retracejs)
+   - [`net-watch.js` y `pc-ping.js`](#net-watchjs-y-pc-pingjs)
 7. [Suite de Auditorías (`tools/audit/`)](#7-suite-de-auditorías-toolsaudit)
    - [`audit.py`](#auditpy-orquestador-principal)
    - [`code_graph.py`](#code_graphpy)
@@ -212,6 +213,19 @@ node tools/retrace.js trace <RUTA_A_DEBUG_LOG>
 ```
 - `save`: Almacena el `mapping.txt` de la última compilación en `backups/mapping/<id>.txt` indexado por su `pg_map_id`.
 - `trace`: Analiza un fichero de registro (`debug.log`), detecta los IDs de compilación (`r8-map-id-XXXXXXXX`) y traduce automáticamente la pila de llamadas utilizando la herramienta `retrace` del Android SDK.
+
+### `net-watch.js` y `pc-ping.js`
+Vigilan la red para distinguir un corte del Wi-Fi de la TV, del router, del DNS, de la salida a Internet o de una web concreta:
+
+```bash
+node tools/net-watch.js [--interval 60] [--hosts a.com,b.com] [--out carpeta]   # se queda corriendo; Ctrl+C para parar
+node tools/net-watch.js --once                                                  # un solo ciclo
+node tools/net-watch.js --summary                                               # cortes, fallos por destino y latencias
+node tools/pc-ping.js [--interval 2] [--target 1.1.1.1]                         # lo mismo, desde el PC, para comparar
+```
+- `net-watch.js` lanza **desde la TV**, por ADB y una vez por ciclo: ping al router, al DNS de la red y a `1.1.1.1` (dos paquetes cada uno: el primero tras reposo revela si el Wi-Fi «duerme»), conexión TCP al puerto 443 de varias webs, señal Wi-Fi y si la TV estaba despierta. Una línea JSON por ciclo en `backups/net-watch/AAAA-MM-DD.jsonl` (sin la IP del dispositivo). No cambia nada en la TV. `--hosts` solo admite letras, cifras, puntos y guiones.
+- `pc-ping.js` anota desde el PC cada caída y recuperación de `1.1.1.1` (`backups/net-watch/pc-ping-*.log`). Si el PC y la TV pierden la salida a la misma hora, el corte es del router o del operador y no de la TV.
+- La lectura del dispositivo (`ADB_DEVICE`) está en `tools/lib/adb-device.js`, compartida con `tv.js`.
 
 ---
 

@@ -44,6 +44,12 @@ import app.kaizen.bypass.launchBypass
 import app.kaizen.commons.findActivity
 import app.kaizen.commons.HostGate
 import app.kaizen.commons.NetworkState
+import app.kaizen.commons.LaLigaBlock
+import app.kaizen.commons.warp.WarpMode
+import app.kaizen.commons.warp.WarpTunnel
+import app.kaizen.tv.ui.components.SectionTitle
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 import app.kaizen.tv.settings.setSourceActive
 import app.kaizen.commons.KaizenSettings
 import app.kaizen.source.AnimeSource
@@ -201,8 +207,11 @@ internal fun SourcesPage() {
 
     // Al abrir se mide cada fuente sin tocar pausas (probe): así se ven los tiempos sin pulsar nada.
     // Fuentes cuya IP está bloqueada ahora por un partido de LaLiga (hayahora.futbol); vacío si no hay bloqueo o no se pudo saber.
-    var laLigaHosts by remember { mutableStateOf<Set<String>>(emptySet()) }
-    LaunchedEffect(Unit) { laLigaHosts = runCatching { app.kaizen.commons.LaLigaBlock.blockedHosts(AnimeSources.selected.map { it.host }) }.getOrDefault(emptySet()) }
+    var laLigaHosts by remember { mutableStateOf<Set<String>?>(null) }
+    LaunchedEffect(Unit) { laLigaHosts = runCatching { LaLigaBlock.blockedHostsOrNull(AnimeSources.selected.map { it.host }) }.getOrNull() }
+    // El túnel WARP: se lee fuera del hilo principal al abrir y cada pocos segundos (sube o baja solo según el modo).
+    var warp by remember { mutableStateOf<WarpTunnel.Snapshot?>(null) }
+    LaunchedEffect(Unit) { while (true) { warp = withContext(Dispatchers.IO) { runCatching { WarpTunnel.snapshot(context) }.getOrNull() }; delay(WARP_REFRESH) } }
     // Mientras dura esa primera medición las tarjetas no ponen texto, solo el círculo vacío (antes ponían «Activa» y a los segundos cambiaban).
     var probing by remember { mutableStateOf(true) }
     // Sin conexión no se mide nada; al volver la red se mide (la clave cambia y se relanza).
@@ -243,25 +252,22 @@ internal fun SourcesPage() {
         // Leer el valor aquí suscribe la rejilla: se rehace al cambiar las fuentes marcadas o las pausas.
         changes
         val selected = AnimeSources.selected
-        // La red, la primera tarjeta: solo indica si hay Internet (el «Modo sin conexión» se cambia en Configuración › Datos y caché); pulsarla no hace nada.
+        // Primera fila, el diagnóstico: comprobar, Internet, Cloudflare, WARP y LaLiga. Debajo, solo las fuentes.
+        item {
+            // Cuántas de las fuentes activas responden bien, con lo ya medido.
+            val summary = sourcesSummary(selected.map { source ->
+                sourceState(true, HostGate.downUntil(source.host), lastCheck[source.id], HostGate.recentFailure(source.host), probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts.orEmpty(), network)
+            })
+            val offline = network != NetworkState.Mode.ONLINE
+            val title = if (offline) "Reintentar conexión" else if (checking) "Comprobando…" else "Comprobar todas"
+            // Sin conexión no hay nada que comprobar: reintentar borra las pruebas de «sin Internet» y la siguiente petición lo decide de nuevo.
+            IconTextCard(title + if (summary.isNotEmpty()) "\n$summary" else "", { if (offline) NetworkState.retry() else check(selected) }) { TintedIcon(R.drawable.ic_sync) }
+        }
+        // Internet: solo indica si hay conexión (el «Modo sin conexión» se cambia en Configuración › Datos y caché); pulsarla no hace nada.
         item {
             val (health, text) = networkSummary(network)
-            IconTextCard("Red\n$text", {}) {
+            IconTextCard("Internet\n$text", {}) {
                 NetworkBadge(health, size = 40.dp)
-            }
-        }
-        // Todas las fuentes: pulsar una la activa o la desactiva (como en los botones del reproductor); siempre queda al menos una.
-        val all = AnimeSources.all
-        items(all.size, key = { all[it].id }, contentType = { "source" }) { index ->
-            val source = all[index]
-            val active = source in selected
-            val pausedUntil = HostGate.downUntil(source.host)
-            val result = lastCheck[source.id]
-            val failure = HostGate.recentFailure(source.host)
-            val state = sourceState(active, pausedUntil, result, failure, probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts, network)
-            IconTextCard(if (state.text.isEmpty()) source.name else "${source.name}\n${state.text}", { setSourceActive(source.id, !active) },
-                background = if (active) ActiveCard else InactiveCard, contentColor = if (active) Color.White else InactiveContent) {
-                SourceLogo(source, size = 40.dp, disabled = !active, health = state.health)
             }
         }
         item {
@@ -270,17 +276,68 @@ internal fun SourcesPage() {
                 CloudflareLogo(health, size = 40.dp)
             }
         }
+        // WARP: si el túnel está activo. Pulsar aplica ahora el modo elegido (lo mismo que la app hace sola cada pocos minutos) y avisa si no pudo.
         item {
-            // Cuántas de las fuentes activas responden bien, con lo ya medido.
-            val summary = sourcesSummary(selected.map { source ->
-                sourceState(true, HostGate.downUntil(source.host), lastCheck[source.id], HostGate.recentFailure(source.host), probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts, network)
-            })
-            val offline = network != NetworkState.Mode.ONLINE
-            val title = if (offline) "Reintentar conexión" else if (checking) "Comprobando…" else "Comprobar todas"
-            // Sin conexión no hay nada que comprobar: reintentar borra las pruebas de «sin Internet» y la siguiente petición lo decide de nuevo.
-            IconTextCard(title + if (summary.isNotEmpty()) "\n$summary" else "", { if (offline) NetworkState.retry() else check(selected) }) { TintedIcon(R.drawable.ic_sync) }
+            val (health, text) = warpSummary(warp)
+            IconTextCard("WARP\n$text", {
+                scope.launch {
+                    app.kaizen.commons.runCatchingCoop { WarpTunnel.evaluate() }.onSuccess { it?.let(KaizenToast::toastLong) }.onFailure(::logError)
+                    warp = withContext(Dispatchers.IO) { runCatching { WarpTunnel.snapshot(context) }.getOrNull() }
+                }
+            }) { NetworkBadge(health, size = 40.dp) }
+        }
+        // LaLiga: cuántas fuentes activas tienen hoy la IP bloqueada. Pulsar vuelve a consultarlo.
+        item {
+            val (health, text) = laLigaSummary(LaLigaBlock.isWatching(), laLigaHosts, selected.size)
+            IconTextCard("LaLiga\n$text", { scope.launch { laLigaHosts = runCatching { LaLigaBlock.blockedHostsOrNull(AnimeSources.selected.map { it.host }) }.getOrNull() } }) {
+                NetworkBadge(health, size = 40.dp)
+            }
+        }
+        // Segunda fila: todas las fuentes. Pulsar una la activa o la desactiva (como en los botones del reproductor); siempre queda al menos una.
+        fullWidth { SectionTitle("Fuentes") }
+        val all = AnimeSources.all
+        items(all.size, key = { all[it].id }, contentType = { "source" }) { index ->
+            val source = all[index]
+            val active = source in selected
+            val pausedUntil = HostGate.downUntil(source.host)
+            val result = lastCheck[source.id]
+            val failure = HostGate.recentFailure(source.host)
+            val state = sourceState(active, pausedUntil, result, failure, probing, { timeFormat.format(Date(it)) }, source.host in laLigaHosts.orEmpty(), network)
+            IconTextCard(if (state.text.isEmpty()) source.name else "${source.name}\n${state.text}", { setSourceActive(source.id, !active) },
+                background = if (active) ActiveCard else InactiveCard, contentColor = if (active) Color.White else InactiveContent) {
+                SourceLogo(source, size = 40.dp, disabled = !active, health = state.health)
+            }
         }
     }
+}
+
+/** Cada cuánto se vuelve a leer el estado del túnel WARP mientras «Fuentes» está abierta. */
+private val WARP_REFRESH = 5.seconds
+
+/**
+ * Color y texto de la tarjeta de WARP: activo si el túnel está subido; apagado, en espera (solo con bloqueo de LaLiga) o con lo que falta para subirlo.
+ * Null: aún no se ha leído.
+ */
+internal fun warpSummary(s: WarpTunnel.Snapshot?): Pair<SourcesHealth, String> = when {
+    s == null -> SourcesHealth.CHECKING to "Comprobando…"
+    s.up -> SourcesHealth.OK to "Túnel activo · ${s.mode.label}"
+    s.mode == WarpMode.OFF -> SourcesHealth.CHECKING to "Apagado · el modo se elige en Configuración"
+    s.mode == WarpMode.ON_BLOCK && !s.consent -> SourcesHealth.PARTIAL to "En espera, pero falta el permiso de VPN"
+    s.mode == WarpMode.ON_BLOCK -> SourcesHealth.OK to "En espera · se activa si LaLiga bloquea"
+    !s.consent -> SourcesHealth.DOWN to "Siempre, pero falta el permiso de VPN"
+    !s.account -> SourcesHealth.PARTIAL to "Siempre, sin cuenta registrada · pulsa para subirlo"
+    else -> SourcesHealth.DOWN to "Siempre, pero el túnel está bajado · pulsa para subirlo"
+}
+
+/**
+ * Color y texto de la tarjeta de LaLiga: [blocked] son las fuentes activas con la IP bloqueada hoy; null si no se pudo saber. [watching] dice si el aviso está encendido
+ * (sin él no se consulta nada). [active] es cuántas fuentes están activas.
+ */
+internal fun laLigaSummary(watching: Boolean, blocked: Set<String>?, active: Int): Pair<SourcesHealth, String> = when {
+    !watching -> SourcesHealth.CHECKING to "Aviso apagado"
+    blocked == null -> SourcesHealth.CHECKING to "No se pudo consultar (¿hayahora.futbol filtrado por tu DNS?)"
+    blocked.isEmpty() -> SourcesHealth.OK to "Sin bloqueo"
+    else -> SourcesHealth.DOWN to "${blocked.size} de $active fuentes bloqueadas"
 }
 
 /** Estado y texto de la tarjeta «Red» de «Fuentes», que es solo un indicador: con conexión, círculo verde; sin ella, el motivo. */

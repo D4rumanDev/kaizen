@@ -76,15 +76,8 @@ function arg(name, fallback) {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
-function deviceFromEnvFile() {
-  const file = path.join(ROOT, 'tools', 'adb-device', '.env');
-  if (!fs.existsSync(file)) return null;
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*ADB_DEVICE\s*=\s*(.+)$/);
-    if (m) return m[1].trim();
-  }
-  return null;
-}
+const { deviceFromEnvFile: envDevice } = require('./lib/adb-device');
+const deviceFromEnvFile = () => envDevice(ROOT);
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' && /gradlew/.test(cmd), ...opts });

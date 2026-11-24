@@ -58,6 +58,27 @@ object NetworkState {
 
     private var registered = false
 
+    /** Cuándo se detectó el corte de Internet que sigue en pie (-1: ninguno), para anotar cuánto duró. */
+    @Volatile private var cutSince = -1L
+
+    /** Lo que se anota al detectar un corte: qué vio Android y qué webs fallaron por red. */
+    internal fun cutLine(platform: Platform, hosts: Collection<String>): String {
+        val android = when (platform) {
+            Platform.NONE -> "Android no ve ninguna red con salida a Internet"
+            Platform.UNVALIDATED -> "Android no valida la red"
+            Platform.VALIDATED -> "Android da la red por buena"
+        }
+        val webs = if (hosts.isEmpty()) "ninguna web falló" else "fallaron por red: " + hosts.sorted().joinToString(", ")
+        return "Internet cortado: $android; $webs"
+    }
+
+    /** Lo que se anota al volver: cuánto estuvo cortado, en palabras. */
+    internal fun backLine(millis: Long): String {
+        val s = (millis / 1000).coerceAtLeast(0)
+        val text = if (s < 60) "$s s" else "${s / 60} min ${s % 60} s"
+        return "Internet recuperado tras $text"
+    }
+
     /** Se llama una vez al arrancar: sigue los cambios de red al instante, sin esperar a ninguna petición. */
     @Synchronized fun start(context: Context = App.context) {
         recompute()
@@ -113,10 +134,14 @@ object NetworkState {
     @Synchronized fun recompute() {
         val now = clock()
         failures.entries.removeAll { now - it.value > EVIDENCE_WINDOW.inWholeMilliseconds }
-        val next = decide(manual(), runCatching { platform() }.getOrDefault(Platform.VALIDATED), failures.size)
+        val seen = runCatching { platform() }.getOrDefault(Platform.VALIDATED)
+        val next = decide(manual(), seen, failures.size)
         val previous = _mode.value
         if (next == previous) return
         _mode.value = next
+        // Para saber si los fallos son cortes de la red y cuánto duran: una línea al caer (con la evidencia) y otra al volver (con la duración).
+        if (next == Mode.NO_INTERNET) { cutSince = now; runCatching { DebugLog.info("Red", cutLine(seen, failures.keys)) } }
+        else if (previous == Mode.NO_INTERNET && cutSince >= 0) { runCatching { DebugLog.info("Red", backLine(now - cutSince)) }; cutSince = -1L }
         // Se anota una vez, al entrar (no en cada petición saltada), en el catálogo único de errores.
         val cause = when (next) {
             Mode.NO_INTERNET -> app.kaizen.domain.ConnectionStats.Cause.NO_INTERNET
