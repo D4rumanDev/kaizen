@@ -81,9 +81,40 @@ object DebugLog {
         // Un fallo al registrar nunca debe romper lo que se estaba registrando (ni en pruebas sin contexto de Android).
         runCatching {
             if (levelProvider() < level) return
-            append(encode(letter, tag, message(), fields))
+            val text = message()
+            // Los errores se anotan siempre (el gestor de errores ya agrupa los suyos); lo informativo que se repite se cuenta, no se vuelve a escribir.
+            val repeated = if (level == ERROR) 0 else repeats.admit(tag, text, System.currentTimeMillis()) ?: return
+            append(encode(letter, tag, text, fields, repeated = repeated))
         }
     }
+
+    /**
+     * Lo informativo que se repite: la misma etiqueta con el mismo texto (los números no cuentan: «avance 10 de 50» y «avance 11 de 50» son lo mismo) no se
+     * vuelve a escribir en [window]. La siguiente vez que sí se escribe lleva cuántas se quedaron fuera (`rep`), que el visor enseña como «×N».
+     * Las que se callan al final y no vuelven a aparecer no se cuentan: no hay cómo saber que fueron las últimas.
+     */
+    internal class Repeats(private val window: Long = 60_000L, private val maxKeys: Int = 300) {
+        private class Seen(var at: Long, var skipped: Int)
+        private val seen = HashMap<String, Seen>()
+
+        /** null: callar esta anotación; si no, cuántas iguales se callaron desde la última que se escribió (0 si ninguna). */
+        @Synchronized fun admit(tag: String, text: String, now: Long): Int? {
+            val key = tag + "|" + text.lineSequence().first().replace(DIGITS, "#").take(120)
+            val entry = seen[key]
+            if (entry != null && now - entry.at < window) { entry.skipped++; return null }
+            if (seen.size >= maxKeys) seen.entries.removeAll { now - it.value.at >= window }
+            if (seen.size >= maxKeys) seen.clear()
+            val skipped = entry?.skipped ?: 0
+            seen[key] = Seen(now, 0)
+            return skipped
+        }
+
+        @Synchronized fun reset() = seen.clear()
+        private companion object { val DIGITS = Regex("""\d+""") }
+    }
+
+    /** Las pruebas del disco escriben líneas casi iguales a propósito: lo cambian por una ventana de 0. */
+    @Volatile internal var repeats = Repeats()
 
     // ------------------------------------------------------------------------------------------------ Escribir
 
@@ -91,7 +122,7 @@ object DebugLog {
     private val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
 
     /** Una línea JSON: la primera línea del mensaje es `m`; el resto del mensaje y el rastro técnico van en `d`. */
-    internal fun encode(letter: String, tag: String, text: String, fields: Fields?, now: Long = System.currentTimeMillis()): String {
+    internal fun encode(letter: String, tag: String, text: String, fields: Fields?, now: Long = System.currentTimeMillis(), repeated: Int = 0): String {
         // Sin direcciones completas ni en el mensaje ni en el rastro técnico (los mensajes de jsoup y OkHttp llevan la URL con sus parámetros).
         val lines = AppErrors.redact(text).lines()
         val json = JsonObject()
@@ -100,6 +131,7 @@ object DebugLog {
         json.addProperty("a", tag)
         json.addProperty("m", lines.first())
         if (lines.size > 1) json.add("d", com.google.gson.JsonArray().also { array -> lines.drop(1).filter { it.isNotBlank() }.forEach { array.add(it.trimEnd()) } })
+        if (repeated > 0) json.addProperty("rep", repeated)
         fields?.code?.let { json.addProperty("code", it) }
         fields?.cause?.let { json.addProperty("cause", it) }
         fields?.origin?.let { json.addProperty("origin", it) }
@@ -162,7 +194,9 @@ object DebugLog {
     /** Una anotación ya leída: cuándo, qué gravedad, de qué parte de la app y qué pasó. [details] son las líneas que siguen (origen y solución, rastro de un error). */
     data class Entry(
         val date: String, val time: String, val level: Int, val area: String, val message: String, val details: List<String>,
-        val code: String? = null, val cause: String? = null, val origin: String? = null, val context: String? = null
+        val code: String? = null, val cause: String? = null, val origin: String? = null, val context: String? = null,
+        /** Cuántas anotaciones iguales se callaron antes de esta (ver [Repeats]). */
+        val repeated: Int = 0
     )
 
     private val ENTRY = Regex("""^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([EID])/([^:]*): (.*)$""")
@@ -172,6 +206,26 @@ object DebugLog {
         "Datos" to "Copia y datos", "Series" to "Libro de series", "Catálogo" to "Catálogo", "ControlADB" to "Control por ADB",
         "Depuración" to "Depuración", "KAIZEN" to "Error de la app"
     )
+
+    /** Qué es cada parte de la app (por su nombre en el visor), para el panel del pie: en una frase y sin jerga. */
+    private val AREA_HELP = mapOf(
+        "Arranque" to "Cuánto tardó cada paso al abrir la app (ms = milisegundos). Si el arranque se nota lento, el paso con más ms es el culpable.",
+        "Libro de series" to "El libro que une la misma serie cuando está en varias webs (cada serie tiene un identificador). Las reglas manuales son tus uniones y separaciones.",
+        "AniList" to "El emparejado de tus series con AniList, de donde salen la nota, la sinopsis y la portada. «Por revisar» son enlaces dudosos que decides tú.",
+        "Copia y datos" to "Tus favoritos, capítulos vistos y las copias de seguridad, y su sincronización entre dispositivos.",
+        "Fuentes y servidores" to "Las webs de las que se bajan las series y el vídeo. Aquí salen los fallos de conexión y los servidores en pausa.",
+        "Portadas" to "Las portadas: descarga, conversión a WebP y la caché de disco (superior para emisión, mejores y favoritas; ninguna para las antiguas).",
+        "Carátulas" to "Fallos al bajar portadas o imágenes de capítulo (una web caída o una imagen que ya no existe).",
+        "AniSkip" to "Los tiempos de apertura y cierre que se usan para el botón de saltar.",
+        "Control por ADB" to "Órdenes recibidas por cable de depuración (ADB) desde el PC: pruebas y comprobaciones, no algo que hagas con el mando.",
+        "Carpeta de red" to "La carpeta compartida de la red donde se guardan las copias y se sincroniza el estado.",
+        "Catálogo" to "La lista interna de series de todas las webs.",
+        "Error de la app" to "Un fallo inesperado de la propia app; el rastro técnico de abajo es lo que hay que enseñar para arreglarlo.",
+        "Actualizaciones" to "La comprobación de versiones nuevas de la app."
+    )
+
+    /** La explicación en una frase de [area] (el nombre que enseña el visor), o null si no hay. */
+    fun areaHelp(area: String): String? = AREA_HELP[area]
 
     private fun levelOf(letter: String) = when (letter) { "E" -> ERROR; "D" -> DETAIL; else -> INFO }
 
@@ -205,7 +259,7 @@ object DebugLog {
         val tag = text("a").orEmpty()
         Entry(date, time, levelOf(text("l").orEmpty()), AREAS[tag] ?: tag, text("m").orEmpty(),
             json.get("d")?.takeIf { it.isJsonArray }?.asJsonArray?.map { it.asString }.orEmpty(),
-            text("code"), text("cause"), text("origin"), text("ctx"))
+            text("code"), text("cause"), text("origin"), text("ctx"), text("rep")?.toIntOrNull() ?: 0)
     }.getOrNull()
 
     /**
@@ -220,6 +274,7 @@ object DebugLog {
     }
 
     fun clear() {
+        repeats.reset()
         runCatching {
             synchronized(lock) {
                 pending.clear()

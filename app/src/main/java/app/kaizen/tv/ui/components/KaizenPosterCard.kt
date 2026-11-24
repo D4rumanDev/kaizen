@@ -124,6 +124,10 @@ internal fun rememberSensitive(source: String?, slug: String?): Boolean {
     return slug != null && ("$source|$slug" in KaizenSettings.sensitiveMarked || rememberAnilistCard(source, slug)?.sensitive == true)
 }
 
+/** Cuánto se guarda en disco la portada de esta tarjeta (ver [CoverTiers]): favoritas, en emisión y mejores, la caché superior; terminadas hace años, ninguna. */
+internal fun coverTierOf(favorite: Boolean, anilist: AnilistCard?): app.kaizen.commons.CoverTier =
+    app.kaizen.commons.CoverTiers.of(favorite, anilist?.info?.status, anilist?.score, anilist?.info?.year, java.time.Year.now().value)
+
 /** El título de la tarjeta: el romaji de AniList si la serie está enlazada (y el ajuste encendido). */
 private fun romajiOr(card: AnilistCard?, name: String): String = card?.romaji?.takeIf { it.isNotBlank() } ?: name
 
@@ -241,6 +245,7 @@ internal fun MediaCard(
     val anilist = rememberAnilistCard(source, slug)
     val shown = romajiOr(anilist, title)
     var focused by remember { mutableStateOf(false) }
+    val coverTier = remember(favorite, anilist) { coverTierOf(favorite, anilist) }
     val total = anilist?.info?.episodes
     val isFinal = !isNew && chapterNumber != null && total != null && total > 1 && chapterNumber == total.toDouble()
     FocusCard(Modifier.size(width, posterHeight(width)), onClick, onLongClick, background = Color.Transparent, onFocusChange = { focused = it }) {
@@ -248,7 +253,7 @@ internal fun MediaCard(
         val imageShape = if (progress != null) RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp) else CardImageShape
         // Como en el diseño: el estado arriba a la izquierda, el corazón arriba a la derecha, el capítulo abajo a la izquierda y el check de visto abajo a la derecha.
         Box(Modifier.weight(1f).fillMaxWidth().clip(imageShape).border(1.dp, Border, imageShape)) {
-            Cover(covers, Modifier.fillMaxSize(), blur = rememberSensitive(source, slug))
+            Cover(covers, Modifier.fillMaxSize(), blur = rememberSensitive(source, slug), tier = coverTier)
             if (isNew || isFinal || status != app.kaizen.domain.SeriesStatus.NONE) {
                 Column(Modifier.align(Alignment.TopStart).padding(start = 6.dp, top = 6.dp, end = 34.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
                     if (isNew) NewBadge() else if (isFinal) NewBadge("FINAL")

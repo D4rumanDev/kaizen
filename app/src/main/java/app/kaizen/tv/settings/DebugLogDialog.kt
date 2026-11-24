@@ -224,7 +224,7 @@ internal fun entryLines(entries: List<DebugLog.Entry>): List<LogLine> {
         val full = fullText(entry)
         val level = when (entry.level) { DebugLog.ERROR -> "ERROR"; DebugLog.DETAIL -> "detalle"; else -> "info" }
         out += LogLine(LogLine.Kind.ENTRY, if (entry.level == DebugLog.ERROR) ErrorTint else White70,
-            time = entry.time, level = level, area = entry.area, message = entry.message.lineSequence().first(), full = full)
+            time = entry.time, level = level, area = entry.area, message = entry.message.lineSequence().first() + repeatedNote(entry), full = full)
         entry.details.firstOrNull()?.let { first ->
             val more = entry.details.size - 1
             out += LogLine(LogLine.Kind.DETAIL, DetailTint, message = first + if (more > 0) " (+$more líneas técnicas; se leen enteras en el panel de abajo)" else "", full = full)
@@ -244,6 +244,11 @@ internal fun fullText(entry: DebugLog.Entry): String = buildString {
     if (info.isNotEmpty()) append(NL).append(info)
     entry.details.take(FULL_DETAIL_LINES).forEach { append(NL).append(it) }
     if (entry.details.size > FULL_DETAIL_LINES) append(NL).append("… (+${entry.details.size - FULL_DETAIL_LINES} líneas más)")
+    if (entry.repeated > 0) append(NL).append("Se repitió ${entry.repeated} ${if (entry.repeated == 1) "vez más" else "veces más"} seguidas en el último minuto y no se anotó para no llenar el registro.")
+    DebugLog.areaHelp(entry.area)?.let { append(NL).append(NL).append("Qué es «").append(entry.area).append("»: ").append(it) }
 }
+
+/** « (×3)»: cuántas veces ocurrió esta anotación contando las que se callaron por repetidas; vacío si ocurrió una sola vez. */
+private fun repeatedNote(entry: DebugLog.Entry): String = if (entry.repeated > 0) " (×${entry.repeated + 1})" else ""
 
 private const val NL = "\n"

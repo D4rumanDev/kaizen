@@ -113,6 +113,8 @@ class App : Application(), Configuration.Provider {
                     runCatchingCoop { kotlinx.coroutines.withContext(app.kaizen.commons.BackgroundCpu) { app.kaizen.commons.DebugLog.timed("Arranque", "Catálogo reagrupado (une las series repetidas de distintas webs)") { app.kaizen.source.CatalogBuilder.regroupIfStale() } } }.onFailure(::logError)
                     runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Nota de cada serie del catálogo sustituida por la de AniList (solo si hacía falta)") { app.kaizen.source.CatalogBuilder.rescoreIfNeeded() } }.onFailure(::logError)
                     runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Catálogo comprobado contra el repositorio (descarga lo que falte)") { app.kaizen.source.CatalogBuilder.ensureFresh() } }.onFailure(::logError)
+                    // El corte de «las mejores portadas» (top 300 por nota de AniList), para decidir qué portadas van a la caché superior.
+                    app.kaizen.commons.CoverTiers.refreshCutoff()
                     // Emparejar con AniList (encendido de fábrica: da la nota de las series): arranca salvo que el usuario lo apagara. Su primera pasada son ~30 s de CPU y memoria (26.000 fichas: el
                     // GC no paraba y «Últimos vistos» tardaba en salir), así que espera a que la app lleve un rato abierta.
                     delay(ANILIST_START_DELAY)
@@ -174,7 +176,7 @@ class App : Application(), Configuration.Provider {
     private fun configureImageLoader() {
         // Las portadas comparten conexiones y TLS con el resto de la app pero no la cola de peticiones: el recorrido del
         // catálogo (cientos de páginas) no las hace esperar.
-        imageClient = AppHttpClient.streaming().newBuilder()
+        imageHttpClient = AppHttpClient.streaming().newBuilder()
             .dispatcher(Dispatcher().apply { maxRequests = IMAGE_MAX_REQUESTS; maxRequestsPerHost = IMAGE_MAX_PER_HOST })
             // Las fuentes cuya web rechaza la firma de OkHttp (también su CDN de portadas) reciben la de un navegador.
             .addInterceptor { chain ->
@@ -195,7 +197,9 @@ class App : Application(), Configuration.Provider {
                 .components {
                     // Lo que se sabe que no existe (404, .ico indecodificable) no se vuelve a pedir en una semana.
                     add(app.kaizen.commons.MissingImageInterceptor)
-                    add(OkHttpNetworkFetcherFactory(callFactory = { imageClient }, cacheStrategy = { app.kaizen.commons.CacheFirstStrategy }))
+                    // Las portadas de serie: bajar, reducir, WebP y guardar en un solo trabajo (ver CoverPipeline).
+                    add(app.kaizen.commons.CoverInterceptor)
+                    add(OkHttpNetworkFetcherFactory(callFactory = { imageHttpClient }, cacheStrategy = { app.kaizen.commons.CacheFirstStrategy }))
                 }
                 .eventListener(app.kaizen.commons.ImageErrorListener)
                 // Calidad de las portadas (ver ImageQuality): solo la «ligera» fija 16 bits de color; las demás dejan el valor de Coil (bitmaps de hardware donde se puede).
@@ -221,7 +225,6 @@ class App : Application(), Configuration.Provider {
         prefs.edit().putBoolean(LEFTOVERS_DONE, true).apply()
     }
 
-    private lateinit var imageClient: OkHttpClient
 
     private val browserUaHosts by lazy { AnimeSources.all.filter { it.needsBrowserUa }.map { it.host } }
 
@@ -236,6 +239,10 @@ class App : Application(), Configuration.Provider {
     }
 
     companion object {
+        /** El cliente HTTP de las imágenes (lo usan Coil y [app.kaizen.commons.CoverPipeline]: mismas conexiones, política TLS y pausas por servidor). */
+        lateinit var imageHttpClient: OkHttpClient
+            private set
+
         private val imageLoaderReady = java.util.concurrent.CountDownLatch(1)
         private val IMAGE_LOADER_WAIT = 5.seconds
 

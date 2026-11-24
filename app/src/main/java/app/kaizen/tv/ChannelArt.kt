@@ -55,6 +55,8 @@ object ChannelArt {
     /** La imagen guardada de [url] (copia abierta al leer); null si no está o no se puede servir. */
     internal fun cachedFile(context: Context, url: String): File? {
         if (!isServable(url, published())) return null
+        // El launcher puede pedir una imagen antes de que la app arranque (App.context aún sin asignar): entonces no hay copia WebP que mirar y se sigue por Coil, que espera a la app.
+        runCatching { app.kaizen.commons.CoverPipeline.cached(url) }.getOrNull()?.let { return it }
         val cache = app.kaizen.App.awaitImageLoader(context).diskCache ?: return null
         return cache.openSnapshot(url)?.use { snapshot -> snapshot.data.toFile().takeIf { it.isFile && it.length() > 0 } }
     }
@@ -87,11 +89,10 @@ object ChannelArt {
         if (NetworkState.isOffline) return
         val todo = missing(urls) { cachedFile(context, it) != null }
         if (todo.isEmpty()) return
-        // awaitImageLoader espera con un tope a que la app configure Coil: se hace una vez y fuera del hilo del llamante.
-        val loader = withContext(Dispatchers.IO) { app.kaizen.App.awaitImageLoader(context) }
         coroutineScope {
             todo.map { url ->
-                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { loader.execute(ImageRequest.Builder(context).data(url).build()) } } }
+                // Las filas del launcher son lo que más se mira: caché superior, y por el mismo camino único que las tarjetas.
+                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.commons.CoverPipeline.obtain(url, app.kaizen.commons.CoverTier.HOT) } } }
             }.awaitAll()
         }
     }

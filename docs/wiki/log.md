@@ -929,3 +929,12 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
   - `DebugLog` comprueba el registro antiguo `debug.log` una vez por carpeta y no en cada anotación; `Removals.step` no vuelve a leer todo si no se quitó nada.
 - **Rendimiento, revisado y sin cambiar:** el índice de lo visto de la página de inicio se rehace con cada cambio de progreso (se para con la pantalla oculta); `DebugLog` sigue escribiendo en el hilo que anota.
 - **Fallo de `tv.js backup` encontrado al instalar la 6.2.2:** dos copias en el mismo minuto (las dos teles seguidas) caían en la misma carpeta y la segunda pisaba los ficheros de nombre común de la primera. Se repitió la copia de la TV en una carpeta nueva antes de instalar; `tv.js` usa ahora siempre una carpeta que no existía.
+
+## 2026-11-24 · Portadas en WebP con caché por niveles y registro sin repeticiones
+
+- **Un solo flujo de portadas (`CoverPipeline`):** bajar, reducir a 400 px de ancho, convertir a WebP (calidad 80) y guardar es un único trabajo por dirección; si varias tarjetas piden la misma portada comparten descarga, conversión y escritura. Máximo 2 a la vez. Coil lo enchufa con `CoverInterceptor` solo para las portadas de serie (fotogramas de capítulo e iconos siguen igual).
+- **Niveles (`CoverTiers`):** superior (favoritas, en emisión/pausa/próximas y top 300 por nota de AniList; 100 MB) · normal (el resto, y todo lo que no se sabe; 50 MB) · ninguna (terminadas con estreno de hace 10 años o más: se bajan cada vez y solo viven en memoria). Cada carpeta desaloja lo menos usado al pasar su tope. El corte del top 300 se calcula al arrancar con las fichas ya descargadas.
+- **Filas del launcher** usan el mismo flujo con nivel superior. **«Renovar portada»** y **«Vaciar cachés»** también vacían la copia WebP.
+- **Lo que no cambia:** la caché de disco de Coil sigue para fotogramas y como respaldo si falla la conversión (sin red); no se ha vaciado. Las portadas ya guardadas por Coil se irán sustituyendo al verse.
+- **Registro:** `DebugLog` calla lo informativo repetido (misma etiqueta y texto con los números enmascarados, 60 s) y la siguiente vez lo anota como «×N»; los errores nunca se callan. El panel del pie explica cada parte de la app («Qué es …»).
+- **Pendiente de verificar en la TV:** tamaño real en disco, tiempos de pintado de una rejilla fría y que el nivel «ninguna» no frene. No instalado todavía.

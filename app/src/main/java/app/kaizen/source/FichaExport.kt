@@ -15,6 +15,10 @@ import kotlin.time.Duration.Companion.hours
 /** Lectura por tramos de [AnimeFicha] para exportarla sin cargar la tabla entera en memoria (cada fila lleva su JSON comprimido). */
 @Dao
 interface FichaExportDao {
+    /** La nota de AniList que ocupa el puesto [offset] (0 = la mejor) entre las fichas descargadas; null si hay menos. Sirve de corte para «las mejores» (ver CoverTiers). */
+    @Query("SELECT nota FROM AnimeFicha WHERE nota IS NOT NULL ORDER BY nota DESC LIMIT 1 OFFSET :offset")
+    fun noteAtRank(offset: Int): Int?
+
     /** Las [limit] fichas siguientes a [after] por id: paginar por clave y no por posición evita repetir o saltar filas si se guarda una ficha mientras se exporta. */
     @Query("SELECT * FROM AnimeFicha WHERE anilistId > :after ORDER BY anilistId LIMIT :limit")
     fun page(after: Long, limit: Int): List<AnimeFicha>

@@ -24,6 +24,7 @@ class DebugLogJsonTest {
     fun setUp() {
         DebugLog.dirProvider = { folder.root }
         DebugLog.levelProvider = { DebugLog.DETAIL }
+        DebugLog.repeats = DebugLog.Repeats(window = 0)
         DebugLog.onDiskFailure = { failures += it }
         DebugLog.clear()
     }

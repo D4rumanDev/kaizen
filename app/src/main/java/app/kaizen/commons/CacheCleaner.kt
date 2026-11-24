@@ -20,5 +20,6 @@ object CacheCleaner {
         val images = SingletonImageLoader.get(context)
         images.diskCache?.clear()
         images.memoryCache?.clear()
+        CoverPipeline.clear()
     }
 }

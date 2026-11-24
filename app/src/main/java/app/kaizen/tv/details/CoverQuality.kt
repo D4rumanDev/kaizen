@@ -71,6 +71,7 @@ internal suspend fun renewCover(context: Context, url: String): Boolean = withCo
     if (!Network.isConnected) return@withContext false
     val loader = SingletonImageLoader.get(context)
     runCatching { loader.diskCache?.remove(url) }
+    app.kaizen.commons.CoverPipeline.forget(url)
     runCatching { loader.memoryCache?.clear() }
     app.kaizen.commons.ImageMisses.forget(url)
     true
