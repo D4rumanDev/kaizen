@@ -40,7 +40,7 @@ object LaLigaBlock {
     /** Las IPs bloqueadas ahora, o null si no se pudo saber. Se guarda 5 minutos. */
     private suspend fun blockedIps(): Set<String>? = withContext(Dispatchers.IO) {
         // Con el aviso apagado no se consulta nada, salvo que el túnel esté en «solo con bloqueo»: ese modo necesita saberlo.
-        if (!KaizenSettings.laLigaWarning && app.kaizen.commons.warp.WarpMode.of(KaizenSettings.warpMode) != app.kaizen.commons.warp.WarpMode.ON_BLOCK) return@withContext null
+        if (!isWatching()) return@withContext null
         cached?.takeIf { System.currentTimeMillis() - it.first < CACHE.inWholeMilliseconds }?.let { return@withContext it.second }
         runCatching {
             // Validación TLS estricta del sistema aunque el usuario haya puesto «permisiva» para las fuentes: es un servicio de un tercero.

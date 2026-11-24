@@ -17,7 +17,7 @@ const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback; };
 const INTERVAL_MS = Math.max(1, Number(arg('--interval', 2))) * 1000;
 const TARGET = arg('--target', '1.1.1.1');
-if (!/^[A-Za-z0-9.-]+$/.test(TARGET)) { console.error(`FALLO: destino no válido: ${TARGET}`); process.exit(1); }
+if (!/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(TARGET)) { console.error(`FALLO: destino no válido: ${TARGET}`); process.exit(1); }
 const OUT = path.resolve(ROOT, arg('--out', path.join('backups', 'net-watch')));
 
 const stamp = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');

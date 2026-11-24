@@ -33,6 +33,13 @@ class SourcesSummaryTest {
         assertEquals(SourcesHealth.PARTIAL, warpSummary(snap(WarpMode.ALWAYS, account = false)).first)
     }
 
+    @Test fun `en espera no depende de que haya cuenta, y activo gana a apagado`() {
+        val (health, text) = warpSummary(snap(WarpMode.ON_BLOCK, account = false))
+        assertEquals(SourcesHealth.OK, health)
+        assertTrue(text.startsWith("En espera"))
+        assertTrue(warpSummary(snap(WarpMode.OFF, up = true)).second.startsWith("Túnel activo"))
+    }
+
     @Test fun `sin leer todavia no afirma nada`() {
         assertEquals(SourcesHealth.CHECKING, warpSummary(null).first)
     }

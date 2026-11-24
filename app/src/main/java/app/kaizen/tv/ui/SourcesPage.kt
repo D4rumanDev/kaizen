@@ -211,7 +211,9 @@ internal fun SourcesPage() {
     LaunchedEffect(Unit) { laLigaHosts = runCatching { LaLigaBlock.blockedHostsOrNull(AnimeSources.selected.map { it.host }) }.getOrNull() }
     // El túnel WARP: se lee fuera del hilo principal al abrir y cada pocos segundos (sube o baja solo según el modo).
     var warp by remember { mutableStateOf<WarpTunnel.Snapshot?>(null) }
-    LaunchedEffect(Unit) { while (true) { warp = withContext(Dispatchers.IO) { runCatching { WarpTunnel.snapshot(context) }.getOrNull() }; delay(WARP_REFRESH) } }
+    // Si el aviso de LaLiga se enciende o apaga en Configuración, la tarjeta lo recoge en la siguiente lectura.
+    var watching by remember { mutableStateOf(LaLigaBlock.isWatching()) }
+    LaunchedEffect(Unit) { while (true) { warp = withContext(Dispatchers.IO) { runCatching { WarpTunnel.snapshot(context) }.getOrNull() }; watching = LaLigaBlock.isWatching(); delay(WARP_REFRESH) } }
     // Mientras dura esa primera medición las tarjetas no ponen texto, solo el círculo vacío (antes ponían «Activa» y a los segundos cambiaban).
     var probing by remember { mutableStateOf(true) }
     // Sin conexión no se mide nada; al volver la red se mide (la clave cambia y se relanza).
@@ -280,7 +282,8 @@ internal fun SourcesPage() {
         item {
             val (health, text) = warpSummary(warp)
             IconTextCard("WARP\n$text", {
-                scope.launch {
+                // En AppScope, como al cambiar el modo en Configuración: salir de la pantalla a mitad no corta la subida ni el aviso.
+                app.kaizen.commons.AppScope.launch {
                     app.kaizen.commons.runCatchingCoop { WarpTunnel.evaluate() }.onSuccess { it?.let(KaizenToast::toastLong) }.onFailure(::logError)
                     warp = withContext(Dispatchers.IO) { runCatching { WarpTunnel.snapshot(context) }.getOrNull() }
                 }
@@ -288,7 +291,7 @@ internal fun SourcesPage() {
         }
         // LaLiga: cuántas fuentes activas tienen hoy la IP bloqueada. Pulsar vuelve a consultarlo.
         item {
-            val (health, text) = laLigaSummary(LaLigaBlock.isWatching(), laLigaHosts, selected.size)
+            val (health, text) = laLigaSummary(watching, laLigaHosts, selected.size)
             IconTextCard("LaLiga\n$text", { scope.launch { laLigaHosts = runCatching { LaLigaBlock.blockedHostsOrNull(AnimeSources.selected.map { it.host }) }.getOrNull() } }) {
                 NetworkBadge(health, size = 40.dp)
             }
