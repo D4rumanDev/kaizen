@@ -10,7 +10,7 @@ import app.kaizen.tv.ui.*
 import app.kaizen.tv.ui.components.*
 import app.kaizen.tv.ui.theme.*
 
-import androidx.compose.ui.window.Dialog
+import app.kaizen.tv.ui.Dialog
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.focusable

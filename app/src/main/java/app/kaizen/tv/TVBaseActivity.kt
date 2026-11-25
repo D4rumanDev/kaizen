@@ -2,6 +2,8 @@ package app.kaizen.tv
 
 import android.content.Context
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import app.kaizen.R
 import app.kaizen.commons.KaizenSettings
@@ -16,6 +18,24 @@ open class TVBaseActivity : ComponentActivity() {
         // Solo en aperturas reales: recreate() (Ajustes › escala) trae un estado guardado y no debe dejar un fundido pendiente.
         if (savedInstanceState == null) screenTransition(open = true)
     }
+
+    override fun onResume() {
+        super.onResume()
+        ScreenDimmer.start(this)
+    }
+
+    override fun onPause() {
+        ScreenDimmer.stop(this)
+        super.onPause()
+    }
+
+    /** ¿Hay algo en marcha que no pide gestos (un vídeo sonando)? Mientras sea así no se oscurece la pantalla. */
+    open fun isScreenBusy(): Boolean = false
+
+    // Cada gesto cuenta para el protector de pantalla; el que despierta una pantalla oscura no llega a la app.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = ScreenDimmer.onKey(event) || super.dispatchKeyEvent(event)
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean = ScreenDimmer.onPointer(event) || super.dispatchTouchEvent(event)
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean = ScreenDimmer.onPointer(event) || super.dispatchGenericMotionEvent(event)
 
     override fun finish() {
         super.finish()

@@ -265,7 +265,9 @@ private fun BoxScope.Controls(controller: PlaybackController) {
             }
             if (controller.chapterTitle.isNotBlank() || controller.subtitle.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(controller.chapterTitle, color = White80, fontSize = PlayerSubtitleText, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    // El capítulo y, a su lado, el servidor de vídeo del que sale el enlace que suena ahora.
+                    val serverName = controller.video?.serverName.orEmpty()
+                    Text(listOf(controller.chapterTitle, serverName).filter { it.isNotBlank() }.joinToString(" · "), color = White80, fontSize = PlayerSubtitleText, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f))
                     if (controller.subtitle.isNotBlank()) {
                         Text(controller.subtitle, color = White80, fontSize = PlayerSubtitleText, maxLines = 1, overflow = TextOverflow.Ellipsis,

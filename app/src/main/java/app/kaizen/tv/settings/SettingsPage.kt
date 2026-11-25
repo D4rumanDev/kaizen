@@ -18,7 +18,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.kaizen.tv.ui.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.kaizen.R
 import app.kaizen.commons.appString

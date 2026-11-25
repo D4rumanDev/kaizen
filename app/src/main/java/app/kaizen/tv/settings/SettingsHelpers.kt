@@ -37,6 +37,9 @@ internal fun cardChoice(context: Context, title: String, values: List<Float>, pr
 
 internal fun minutesLabel(minutes: Int) = if (minutes < 60) "$minutes min" else "${minutes / 60} h"
 
+/** [value] en segundos como «30 s», «2 min»; con [seconds] falso son minutos, como [minutesLabel]. */
+internal fun minutesLabel(value: Int, seconds: Boolean) = if (!seconds) minutesLabel(value) else if (value < 60) "$value s" else "${value / 60} min"
+
 /** Un submenú de un nivel con su resumen (el valor actual): es la única forma de agrupar en los paneles de Configuración. */
 internal fun submenu(title: String, @DrawableRes icon: Int, summary: () -> String, items: () -> List<SettingItem>): SubMenuItem =
     SubMenuItem(title, summary, SettingsCategory(title, icon, items))

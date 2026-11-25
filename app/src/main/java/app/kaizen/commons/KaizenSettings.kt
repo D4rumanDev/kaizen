@@ -177,6 +177,12 @@ object KaizenSettings {
     /** Modo parental («Contenido sensible»): carátulas con blur de las series sensibles. Apagado de fábrica. */
     var sensitiveBlur: Boolean by booleanPref("kaizen_sensitive_blur", false)
 
+    /** Protector de pantalla: segundos sin pulsar nada tras los que se oscurece (0 = nunca). No actúa mientras suena un vídeo. */
+    var idleDimSeconds: Int by intPref("kaizen_idle_dim_seconds", 60)
+
+    /** Cuánto se oscurece: porcentaje de negro de la capa (100 = pantalla negra). */
+    var idleDimPercent: Int by intPref("kaizen_idle_dim_percent", 80)
+
     /** Intensidad del blur de las carátulas sensibles: índice de [BLUR_LEVEL_OPTIONS] (0 suave, 1 media, 2 fuerte). */
     var sensitiveBlurLevel: Int
         get() = prefs.getInt("kaizen_sensitive_blur_level", 1).coerceIn(0, BLUR_LEVEL_OPTIONS.lastIndex)
@@ -492,6 +498,8 @@ object KaizenSettings {
     val DEFAULT_SENSITIVE_GENRES = setOf("ecchi", "hentai")
     /** Géneros de AniList que se pueden marcar como sensibles en Configuración (en minúsculas, como los guarda [sensitiveGenres]). */
     val SENSITIVE_GENRE_CHOICES = listOf("ecchi", "hentai", "horror", "psychological", "thriller")
+    val IDLE_DIM_SECONDS_OPTIONS = listOf(0, 30, 60, 120, 300, 600)
+    val IDLE_DIM_PERCENT_OPTIONS = listOf(50, 70, 80, 90, 100)
     val BLUR_LEVEL_OPTIONS = listOf("Suave", "Media", "Fuerte")
     private const val KEY_HIDDEN_PLAYER_BUTTONS = "kaizen_hidden_player_buttons"
     private const val KEY_PLAYER_BUTTON_ORDER = "kaizen_player_button_order"

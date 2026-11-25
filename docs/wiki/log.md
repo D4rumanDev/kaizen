@@ -14,6 +14,13 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-25 · Protector de pantalla, menú de tarjeta y servidor en el reproductor (6.2.7)
+- **Protector de pantalla** (inspirado en `ScreensaverManager` de SmartTube, que usa una capa negra translúcida a pantalla completa): `ScreenDimmer` oscurece **toda la app** tras un rato sin gestos (Ajustes › Pantalla › Protector de pantalla: «Oscurecer tras» Nunca/30 s/1/2/5/10 min, de fábrica 1 min; «Cuánto oscurece» 50 a 100 %, de fábrica 80 %). No actúa con el vídeo sonando (`TVBaseActivity.isScreenBusy`); al pausarlo cuenta desde la pausa. La capa es una ventana propia sin foco ni toque, por encima de los diálogos abiertos; el primer gesto que despierta la pantalla no llega a la app. Los diálogos son ventanas aparte, así que el `Dialog` de Compose se sustituye por `app.kaizen.tv.ui.Dialog`, que avisa de sus gestos. **Comprobado en la Shield:** se oscureció a los ~75 s y una tecla la despertó sin mover el foco.
+- **Menú de tarjeta:** el título sale una vez, con dos líneas como máximo; los encabezados son «Episodio N» y «Serie». «Quitar de Seguir viendo» no hacía nada en los capítulos de Recientes: llegaban con `seriesId = 0` y se borraba la clave de progreso equivocada; ahora se busca el id por la ficha.
+- **Reproductor:** junto al episodio se ve el servidor de vídeo del enlace que suena (`Video.serverName`).
+
+---
+
 ## 2026-11-25 · Blur ajustable, ajustes sin resúmenes y táctil para tablet
 - **Contenido sensible:** nueva «Intensidad del blur» (Suave, Media, Fuerte; de fábrica Media, que es el radio de siempre) y «Géneros sensibles» (Ecchi, Hentai, Horror, Psychological, Thriller; de fábrica Ecchi y Hentai). Las series adultas de AniList siguen desenfocándose siempre. La clave de caché de Coil lleva el nivel (`sensitive-blur-v3-<n>`), así que cambiar de intensidad no reutiliza lo ya desenfocado; al cambiarla se recrea la pantalla.
 - **Configuración:** las filas ya no llevan línea de resumen bajo el título. En las listas de elección el valor elegido se ve a la derecha. Los campos `summary` de los elementos siguen en el modelo sin mostrarse (pendiente de limpiar).

@@ -5,7 +5,7 @@ import app.kaizen.tv.ui.theme.*
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.window.Dialog
+import app.kaizen.tv.ui.Dialog
 import androidx.compose.ui.window.DialogProperties
 
 /** Lista de opciones (servidor, calidad, idioma) sobre la pantalla actual, sin lanzar otra actividad. */

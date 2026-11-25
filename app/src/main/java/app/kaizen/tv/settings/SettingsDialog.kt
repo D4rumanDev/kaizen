@@ -50,7 +50,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.kaizen.tv.ui.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text

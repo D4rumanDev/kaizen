@@ -45,7 +45,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.kaizen.tv.ui.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon

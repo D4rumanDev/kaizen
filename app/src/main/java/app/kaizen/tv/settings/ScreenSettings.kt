@@ -28,6 +28,7 @@ internal class ScreenSettingsItems(private val context: Context, private val ope
         submenu("Tamaño y tarjetas", icon, { "Tarjetas ${KaizenSettings.formatFactor(KaizenSettings.cardScale)}" }, ::sizeItems),
         submenu("Foco y animaciones", icon, { if (KaizenSettings.focusPanel) "Panel de datos al enfocar" else "Sin panel de datos" }, ::focusItems),
         submenu("Reloj", icon, { if (KaizenSettings.topClock) "Hora arriba" else "Sin hora" }, ::clockItems),
+        submenu("Protector de pantalla", icon, { "" }, ::dimItems),
         submenu("Inicio y menú", icon, { MainSections.ordered().firstOrNull { it.first == KaizenSettings.startSection }?.second ?: "Inicio" }, ::menuItems),
         if (SettingsFlags.SENSITIVE) submenu("Contenido sensible", icon, { if (KaizenSettings.sensitiveBlur) "Activado" else "Apagado" }, ::sensitiveItems) else null
     )
@@ -52,6 +53,12 @@ internal class ScreenSettingsItems(private val context: Context, private val ope
         CheckItem(appString(R.string.ui_hora_y_fecha_arriba), null, KaizenSettings::topClock),
         ChoiceItem(appString(R.string.ui_formato_de_hora), listOf(appString(R.string.ui_24_horas), appString(R.string.ui_12_horas)),
             { if (KaizenSettings.clock24h) 0 else 1 }, { KaizenSettings.clock24h = it == 0 })
+    )
+
+    /** Protector de pantalla (ver [app.kaizen.tv.ScreenDimmer]): oscurece la pantalla tras un rato sin pulsar nada, salvo con el vídeo sonando. */
+    private fun dimItems() = listOf(
+        choiceItem("Oscurecer tras", KaizenSettings.IDLE_DIM_SECONDS_OPTIONS, KaizenSettings::idleDimSeconds) { if (it == 0) "Nunca" else minutesLabel(it, seconds = true) },
+        choiceItem("Cuánto oscurece", KaizenSettings.IDLE_DIM_PERCENT_OPTIONS, KaizenSettings::idleDimPercent) { "$it %" }
     )
 
     private fun menuItems() = listOf(

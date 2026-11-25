@@ -119,9 +119,10 @@ object CardMenu {
             }
             null -> Unit
         }
-        val dialogTitle = target.chapter?.let { "${target.name} · ${it.chapter()}" } ?: target.name
+        // El título (máximo dos líneas) es el de la serie; el capítulo y la serie son solo encabezados cortos, sin repetir el nombre.
+        val dialogTitle = target.name
         // Con títulos largos y varias opciones el diálogo no cabe en pantalla: desplazable y con el título entero.
-        KaizenDialog(onDismissRequest = onDismiss, title = dialogTitle, titleMaxLines = 5, scrollable = true) {
+        KaizenDialog(onDismissRequest = onDismiss, title = dialogTitle, scrollable = true) {
             LaunchedEffect(list) { runCatching { first.requestFocus() } }
             list.forEachIndexed { index, option ->
                 if (option.group != null && list.getOrNull(index - 1)?.group != option.group) {
@@ -148,6 +149,10 @@ object CardMenu {
         else -> null
     }
 
+    /** La clave del progreso del capítulo: un capítulo de Recientes llega sin id de serie (0), así que se busca por su ficha, como hace la tarjeta. */
+    private fun progressKeyOf(record: Record) =
+        KaizenProgress.Key(record.seriesId.takeIf { it != 0L } ?: app.kaizen.source.seriesIdOf(record.source, record.slug), record.number)
+
     private fun chapterTarget(record: Record, isContinue: Boolean = false) =
         Target(record.aid, record.name, record.animeUrl(), record.slug, null, record, isContinue)
 
@@ -157,13 +162,13 @@ object CardMenu {
     private fun options(activity: ComponentActivity, target: Target, seen: Boolean, favorite: Boolean, onTitle: (TitleAction) -> Unit): List<Option> = buildList {
         val record = target.chapter
         // Con un capítulo, el menú se divide en lo del capítulo y lo de la serie; con una serie sola, solo lo de la serie y sin encabezados.
-        val chapterGroup = if (record != null) "Capítulo ${record.chapter()}" else null
-        val seriesGroup = if (record != null) "Serie · ${target.name}" else null
+        val chapterGroup = record?.chapter()
+        val seriesGroup = if (record != null) "Serie" else null
         if (record != null) {
             add(Option(appString(R.string.ui_reproducir), group = chapterGroup) { TVServersFactory.start(activity, record) })
             add(Option(appString(R.string.ui_elegir_servidor), group = chapterGroup) { TVServersFactory.start(activity, record, ServerChoice.ASK) })
             add(Option(if (seen) appString(R.string.ui_marcar_como_no_visto) else appString(R.string.ui_marcar_como_visto), group = chapterGroup) { io { record.markSeen(!seen) } })
-            if (target.isContinue) add(Option(appString(R.string.ui_quitar_de_seguir_viendo), group = chapterGroup) { KaizenProgress.remove(record.progressKey(), record.eid) })
+            if (target.isContinue) add(Option(appString(R.string.ui_quitar_de_seguir_viendo), group = chapterGroup) { KaizenProgress.remove(progressKeyOf(record), record.eid) })
         }
         // De la serie, lo que más se hace arriba: abrir la ficha, favorito y estado; después lo demás.
         add(Option(appString(R.string.ui_abrir_ficha), group = seriesGroup) { TVAnimesDetails.start(activity, target.animeUrl) })

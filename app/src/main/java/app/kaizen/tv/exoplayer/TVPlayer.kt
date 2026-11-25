@@ -20,6 +20,9 @@ class TVPlayer : TVBaseActivity(), TVServersFactory.ServersInterface {
         setContent { KaizenTheme { PlayerScreen(playback) } }
     }
 
+    // Con el vídeo sonando no se oscurece la pantalla; en pausa, sí (tras el tiempo de Ajustes).
+    override fun isScreenBusy(): Boolean = ::playback.isInitialized && playback.isPlaying
+
     override fun onStart() {
         super.onStart()
         app.kaizen.source.AnilistSyncRunner.playerStarted()
