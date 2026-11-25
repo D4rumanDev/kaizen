@@ -14,6 +14,13 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-25 · Icono nuevo y logo del canal de inicio (6.2.8)
+- **Icono de la app:** el gato de `art/icono.png` (transparente) sustituye al anterior; `tools/make_brand.py` lo genera en las cinco densidades (clásico 48 dp, redondo y adaptativo de 108 dp con el gato al 60 % para quedar dentro de la zona segura de 66 dp). El banner de TV (16:9, 640 x 360, el doble de los 320 x 180 de base) ya era «Kaizen bajo la luna de Japón»: al regenerarlo no cambió.
+- **Logo del canal «Capítulos recientes»** (inicio de Android TV): es otro fichero, `drawable-nodpi/ic_home_channel.png` (cuadrado, 320 px = 80 dp) y seguía siendo la grulla de origami. Ahora es el gato. `HomeChannels.LOGO_VERSION` pasa de 3 a 4: la app solo reenvía el logo al sistema cuando sube esa versión, y entonces actualiza el canal existente sin recrearlo. Limpiar la caché del launcher no lo arregla porque el logo vive en el proveedor de TV.
+- Pendiente de comprobar en la TV: que el launcher muestre el icono y el logo nuevos tras instalar (puede hacer falta reiniciar).
+
+---
+
 ## 2026-11-25 · Protector de pantalla, menú de tarjeta y servidor en el reproductor (6.2.7)
 - **Protector de pantalla** (inspirado en `ScreensaverManager` de SmartTube, que usa una capa negra translúcida a pantalla completa): `ScreenDimmer` oscurece **toda la app** tras un rato sin gestos (Ajustes › Pantalla › Protector de pantalla: «Oscurecer tras» Nunca/30 s/1/2/5/10 min, de fábrica 1 min; «Cuánto oscurece» 50 a 100 %, de fábrica 80 %). No actúa con el vídeo sonando (`TVBaseActivity.isScreenBusy`); al pausarlo cuenta desde la pausa. La capa es una ventana propia sin foco ni toque, por encima de los diálogos abiertos; el primer gesto que despierta la pantalla no llega a la app. Los diálogos son ventanas aparte, así que el `Dialog` de Compose se sustituye por `app.kaizen.tv.ui.Dialog`, que avisa de sus gestos. **Comprobado en la Shield:** se oscureció a los ~75 s y una tecla la despertó sin mover el foco.
 - **Menú de tarjeta:** el título sale una vez, con dos líneas como máximo; los encabezados son «Episodio N» y «Serie». «Quitar de Seguir viendo» no hacía nada en los capítulos de Recientes: llegaban con `seriesId = 0` y se borraba la clave de progreso equivocada; ahora se busca el id por la ficha.

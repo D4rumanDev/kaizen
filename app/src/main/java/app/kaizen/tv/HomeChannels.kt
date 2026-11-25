@@ -40,7 +40,7 @@ object HomeChannels {
     private const val PREFS = "home_channels"
     private const val KEY_CHANNEL = "recents_channel_id"
     private const val KEY_LOGO = "logo_version"
-    private const val LOGO_VERSION = 3
+    private const val LOGO_VERSION = 4
 
     /** Capítulos de «Seguir viendo» para Watch Next: el más reciente de cada serie y capítulo, hasta [MAX_ROWS]. */
     internal fun pickContinue(history: List<Record>, inProgress: Map<KaizenProgress.Key, KaizenProgress.Progress>): List<Pair<Record, KaizenProgress.Progress>> =
