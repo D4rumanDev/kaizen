@@ -65,7 +65,7 @@ internal class ScreenSettingsItems(private val context: Context, private val ope
         ChoiceItem(appString(R.string.ui_seccion_al_abrir), MainSections.ordered().map { it.second },
             { MainSections.ordered().indexOfFirst { it.first == KaizenSettings.startSection }.coerceAtLeast(0) },
             { KaizenSettings.startSection = MainSections.ordered()[it].first }),
-        ActionItem(appString(R.string.ui_secciones_del_menu), { "Mostrar, ocultar y organizar" }) { openMenuSections() }
+        ActionItem(appString(R.string.ui_secciones_del_menu), { "" }, opens = true) { openMenuSections() }
     )
 
     /** Modo parental: las carátulas de las series sensibles (adultas o de los géneros ecchi y hentai en AniList) salen desenfocadas en tarjetas y ficha. */

@@ -14,6 +14,14 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-25 · Menús de Configuración: valores largos y filas de información (6.2.9)
+- **Regresión mía de la 6.2.6:** al quitar todos los resúmenes de Configuración puse el valor elegido de cada lista a la derecha sin límite de ancho y dejé en blanco las filas cuyo resumen era el dato. Se vio en la Shield: «Calidad» salía partida en «Calid / ad» (el valor «Automática (según la red)» apretaba el título) y Biblioteca, Acerca de y Copia de seguridad perdieron sus cifras.
+- **Arreglo:** el valor de texto ocupa como máximo el 45 % de la fila, a dos líneas y con puntos suspensivos. Las opciones (casillas, listas, submenús, confirmaciones) siguen sin línea de resumen; las filas que SON un dato (`ActionItem` y `TextItem`: versión instalada, dudas de AniList, series unidas, última copia, rutas) la conservan. `ActionItem` gana `opens`: las que abren otra pantalla (botones del reproductor, secciones del menú, las de Biblioteca, registro, NAS) llevan la flecha; `ConfirmItem` y los `MultiChoiceItem` también (estos con las opciones elegidas a la derecha).
+- **Comprobado en la Shield** con capturas: Reproductor, Biblioteca, Acerca de, Depuración, Copia de seguridad, Contenido sensible y Protector de pantalla. **Sin ver aún:** el panel de calidad dentro del reproductor con pistas reales (mismo código de fila), Fuentes y red, Datos y caché, Estadísticas.
+- **Incidente menor:** al recorrer menús por ADB una navegación a ciegas abrió un capítulo unos segundos en la Shield; el contador de vistos pasó de 6480 a 6482 entre dos comprobaciones y no se puede atribuir. No se tocaron datos. Regla para la próxima: recorrer menús con una captura antes de cada OK.
+
+---
+
 ## 2026-11-25 · Icono nuevo y logo del canal de inicio (6.2.8)
 - **Icono de la app:** el gato de `art/icono.png` (transparente) sustituye al anterior; `tools/make_brand.py` lo genera en las cinco densidades (clásico 48 dp, redondo y adaptativo de 108 dp con el gato al 60 % para quedar dentro de la zona segura de 66 dp). El banner de TV (16:9, 640 x 360, el doble de los 320 x 180 de base) ya era «Kaizen bajo la luna de Japón»: al regenerarlo no cambió.
 - **Logo del canal «Capítulos recientes»** (inicio de Android TV): es otro fichero, `drawable-nodpi/ic_home_channel.png` (cuadrado, 320 px = 80 dp) y seguía siendo la grulla de origami. Ahora es el gato. `HomeChannels.LOGO_VERSION` pasa de 3 a 4: la app solo reenvía el logo al sistema cuando sube esa versión, y entonces actualiza el canal existente sin recrearlo. Limpiar la caché del launcher no lo arregla porque el logo vive en el proveedor de TV.

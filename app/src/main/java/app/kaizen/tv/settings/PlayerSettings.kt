@@ -35,7 +35,7 @@ internal class PlayerSettingsItems(private val openPlayerButtons: () -> Unit) {
         tunedChoice("Salto máximo al mantener la tecla", KaizenSettings.SEEK_CAP_OPTIONS, KaizenSettings::seekCapSeconds) { "$it s" },
         choiceItem(appString(R.string.ui_ocultar_controles_tras), KaizenSettings.CONTROLS_HIDE_OPTIONS, KaizenSettings::controlsHideSeconds) { "$it s" },
         CheckItem(appString(R.string.ui_reloj), appString(R.string.ui_arriba_a_la_derecha_de_los_controles), KaizenSettings::playerClock),
-        ActionItem(appString(R.string.ui_botones_del_reproductor), { "Mostrar, ocultar y organizar" }) { openPlayerButtons() }
+        ActionItem(appString(R.string.ui_botones_del_reproductor), { "" }, opens = true) { openPlayerButtons() }
     )
 
     private fun continuityItems() = listOf(

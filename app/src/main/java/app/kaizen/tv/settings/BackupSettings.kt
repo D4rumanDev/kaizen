@@ -81,7 +81,7 @@ internal class BackupSettingsItems(private val context: Context, private val ope
             }
         },
         // Elegir la carpeta examinando el servidor, sin teclear su dirección (ver SmbPickerDialog).
-        ActionItem("Elegir carpeta en el NAS", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Servidor, usuario, contraseña y carpeta" }) { openSmbPicker() },
+        ActionItem("Elegir carpeta en el NAS", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Servidor, usuario, contraseña y carpeta" }, opens = true) { openSmbPicker() },
         TextItem("Editar la dirección a mano", { KaizenSettings.smbUrl?.takeIf { it.isNotBlank() }?.let { app.kaizen.commons.SmbFolder.display(it) } ?: "Sin configurar" },
             { app.kaizen.commons.SmbFolder.display(KaizenSettings.smbUrl) },
             { KaizenSettings.smbUrl = if (it.isBlank()) null else app.kaizen.commons.SmbFolder.normalizeUrl(it) ?: KaizenSettings.smbUrl }, app.kaizen.commons.SmbFolder::problem, "servidor/recurso/carpeta",

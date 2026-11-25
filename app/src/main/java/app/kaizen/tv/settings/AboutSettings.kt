@@ -116,7 +116,7 @@ internal class DebugSettingsItems(private val openDebugLog: () -> Unit) {
         },
         tunedChoice("Tamaño máximo del registro", KaizenSettings.LOG_KB_OPTIONS, KaizenSettings::logKb) { if (it >= 1024) "${it / 1024} MB" else "$it KB" },
         CheckItem("Control por ADB", "Permite crear copias y ver recuentos desde ADB (solo el shell, solo esas dos acciones)", KaizenSettings::adbControl),
-        ActionItem("Ver el registro", { "Lo escrito hasta ahora (${DebugLog.file.path})" }) { openDebugLog() },
+        ActionItem("Ver el registro", { "Lo escrito hasta ahora (${DebugLog.file.path})" }, opens = true) { openDebugLog() },
         ConfirmItem("Borrar el registro", "Vacía el fichero del registro", warning = "Se borra todo lo escrito en el registro de depuración.",
             confirmLabel = "Borrar") { DebugLog.clear(); app.kaizen.tv.ui.KaizenToast.toast("Registro borrado") }
     )

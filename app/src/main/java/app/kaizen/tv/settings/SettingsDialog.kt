@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -94,7 +96,8 @@ class MultiChoiceItem(
 /** Lista que se ordena: OK agarra un elemento, arriba/abajo lo mueven y OK lo suelta; el foco lo acompaña. */
 class ReorderItem(title: String, val get: () -> List<String>, val set: (List<String>) -> Unit) : SettingItem(title)
 
-class ActionItem(title: String, val summary: () -> String, val run: (Context) -> Unit) : SettingItem(title)
+/** Una acción o una fila de información: [summary] es el dato o el estado que enseña bajo el título. Con [opens], además abre otra pantalla y lleva la flecha. */
+class ActionItem(title: String, val summary: () -> String, val opens: Boolean = false, val run: (Context) -> Unit) : SettingItem(title)
 
 /**
  * Acción que borra o cambia cosas: al pulsarla se abre una confirmación con el [warning] y dos opciones, con el foco en
@@ -277,23 +280,23 @@ private fun rows(
     else -> category.items().mapIndexed { index, item ->
         val focus = if (focusTitle != null) item.title == focusTitle else index == 0
         when (item) {
-            // Sin línea de resumen bajo el título: confunde. La opción elegida de una lista sí se ve a la derecha (es el valor, no una explicación).
+            // Las opciones no llevan línea de resumen (confunde): la opción elegida de una lista se ve a la derecha, acotada para no apretar el título. Las filas que SON un dato (acciones e información, texto editable) conservan su línea.
             is CheckItem -> PanelRow(item.title, null, if (item.get()) CHECKED else UNCHECKED, focus) {
                 item.set(!item.get())
                 onChanged()
             }
             is ChoiceItem -> PanelRow(item.title, null, item.options.getOrNull(item.get()).orEmpty(), focus) { onOpen(item) }
-            is MultiChoiceItem -> PanelRow(item.title, null, MORE, focus) { onOpen(item) }
+            is MultiChoiceItem -> PanelRow(item.title, null, item.get().sorted().joinToString { item.options[it] }.ifEmpty { "Ninguna" }, focus) { onOpen(item) }
             is ReorderItem -> PanelRow(item.title, null, MORE, focus) {
                 onMoved(null)
                 onOpen(item)
             }
-            is ActionItem -> PanelRow(item.title, null, "", focus) {
+            is ActionItem -> PanelRow(item.title, item.summary().takeIf { it.isNotBlank() }, if (item.opens) MORE else "", focus) {
                 item.run(context)
                 onChanged()
             }
-            is ConfirmItem -> PanelRow(item.title, null, "", focus) { onOpen(item) }
-            is TextItem -> PanelRow(item.title, null, MORE, focus) { onOpen(item) }
+            is ConfirmItem -> PanelRow(item.title, null, MORE, focus) { onOpen(item) }
+            is TextItem -> PanelRow(item.title, item.summary().takeIf { it.isNotBlank() }, MORE, focus) { onOpen(item) }
             is SubMenuItem -> PanelRow(item.title, null, MORE, focus) { onPush(item.category, item.title) }
         }
     }
@@ -334,8 +337,12 @@ private fun SettingRow(row: PanelRow, modifier: Modifier) {
         if (mark != null) {
             // El rol y el estado ya van en la semántica de la fila: el icono es solo dibujo.
             Icon(painterResource(mark), contentDescription = null, tint = Color.White, modifier = Modifier.padding(start = 12.dp).size(IconLg))
-        } else {
-            Text(row.value, color = Color.White, fontSize = Text17, modifier = Modifier.clearAndSetSemantics { }.padding(start = 12.dp))
+        } else if (row.value.isNotEmpty()) {
+            // El valor ocupa como mucho el 45 % de la fila y se corta con puntos suspensivos: con un valor largo («Automática (según la red)») el título se partía letra a letra.
+            val inner = LocalConfiguration.current.screenWidthDp * PANEL_WIDTH_RATIO - PANEL_INSET_DP
+            Text(row.value, color = Color.White, fontSize = Text17, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.clearAndSetSemantics { }.padding(start = 12.dp).widthIn(max = (inner * VALUE_SHARE).dp))
         }
     }
 }
@@ -351,6 +358,9 @@ private fun markIcon(value: String): Int? = when (value) {
 }
 
 private const val PANEL_WIDTH_RATIO = 0.36f
+// Lo que el panel y la fila gastan en márgenes (dp), y la parte de la fila que puede ocupar el valor.
+private const val PANEL_INSET_DP = 92
+private const val VALUE_SHARE = 0.45f
 // Marcas de PanelRow.value: se dibujan con icono (markIcon), no como texto.
 private const val CHECKED = "mark:checked"
 private const val UNCHECKED = "mark:unchecked"

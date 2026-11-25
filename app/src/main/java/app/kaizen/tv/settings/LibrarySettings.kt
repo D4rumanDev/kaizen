@@ -42,8 +42,8 @@ internal class LibrarySettingsItems(private val stats: LibraryStats, private val
         ActionItem("Resumen", {
             stats.facts?.let { "${it.catalogSeries} series · ${it.walked}/${it.sources} fuentes · ${it.userMerges + it.userSplits} reglas tuyas" } ?: "Calculando…"
         }) { },
-        ActionItem("Dudas de AniList", { stats.pending?.let { if (it == 0) "Ninguna por decidir" else "$it por decidir" } ?: "Calculando…" }) { open(LibraryScreen.REVIEW) },
-        ActionItem("Series unidas", { stats.facts?.let { "${it.joined} (reúnen ${it.joinedFichas} fichas)" } ?: "Calculando…" }) { open(LibraryScreen.JOINED) },
+        ActionItem("Dudas de AniList", { stats.pending?.let { if (it == 0) "Ninguna por decidir" else "$it por decidir" } ?: "Calculando…" }, opens = true) { open(LibraryScreen.REVIEW) },
+        ActionItem("Series unidas", { stats.facts?.let { "${it.joined} (reúnen ${it.joinedFichas} fichas)" } ?: "Calculando…" }, opens = true) { open(LibraryScreen.JOINED) },
         ActionItem("Fuentes", {
             val facts = stats.facts
             when {
@@ -52,7 +52,7 @@ internal class LibrarySettingsItems(private val stats: LibraryStats, private val
                 facts.walked < facts.sources -> "Faltan ${facts.sources - facts.walked} por recorrer"
                 else -> "Todas recorridas"
             }
-        }) { open(LibraryScreen.SOURCES) },
+        }, opens = true) { open(LibraryScreen.SOURCES) },
         submenu("Emparejado con AniList", icon, { if (KaizenSettings.anilistSync) "Activado" else "Apagado" }, ::anilistItems),
         submenu("Mantenimiento", icon, { "Volver a agrupar o rehacer las uniones" }, ::maintenanceItems)
     )
