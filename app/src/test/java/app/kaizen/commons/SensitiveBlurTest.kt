@@ -47,4 +47,11 @@ class SensitiveBlurTest {
         assertEquals(8, blurRadius(96))
         assertEquals(2, blurRadius(10))
     }
+
+    @Test fun `cada intensidad tiene su radio y su clave de caché`() {
+        assertEquals(listOf(4, 8, 16), (0..2).map { blurRadius(96, it) })
+        // Un índice fuera de rango no rompe: se queda con el más cercano.
+        assertEquals(blurRadius(96, 2), blurRadius(96, 9))
+        assertEquals(3, (0..2).map { SensitiveBlur.of(it).cacheKey }.toSet().size)
+    }
 }

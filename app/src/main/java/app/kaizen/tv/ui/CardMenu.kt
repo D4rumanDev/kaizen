@@ -120,7 +120,8 @@ object CardMenu {
             null -> Unit
         }
         val dialogTitle = target.chapter?.let { "${target.name} · ${it.chapter()}" } ?: target.name
-        KaizenDialog(onDismissRequest = onDismiss, title = dialogTitle) {
+        // Con títulos largos y varias opciones el diálogo no cabe en pantalla: desplazable y con el título entero.
+        KaizenDialog(onDismissRequest = onDismiss, title = dialogTitle, titleMaxLines = 5, scrollable = true) {
             LaunchedEffect(list) { runCatching { first.requestFocus() } }
             list.forEachIndexed { index, option ->
                 if (option.group != null && list.getOrNull(index - 1)?.group != option.group) {
@@ -138,7 +139,9 @@ object CardMenu {
     private fun targetFor(item: Any): Target? = when (item) {
         is ContinueItem -> chapterTarget(item.record, isContinue = true)
         is Record -> chapterTarget(item)
-        is RecentEpisode -> chapterTarget(item.asRecord())
+        // Un capítulo reciente que ya se empezó se trata como uno de «Seguir viendo»: mismo servidor recordado y opción de quitarlo.
+        is RecentEpisode -> chapterTarget(item.asRecord(),
+            isContinue = KaizenProgress.startedOf(KaizenProgress.Key(app.kaizen.source.seriesIdOf(item.source, item.slug), item.number), item.eid) != null)
         is FavoriteAV1 -> Target(item.aid, item.name, item.animeUrl(), item.slug, item)
         is Recommended -> slugOfUrl(item.animeUrl).let { slug -> Target(item.aid, item.name, item.animeUrl, slug, favoriteOf(item.aid, item.name, slug, item.type, AnimeSources.forUrl(item.animeUrl).id)) }
         is SeriesSummary -> Target(item.aid, item.name, item.animeUrl, item.slug, favoriteOf(item.aid, item.name, item.slug, item.type, item.source))

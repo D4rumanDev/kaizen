@@ -120,11 +120,12 @@ internal fun Cover(urls: List<String>, modifier: Modifier = Modifier, fit: Boole
     val context = LocalContext.current
     val fade = Motion.ms(200)
     // Aparece con un fundido (solo si no estaba ya en la caché de memoria); la duración sigue a Ajustes › Interfaz › Animaciones.
-    val request = remember(candidates, attempt, fade, reuseCached, blur, tier) {
+    val blurLevel = KaizenSettings.sensitiveBlurLevel
+    val request = remember(candidates, attempt, fade, reuseCached, blur, blurLevel, tier) {
         ImageRequest.Builder(context).data(candidates.getOrNull(attempt)).crossfade(fade).apply {
             // Portada de serie: pasa por CoverPipeline (WebP reducido, caché según su nivel).
             if (tier != null) extras[app.kaizen.commons.CoverTier.KEY] = tier
-            if (blur) transformations(app.kaizen.commons.SensitiveBlur)
+            if (blur) transformations(app.kaizen.commons.SensitiveBlur.of(blurLevel))
             // [reuseCached]: mientras llega la imagen a este tamaño se ve la ya cargada en otro (la de la tarjeta de la que se viene).
             if (reuseCached && !blur) SingletonImageLoader.get(context).memoryCache?.keys.orEmpty().let { keys -> candidates.firstNotNullOfOrNull { url -> keys.firstOrNull { it.key == url } } }?.let { placeholderMemoryCacheKey(it) }
         }.build()

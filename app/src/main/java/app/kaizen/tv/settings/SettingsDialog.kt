@@ -9,6 +9,7 @@ import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
@@ -141,8 +143,10 @@ fun SettingsPanel(root: SettingsCategory, refresh: Int = 0, onDismiss: () -> Uni
 
     // Un ajuste de texto abre su cuadro para escribir encima del panel; al cerrarlo vuelve a la categoría.
     (openChoice as? TextItem)?.let { TextEditDialog(it) { closeChoice() } }
+    // Atrás (o tocar fuera del panel): cierra la lista abierta, luego el submenú y por último el panel.
+    val goBack = { if (openChoice != null) closeChoice() else if (stack.size > 1) { focusTitle = stack.last().second; stack = stack.dropLast(1) } else dismissAnimated() }
     Dialog(
-        onDismissRequest = { if (openChoice != null) closeChoice() else if (stack.size > 1) { focusTitle = stack.last().second; stack = stack.dropLast(1) } else dismissAnimated() },
+        onDismissRequest = goBack,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         // La ventana del diálogo se ajusta a su contenido por defecto: al cambiar de nivel o cerrar, un instante con el contenido sin medir la encogía a una franja. Se fija a pantalla completa.
@@ -150,12 +154,16 @@ fun SettingsPanel(root: SettingsCategory, refresh: Int = 0, onDismiss: () -> Uni
         androidx.compose.runtime.SideEffect { window?.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT) }
         AnimatedVisibility(visibleState = shown, modifier = Modifier.fillMaxSize(),
             enter = fadeIn(Motion.spec(PANEL_ANIMATION_MS)), exit = fadeOut(Motion.spec(PANEL_ANIMATION_MS))) {
-        Box(Modifier.fillMaxSize().background(Black50)) {
+        // Con pantalla táctil, tocar la parte oscura (fuera del panel) hace lo mismo que Atrás.
+        Box(Modifier.fillMaxSize().background(Black50)
+            // Solo para el dedo: sin foco, el mando no puede dejarse en el fondo y que OK cierre el panel.
+            .focusProperties { canFocus = false }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = goBack)) {
             Column(
                 Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(PANEL_WIDTH_RATIO)
                     .animateEnterExit(enter = slideInHorizontally(Motion.spec(PANEL_ANIMATION_MS)) { it },
                         exit = slideOutHorizontally(Motion.spec(PANEL_ANIMATION_MS)) { it })
-                    .background(PanelColor).padding(start = 24.dp, top = 40.dp, end = 24.dp, bottom = 24.dp)
+                    .background(PanelColor).focusProperties { canFocus = false }.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }.padding(start = 24.dp, top = 40.dp, end = 24.dp, bottom = 24.dp)
             ) {
                 // Miga de pan: dónde estás («Reproductor › Controles › Salto»), para no perderse al entrar en submenús y listas.
                 val crumb = (stack.map { it.first.title } + listOfNotNull(openChoice?.title)).joinToString(" › ")
@@ -269,23 +277,24 @@ private fun rows(
     else -> category.items().mapIndexed { index, item ->
         val focus = if (focusTitle != null) item.title == focusTitle else index == 0
         when (item) {
-            is CheckItem -> PanelRow(item.title, item.summary, if (item.get()) CHECKED else UNCHECKED, focus) {
+            // Sin línea de resumen bajo el título: confunde. La opción elegida de una lista sí se ve a la derecha (es el valor, no una explicación).
+            is CheckItem -> PanelRow(item.title, null, if (item.get()) CHECKED else UNCHECKED, focus) {
                 item.set(!item.get())
                 onChanged()
             }
-            is ChoiceItem -> PanelRow(item.title, item.options.getOrNull(item.get()), MORE, focus) { onOpen(item) }
-            is MultiChoiceItem -> PanelRow(item.title, item.get().sorted().joinToString { item.options[it] }.ifEmpty { "Ninguna" }, MORE, focus) { onOpen(item) }
-            is ReorderItem -> PanelRow(item.title, "OK agarra un botón, arriba/abajo lo mueven", MORE, focus) {
+            is ChoiceItem -> PanelRow(item.title, null, item.options.getOrNull(item.get()).orEmpty(), focus) { onOpen(item) }
+            is MultiChoiceItem -> PanelRow(item.title, null, MORE, focus) { onOpen(item) }
+            is ReorderItem -> PanelRow(item.title, null, MORE, focus) {
                 onMoved(null)
                 onOpen(item)
             }
-            is ActionItem -> PanelRow(item.title, item.summary(), "", focus) {
+            is ActionItem -> PanelRow(item.title, null, "", focus) {
                 item.run(context)
                 onChanged()
             }
-            is ConfirmItem -> PanelRow(item.title, item.summary, "", focus) { onOpen(item) }
-            is TextItem -> PanelRow(item.title, item.summary(), MORE, focus) { onOpen(item) }
-            is SubMenuItem -> PanelRow(item.title, item.summary(), MORE, focus) { onPush(item.category, item.title) }
+            is ConfirmItem -> PanelRow(item.title, null, "", focus) { onOpen(item) }
+            is TextItem -> PanelRow(item.title, null, MORE, focus) { onOpen(item) }
+            is SubMenuItem -> PanelRow(item.title, null, MORE, focus) { onPush(item.category, item.title) }
         }
     }
 }

@@ -63,6 +63,17 @@ internal class ScreenSettingsItems(private val context: Context, private val ope
 
     /** Modo parental: las carátulas de las series sensibles (adultas o de los géneros ecchi y hentai en AniList) salen desenfocadas en tarjetas y ficha. */
     private fun sensitiveItems() = listOf(
-        CheckItem("Carátulas con blur", "Desenfoca las carátulas de las series adultas o ecchi y hentai de AniList", KaizenSettings::sensitiveBlur)
+        CheckItem("Carátulas con blur", null, KaizenSettings::sensitiveBlur),
+        // Las tarjetas ya compuestas no leen el ajuste como estado: se recrea la pantalla para ver la intensidad nueva al momento.
+        ChoiceItem("Intensidad del blur", KaizenSettings.BLUR_LEVEL_OPTIONS, { KaizenSettings.sensitiveBlurLevel }) { position ->
+            if (position != KaizenSettings.sensitiveBlurLevel) {
+                KaizenSettings.sensitiveBlurLevel = position
+                context.findActivity()?.recreate()
+            }
+        },
+        // Las series adultas de AniList siempre se desenfocan; aquí se eligen además los géneros.
+        MultiChoiceItem("Géneros sensibles", KaizenSettings.SENSITIVE_GENRE_CHOICES.map { it.replaceFirstChar(Char::titlecase) },
+            { KaizenSettings.SENSITIVE_GENRE_CHOICES.indices.filter { KaizenSettings.SENSITIVE_GENRE_CHOICES[it] in KaizenSettings.sensitiveGenres }.toSet() },
+            { chosen -> KaizenSettings.sensitiveGenres = chosen.map { KaizenSettings.SENSITIVE_GENRE_CHOICES[it] }.toSet() })
     )
 }

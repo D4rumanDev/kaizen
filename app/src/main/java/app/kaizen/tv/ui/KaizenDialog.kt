@@ -42,6 +42,7 @@ internal fun KaizenDialog(
     subtitle: String? = null,
     width: Dp = DialogWidthDefault,
     scrollable: Boolean = false,
+    titleMaxLines: Int = 2,
     properties: DialogProperties = DialogProperties(),
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -62,7 +63,7 @@ internal fun KaizenDialog(
                     color = Color.White,
                     fontSize = Text18,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 2,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = if (subtitle.isNullOrBlank()) 4.dp else 2.dp)
                 )

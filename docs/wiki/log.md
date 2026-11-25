@@ -14,6 +14,13 @@ Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, 
 
 ---
 
+## 2026-11-25 · Blur ajustable, ajustes sin resúmenes y táctil para tablet
+- **Contenido sensible:** nueva «Intensidad del blur» (Suave, Media, Fuerte; de fábrica Media, que es el radio de siempre) y «Géneros sensibles» (Ecchi, Hentai, Horror, Psychological, Thriller; de fábrica Ecchi y Hentai). Las series adultas de AniList siguen desenfocándose siempre. La clave de caché de Coil lleva el nivel (`sensitive-blur-v3-<n>`), así que cambiar de intensidad no reutiliza lo ya desenfocado; al cambiarla se recrea la pantalla.
+- **Configuración:** las filas ya no llevan línea de resumen bajo el título. En las listas de elección el valor elegido se ve a la derecha. Los campos `summary` de los elementos siguen en el modelo sin mostrarse (pendiente de limpiar).
+- **Táctil (tablet):** tocar la parte oscura fuera del panel de ajustes lo cierra (como Atrás); en el reproductor un toque en el vídeo muestra u oculta los controles y la barra de tiempo se toca o se arrastra para saltar. El manifiesto del sabor `tv` ya tenía `LAUNCHER`. **Sin probar en una tablet real**; solo compila y pasan los tests unitarios.
+
+---
+
 ## 2026-11-20 · Release 6.2.3 y prueba real de la actualización desde la app (SHIELD)
 - **Release:** `v6.2.3` publicada en `D4rumanDev/kaizen` (commit `5ee0ce4`, `versionCode` 246). El APK pesa 31.483.031 B, SHA-256 `6503f0d0…`, firma v2 válida y certificado `e9a4e8d5…` idéntico al de la 6.2.2. Comprobada con `gh release view`: el asset está `uploaded` y GitHub publica el mismo `digest`. Auditoría independiente de la subida de versión (SHA `7d7859b6`): aprobada sin recomendaciones. El primer intento de `ship.js publish` lo bloqueó el clasificador de permisos de Claude Code; se repitió tras la orden expresa del usuario.
 - **Prueba en la SHIELD** (6.2.2 → 6.2.3, copia previa `backups/tv-2026-11-20-1745/` con manifiesto sha256): «Comprobar ahora» detectó la 6.2.3 (aviso en pantalla, fila «Versión instalada» con la dirección, etiqueta «Nueva versión 6.2.3» junto a la hora, que recibe el foco con el mando). La etiqueta abre el diálogo («Descargar e instalar», «Más tarde», «Omitir esta versión»). Sin el permiso, el diálogo lo explica y abre la pantalla del sistema «Instalar aplicaciones desconocidas» (`ExternalSourcesActivity`).

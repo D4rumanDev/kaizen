@@ -21,6 +21,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -123,6 +126,8 @@ fun PlayerScreen(controller: PlaybackController) {
     }
     Box(Modifier.fillMaxSize().background(Color.Black)
         .focusRequester(root)
+        // Pantalla táctil (tablet): un toque en el vídeo muestra u oculta los controles. Los botones consumen su toque antes.
+        .pointerInput(controller) { detectTapGestures { controller.toggleControlsByTouch() } }
         .onFocusChanged { rootHasFocus = it.hasFocus; rootIsFocused = it.isFocused }
         .onPreviewKeyEvent { event ->
             // Con los controles a la vista pero sin ningún botón enfocado, OK (pausa/reanuda) o arriba/abajo llevan el foco a «reproducir».
@@ -397,6 +402,15 @@ private fun SeekBar(controller: PlaybackController, onUp: () -> Unit, onDown: ()
         Box(
             Modifier.weight(1f).height(28.dp)
                 .onSizeChanged { barWidth = it.width }
+                // Pantalla táctil: tocar la barra salta a ese punto y arrastrar la recorre.
+                .pointerInput(controller) {
+                    detectTapGestures { offset -> if (size.width > 0) controller.seekToFraction(offset.x / size.width) }
+                }
+                .pointerInput(controller) {
+                    detectHorizontalDragGestures { change, _ ->
+                        if (size.width > 0) { controller.seekToFraction(change.position.x / size.width); change.consume() }
+                    }
+                }
                 .onFocusChanged { focused = it.isFocused }
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false

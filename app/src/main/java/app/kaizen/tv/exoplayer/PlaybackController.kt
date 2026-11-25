@@ -564,6 +564,21 @@ class PlaybackController(private val activity: TVPlayer) {
         seekBy(KaizenSettings.seekSeconds * 1000L)
     }
 
+    /** Pantalla táctil: salta a [fraction] (0..1) de la duración; como las flechas, se aplica al acabar de mover. */
+    fun seekToFraction(fraction: Float) {
+        val current = player ?: return
+        if (durationMs <= 0) return
+        val base = pendingSeek ?: current.currentPosition
+        seekBy((fraction.coerceIn(0f, 1f) * durationMs).toLong() - base, deferred = true)
+        touch()
+    }
+
+    /** Pantalla táctil: tocar el vídeo muestra los controles o, si ya se ven, los oculta. */
+    fun toggleControlsByTouch() {
+        if (overlayOpen) return
+        if (controlsVisible) { closeChapters(); hideControls() } else showControls()
+    }
+
     /** Barra de tiempo con el mando: 1 % del vídeo por pulsación. */
     fun seekPercent(direction: Int) {
         val step = (durationMs / 100).coerceAtLeast(MIN_BAR_STEP_MS)

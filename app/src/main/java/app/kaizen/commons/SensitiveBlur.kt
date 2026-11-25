@@ -9,12 +9,9 @@ import coil3.transform.Transformation
  * [WORK_WIDTH] píxeles de ancho, se le pasan tres desenfoques de caja seguidos (que se parecen a uno gaussiano) y se amplía con filtro. Antes solo se reducía a 20 píxeles y se
  * volvía a ampliar, y el resultado eran cuadros de colores (pixelación), no un desenfoque. Como transformación de Coil, lo que se guarda en memoria ya va desenfocado.
  */
-object SensitiveBlur : Transformation() {
-    // v2: el desenfoque de caja sustituye a la reducción a cuadros; la versión sube para no reutilizar lo ya guardado en la caché de imágenes.
-    override val cacheKey: String = "sensitive-blur-v2"
-
-    private const val WORK_WIDTH = 96
-    private const val PASSES = 3
+class SensitiveBlur private constructor(private val level: Int) : Transformation() {
+    // v3: la intensidad se elige en Configuración y va en la clave, para no reutilizar en la caché de imágenes lo desenfocado con otra.
+    override val cacheKey: String = "sensitive-blur-v3-$level"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val w = input.width.coerceAtLeast(1)
@@ -24,7 +21,7 @@ object SensitiveBlur : Transformation() {
         val small = Bitmap.createScaledBitmap(input, sw, sh, true)
         val pixels = IntArray(sw * sh)
         small.getPixels(pixels, 0, sw, 0, 0, sw, sh)
-        repeat(PASSES) { boxBlur(pixels, sw, sh, blurRadius(sw)) }
+        repeat(PASSES) { boxBlur(pixels, sw, sh, blurRadius(sw, level)) }
         val soft = Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888)
         soft.setPixels(pixels, 0, sw, 0, 0, sw, sh)
         val blurred = Bitmap.createScaledBitmap(soft, w, h, true)
@@ -32,10 +29,22 @@ object SensitiveBlur : Transformation() {
         if (soft !== blurred) soft.recycle()
         return blurred
     }
+
+    companion object {
+        private const val WORK_WIDTH = 96
+        private const val PASSES = 3
+        private val levels = List(KaizenSettings.BLUR_LEVEL_OPTIONS.size) { SensitiveBlur(it) }
+
+        /** La transformación de la intensidad elegida en Configuración (índice de [KaizenSettings.BLUR_LEVEL_OPTIONS]). */
+        fun of(level: Int): SensitiveBlur = levels[level.coerceIn(0, levels.lastIndex)]
+    }
 }
 
-/** Radio del desenfoque para una imagen de [width] píxeles de ancho: una doceava parte, para que no se reconozca la imagen y sí queden manchas de color suaves. */
-internal fun blurRadius(width: Int): Int = (width / 12).coerceAtLeast(2)
+/** Divisores del ancho para cada intensidad (suave, media, fuerte): con la media, una doceava parte, para que no se reconozca la imagen y sí queden manchas de color suaves. */
+private val RADIUS_DIVISORS = intArrayOf(24, 12, 6)
+
+/** Radio del desenfoque para una imagen de [width] píxeles de ancho con la intensidad [level] (la media por defecto). */
+internal fun blurRadius(width: Int, level: Int = 1): Int = (width / RADIUS_DIVISORS[level.coerceIn(0, RADIUS_DIVISORS.lastIndex)]).coerceAtLeast(2)
 
 /**
  * Desenfoque de caja de [pixels] (ARGB, [width] × [height], por filas) con ventana de 2·[radius]+1: primero por filas y luego por columnas. En los bordes repite el píxel
