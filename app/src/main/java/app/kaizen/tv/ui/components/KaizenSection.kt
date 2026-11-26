@@ -17,8 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import app.kaizen.tv.ui.*
 import app.kaizen.tv.ui.theme.*
 

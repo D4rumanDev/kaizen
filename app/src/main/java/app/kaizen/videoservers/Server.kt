@@ -6,20 +6,11 @@ import app.kaizen.domain.ConnectionStats
 import app.kaizen.commons.HostGate
 import app.kaizen.tv.ui.KaizenToast
 import app.kaizen.commons.logError
-import app.kaizen.commons.noCrash
 import app.kaizen.commons.runCatchingCoop
 import app.kaizen.source.SourceHttp
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration.Companion.seconds
-import app.kaizen.commons.postDelayed
 
 abstract class Server(val context: Context, val baseLink: String) : Comparable<Server> {
     @Volatile private var server: VideoServer? = null
@@ -90,42 +81,6 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
         // Un tiempo agotado propio es un fallo del servidor, aunque no sea un IOException.
         networkFailure = java.net.SocketTimeoutException(e.message)
         null
-    }
-
-    protected suspend fun getFinishedHtml(link: String): String {
-        return suspendCoroutine {
-            WebView(context).apply {
-                settings.apply {
-                    javaScriptEnabled = true
-                }
-                addJavascriptInterface(object : ZippyServer.ZippyJSInterface() {
-                    @JavascriptInterface
-                    override fun printHtml(string: String) {
-                        // La página puede llamar al puente JS más de una vez: el segundo resume no debe cerrar la app.
-                        noCrash { it.resume(string) }
-                    }
-                }, "HtmlViewer")
-                val handler = Handler(Looper.getMainLooper())
-                var isExecuted = false
-                val runnable = Runnable {
-                    if (!isExecuted) {
-                        isExecuted = true
-                        loadUrl(
-                            "javascript:window.HtmlViewer.printHtml" +
-                                    "('<html>'+document.getElementsByTagName('html')[0].innerHTML+'</html>');"
-                        )
-                    }
-                }
-                handler.postDelayed(runnable, 5.seconds)
-                webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        handler.removeCallbacks(runnable)
-                        runnable.run()
-                    }
-                }
-                loadUrl(link)
-            }
-        }
     }
 
     private fun verify(videoServer: VideoServer?): VideoServer? {
@@ -209,7 +164,6 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
                 VoeServer(context, base),
                 FireServer(context, base),
                 NatsukiServer(context, base),
-                GoCDNServer(context, base),
                 StapeServer(context, base),
                 StreamWishServer(context, base),
                 VidHideServer(context, base),
@@ -224,16 +178,12 @@ abstract class Server(val context: Context, val baseLink: String) : Comparable<S
                 DoodServer(context, base),
                 VidGuardServer(context, base),
                 //SBServer(context, base),
-                VeryStreamServer(context, base),
                 FembedServer(context, base),
                 FenixServer(context, base),
                 HyperionServer(context, base),
                 IzanagiServer(context, base),
-                MangoServer(context, base),
                 MegaServer(context, base),
                 OkruServer(context, base),
-                RVServer(context, base),
-                ZippyServer(context, base),
                 YUServer(context, base),
                 MP4UploadServer(context, base),
                 ZillaServer(context, base),

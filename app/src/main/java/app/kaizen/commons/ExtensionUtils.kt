@@ -1,11 +1,8 @@
 package app.kaizen.commons
 
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
@@ -191,34 +188,3 @@ fun jsoupCookies(url: String?, followRedirects: Boolean = true): Connection =
                 .userAgent(BypassUtil.userAgent)
                 .timeout(KaizenSettings.timeoutTime.seconds.toInt(DurationUnit.MILLISECONDS))
                 .followRedirects(followRedirects)
-
-private fun isIntentResolved(ctx: Context, intent: Intent): Boolean {
-    return ctx.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
-}
-
-val isMIUI: Boolean by lazy {
-    Build.MANUFACTURER.lowercase().contains("huawei") ||
-            Build.BRAND.contains("huawei") ||
-            isIntentResolved(
-                safeContext,
-                Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT)
-            ) ||
-            isIntentResolved(
-                safeContext,
-                Intent().setComponent(
-                    ComponentName(
-                        "com.miui.securitycenter",
-                        "com.miui.permcenter.autostart.AutoStartManagementActivity"
-                    )
-                )
-            )
-            || isIntentResolved(
-        safeContext, Intent("miui.intent.action.POWER_HIDE_MODE_APP_LIST").addCategory(Intent.CATEGORY_DEFAULT)
-    )
-            || isIntentResolved(
-        safeContext,
-        Intent().setComponent(
-            ComponentName("com.miui.securitycenter", "com.miui.powercenter.PowerSettings")
-        )
-    )
-}

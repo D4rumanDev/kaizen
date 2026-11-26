@@ -14,8 +14,6 @@ import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 import app.kaizen.commons.connectTimeout
 import app.kaizen.commons.readTimeout
-import app.kaizen.commons.writeTimeout
-import app.kaizen.commons.callTimeout
 
 /**
  * Los tiempos reales del opening y del cierre de un capítulo, de la API pública de AniSkip (api.aniskip.com), por id de MyAnimeList y número de capítulo.

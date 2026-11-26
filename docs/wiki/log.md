@@ -5,7 +5,7 @@ tags:
   - rsc
   - activity
   - decisions
-updated: 2026-11-20
+updated: 2026-11-26
 ---
 
 # Registro de Actividad y Decisiones (`log.md`)
@@ -13,6 +13,14 @@ updated: 2026-11-20
 Este fichero registra cronológicamente las sesiones de trabajo, diagnósticos, hitos y decisiones técnicas del proyecto Kaizen.
 
 ---
+
+## 2026-11-26 · Recorte de código sin cambio de funcionalidad
+- **Quitado:** `TlsOnlySocketFactory.java` (558 líneas, parche de SSLv3 para Android anterior a 4.4; `minSdk` es 26) y con él `isMIUI`, `isIntentResolved` y el parámetro `miui` de `AppHttpClient.strictClient`; cuatro funciones sin uso (`sha256Of`, `seenFlow` ×2, `chapterIsSeenFlow`); 22 textos de `ui_strings.xml`, `layType` (3 ficheros `bool.xml`, dos vacíos borrados), las animaciones `fadein`/`fadeout` y 73 imports huérfanos (`tools/remove_unused_imports.py`). **Pendiente de comprobar en un móvil MIUI/Huawei:** nada lo prueba aquí; en la Shield no aplica.
+- **Trampa:** `code_graph.py`/`unused_resources.py` marcan `activity_browser.xml` como sin uso, pero lo usa `WebPlayerActivity` por ViewBinding (`ActivityBrowserBinding`). No borrarlo.
+- **Trampa 2:** hay ficheros con finales de línea mezclados (p. ej. `SearchPage.kt`); cualquier script que parta por CRLF los lee mal. Usar `splitlines(keepends=True)`.
+- **Comprobado:** `assembleTv`, 1.302 pruebas unitarias sin fallos y `compileDebugAndroidTestKotlin`. No instalado en la TV.
+- **Servidores de vídeo quitados** (dominios muertos comprobados el 26-nov): VeryStream, Mango (streamango), RV (rapidvideo), Zippyshare y GoCDN (streamium.xyz aparcado), con `getFinishedHtml`, `ZippyJSInterface`, `KDecoder` y los dos métodos de rapidvideo de `PatternUtil`. **Zilla se queda** (el usuario lo usa y funciona aunque su dominio no responda desde el PC). Producción: 40.882 → 39.904 líneas.
+- **Herramientas unificadas en `code_graph.py`:** nuevos `dups` (bloques repetidos) y `big` (funciones largas); `unused` ya no marca `getValue`/`setValue`/operadores (141 → 2 falsos positivos, ambos `SpecSources`) y solo borra con `--apply-imports --yes`. Los tres scripts sueltos se borraron. Detalle en `02-DOCS/wiki/ftd/recorte-codigo-2026-11-26.md`.
 
 ## 2026-11-25 · Menús de Configuración: valores largos y filas de información (6.2.9)
 - **Regresión mía de la 6.2.6:** al quitar todos los resúmenes de Configuración puse el valor elegido de cada lista a la derecha sin límite de ancho y dejé en blanco las filas cuyo resumen era el dato. Se vio en la Shield: «Calidad» salía partida en «Calid / ad» (el valor «Automática (según la red)» apretaba el título) y Biblioteca, Acerca de y Copia de seguridad perdieron sus cifras.

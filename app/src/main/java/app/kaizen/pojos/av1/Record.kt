@@ -99,9 +99,6 @@ abstract class RecordDao {
     // consulta, así un capítulo visto en una fuente cuenta como visto en las demás y no depende de que el libro esté cargado en memoria.
     // EXISTS y no count(*): el convertidor de Boolean solo da true con 1.
     @Query("SELECT EXISTS(SELECT 1 FROM Record WHERE number = :number AND seriesId IN ($SERIES_OF_FICHA))")
-    abstract fun chapterIsSeenFlow(source: String, slug: String, number: Double): Flow<Boolean>
-
-    @Query("SELECT EXISTS(SELECT 1 FROM Record WHERE number = :number AND seriesId IN ($SERIES_OF_FICHA))")
     abstract fun chapterIsSeen(source: String, slug: String, number: Double): Boolean
 
     /** Todo lo visto de la serie de la ficha [source]/[slug]. */

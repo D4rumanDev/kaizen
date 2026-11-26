@@ -33,7 +33,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import app.kaizen.source.AnimeSource
@@ -299,9 +298,6 @@ data class Chapter(
         .ifBlank { userCover(slug, source) ?: BestCovers.get(slug) ?: AnimeSources.of(source).coverUrl(aid, slug) }
     val link: String get() = AnimeSources.of(source).chapterUrl(slug, number.roundedString())
     val episodeName: String get() = "Episodio ${number.roundedString()}"
-
-    /** Si el capítulo está visto, y cada vez que cambia (marcar o desmarcar desde cualquier pantalla). */
-    fun seenFlow(): Flow<Boolean> = CacheDB.INSTANCE.recordAV1DAO().chapterIsSeenFlow(source, slug, number)
 
     fun asRecord() : Record {
         return Record(

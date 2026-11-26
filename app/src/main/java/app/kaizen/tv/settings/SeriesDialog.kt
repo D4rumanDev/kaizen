@@ -6,9 +6,7 @@ import app.kaizen.tv.ui.components.*
 
 import app.kaizen.tv.ui.theme.*
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -22,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.kaizen.tv.ui.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import app.kaizen.R
@@ -52,7 +47,6 @@ import app.kaizen.source.JoinedCheck
 import app.kaizen.source.SeriesMatch
 import app.kaizen.source.UserTitles
 import app.kaizen.source.foldTitleUncached
-import app.kaizen.tv.ui.CardMenu
 import app.kaizen.tv.ui.CenterMessage
 import app.kaizen.tv.ui.rememberLoadable
 import app.kaizen.tv.ui.valueOrNull

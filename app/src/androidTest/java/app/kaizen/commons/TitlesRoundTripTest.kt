@@ -3,7 +3,6 @@ package app.kaizen.commons
 import androidx.test.runner.AndroidJUnit4
 import app.kaizen.database.CacheDB
 import app.kaizen.source.SeriesLedger
-import app.kaizen.source.SeriesMap
 import app.kaizen.source.TitleRules
 import app.kaizen.source.UserTitles
 import org.junit.Assert.assertEquals

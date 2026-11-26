@@ -13,12 +13,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import app.kaizen.commons.connectTimeout
 import app.kaizen.commons.readTimeout
-import app.kaizen.commons.writeTimeout
-import app.kaizen.commons.callTimeout
 
 /** Fallo de red o de AniList que no es «sin resultado»: la cola para y vuelve a intentarlo más tarde. */
 internal class AnilistUnavailable(message: String, cause: Throwable? = null) : IOException(message, cause)

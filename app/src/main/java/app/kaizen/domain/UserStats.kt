@@ -1,7 +1,6 @@
 package app.kaizen.domain
 
 import app.kaizen.pojos.av1.Record
-import app.kaizen.source.ApiCache
 import app.kaizen.source.seriesIdentity
 import java.text.SimpleDateFormat
 import java.util.Calendar

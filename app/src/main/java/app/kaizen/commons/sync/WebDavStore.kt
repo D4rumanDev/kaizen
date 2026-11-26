@@ -13,7 +13,6 @@ import kotlin.time.Duration.Companion.seconds
 import app.kaizen.commons.connectTimeout
 import app.kaizen.commons.readTimeout
 import app.kaizen.commons.writeTimeout
-import app.kaizen.commons.callTimeout
 
 /**
  * [RemoteStore] sobre un servidor WebDAV (Nextcloud, Synology, un servidor propio…): lista con `PROPFIND`, lee con `GET` y escribe con `PUT`. [baseUrl] es una carpeta (`https`,

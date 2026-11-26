@@ -33,8 +33,6 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import app.kaizen.commons.connectTimeout
 import app.kaizen.commons.readTimeout
-import app.kaizen.commons.writeTimeout
-import app.kaizen.commons.callTimeout
 
 /**
  * El túnel WARP (WireGuard de Cloudflare) **solo para el tráfico de Kaizen**: es una VPN de Android limitada a esta app

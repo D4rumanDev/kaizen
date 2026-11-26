@@ -9,14 +9,10 @@ import app.kaizen.commons.KaizenStore
 import app.kaizen.commons.NetworkState
 import app.kaizen.commons.runCatchingCoop
 import app.kaizen.domain.ConnectionStats.Cause
-import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
-import coil3.request.ImageRequest
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.time.Duration.Companion.seconds

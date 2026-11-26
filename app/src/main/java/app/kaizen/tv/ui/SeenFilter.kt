@@ -28,7 +28,7 @@ internal class SeenIndex(records: List<Record>, private val resuming: (seriesId:
 }
 
 /**
- * Los capítulos vistos (id de serie y número), en memoria y compartidos por todas las tarjetas de «Recientes». Es el criterio de `RecordDao.chapterIsSeenFlow`
+ * Los capítulos vistos (id de serie y número), en memoria y compartidos por todas las tarjetas de «Recientes». Es el criterio de `RecordDao.chapterIsSeen`
  * (el registro con ese número cuya serie es la de la ficha), pero con **una** suscripción a Room para toda la pantalla: antes cada tarjeta abría la suya y cada
  * cambio en lo visto relanzaba una consulta por tarjeta. null mientras se lee la primera vez. Se mantiene mientras alguien lo mira (y unos segundos después).
  */

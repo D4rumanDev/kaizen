@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <bool name="isTv">false</bool>
-    <string name="layType">0</string>
 </resources>

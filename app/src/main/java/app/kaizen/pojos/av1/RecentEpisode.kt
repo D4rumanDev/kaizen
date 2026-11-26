@@ -10,7 +10,6 @@ import androidx.room.Query
 import app.kaizen.commons.roundedString
 import app.kaizen.source.AnimeAv1
 import app.kaizen.source.AnimeSources
-import app.kaizen.database.CacheDB
 import kotlinx.coroutines.flow.Flow
 
 @Entity
@@ -44,9 +43,6 @@ data class RecentEpisode(
         date = System.currentTimeMillis(),
         source = source
     )
-
-    /** Si el capítulo está visto, y cada vez que cambia. */
-    fun seenFlow(): Flow<Boolean> = CacheDB.INSTANCE.recordAV1DAO().chapterIsSeenFlow(source, slug, number)
 
 }
 

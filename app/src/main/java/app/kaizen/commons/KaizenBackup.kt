@@ -7,7 +7,6 @@ import app.kaizen.App
 import app.kaizen.database.CacheDB
 import app.kaizen.pojos.av1.FavoriteAV1
 import app.kaizen.pojos.av1.Record
-import app.kaizen.source.ApiCache
 import app.kaizen.source.SeriesLedger
 import app.kaizen.source.UserTitles
 import com.google.gson.annotations.SerializedName

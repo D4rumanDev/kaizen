@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,12 +39,10 @@ import app.kaizen.R
 import app.kaizen.tv.ui.rememberLoadable
 import app.kaizen.tv.ui.valueOrNull
 import app.kaizen.commons.AppScope
-import app.kaizen.commons.DebugLog
 import app.kaizen.commons.KaizenSettings
 import app.kaizen.commons.appString
 import app.kaizen.commons.logError
 import app.kaizen.commons.runCatchingCoop
-import app.kaizen.source.AnilistSyncRunner
 import app.kaizen.source.AnimeSources
 import app.kaizen.source.CatalogBuilder
 import app.kaizen.source.CatalogOverview

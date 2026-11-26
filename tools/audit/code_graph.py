@@ -7,7 +7,7 @@ all plausible declarations, preferring same-file and same-package candidates.
 PSI parsing is syntactic; this tool does not claim compiler-grade symbol resolution.
 """
 from __future__ import annotations
-import argparse, collections, datetime as dt, html, json, os, pathlib, shutil, subprocess, sys, tempfile
+import argparse, collections, re, datetime as dt, html, json, os, pathlib, shutil, subprocess, sys, tempfile
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -334,6 +334,9 @@ def backup_files(root: pathlib.Path, files: set[pathlib.Path], label: str) -> pa
         rel = p.relative_to(root); target = dest / rel; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(p, target)
     return dest
 
+# Importaciones que Kotlin usa sin nombrarlas en el texto (delegados `by`, `for`, operadores, desestructuración): nunca se consideran sin uso.
+IMPLICIT_IMPORTS = {"getValue", "setValue", "provideDelegate", "iterator", "invoke", "plus", "minus", "times", "div", "rem", "unaryMinus", "compareTo", "contains", "get", "set", "next", "hasNext", "rangeTo", "not"}
+
 def cmd_unused(a: Analyzer, args: argparse.Namespace) -> None:
     selected = set(args.paths or [])
     unused: list[tuple[str,int,str]] = []
@@ -347,12 +350,12 @@ def cmd_unused(a: Analyzer, args: argparse.Namespace) -> None:
         for item in imports:
             if item.get("allUnder"): continue
             fq = item["fqName"]; simple = item.get("alias") or fq.split(".")[-1]
-            if simple not in references:
+            if simple not in references and simple not in IMPLICIT_IMPORTS and not re.fullmatch(r"component\d+", simple):
                 line = next((i for i,l in enumerate(content.splitlines(),1) if l.lstrip().startswith("import ") and fq in l), 0)
                 unused.append((path,line,simple))
     print(f"## Imports sin referencias detectables ({len(unused)})")
     for path,line,name in unused: print(f"  {path}:{line} {name}")
-    if args.apply_imports and unused:
+    if args.apply_imports and args.yes and unused:
         files = {a.root / p for p,_,_ in unused}
         backup = backup_files(a.root, files, "unused-imports")
         by_file = collections.defaultdict(set)
@@ -402,6 +405,55 @@ def cmd_prune(a: Analyzer, args: argparse.Namespace) -> None:
     print(f"Eliminadas {len(safe)} declaraciones en {len(files)} archivos. Backup: {backup}")
     print("IMPORTANTE: ejecuta ./gradlew test y ./gradlew assembleDebug; el script no afirma que el proyecto compile.")
 
+def _kt_files(root: pathlib.Path, scope: str) -> list[pathlib.Path]:
+    return sorted((root / scope).rglob("*.kt"))
+
+def cmd_dups(root: pathlib.Path, args: argparse.Namespace) -> None:
+    """Bloques de >= --min líneas idénticas (sin comentarios, imports ni espacios) en 2+ sitios; ahorro teórico si se extrajeran a una función."""
+    trivial = re.compile(r"^(\}|\)|\{|else \{|\}\)|\},?|\)\)|\]|return|\)\.?|\.build\(\))$")
+    files: dict[str, list[tuple[int, str]]] = {}
+    for p in _kt_files(root, args.scope):
+        rows = []
+        for n, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            t = l.strip()
+            if not t or t.startswith(("import ", "package ", "//", "/*", "*", "@file")) or trivial.match(t): continue
+            rows.append((n, re.sub(r"\s+", " ", t)))
+        files[p.relative_to(root).as_posix()] = rows
+    idx = collections.defaultdict(list)
+    for f, rows in files.items():
+        for i in range(len(rows) - args.min + 1): idx[tuple(r[1] for r in rows[i:i + args.min])].append((f, i))
+    seen: set[tuple[str, int]] = set(); blocks = []
+    for occ in idx.values():
+        if len(occ) < 2 or all(o in seen for o in occ): continue
+        ln = args.min
+        while all(i + ln < len(files[f]) for f, i in occ) and len({files[f][i + ln][1] for f, i in occ}) == 1: ln += 1
+        for f, i in occ: seen.update((f, i + k) for k in range(ln))
+        blocks.append((ln * (len(occ) - 1), ln, occ))
+    blocks.sort(key=lambda b: b[0], reverse=True)
+    print(f"## {len(blocks)} bloques duplicados (min {args.min} líneas); ahorro teórico {sum(b[0] for b in blocks)} líneas")
+    for save, ln, occ in blocks[:args.top]:
+        print(f"\n-{save} líneas · {ln} líneas × {len(occ)} sitios")
+        for f, i in occ: print(f"   {f}:{files[f][i][0]}")
+
+def cmd_big(root: pathlib.Path, args: argparse.Namespace) -> None:
+    """Funciones más largas (heurística por llaves: no entiende cadenas con llaves)."""
+    fun = re.compile(r"^\s*(?:@\w+\s+)*(?:(?:private|internal|public|protected|override|open|suspend|inline|operator|abstract)\s+)*fun\s+(?:<[^>]+>\s*)?([\w.]+)")
+    out = []
+    for p in _kt_files(root, args.scope):
+        L = p.read_text(encoding="utf-8").splitlines()
+        for i, l in enumerate(L):
+            m = fun.match(l)
+            if not m: continue
+            depth, opened, j = 0, False, i
+            while j < len(L):
+                depth += L[j].count("{") - L[j].count("}"); opened = opened or "{" in L[j]
+                if (opened and depth <= 0) or (not opened and j > i and not L[j - 1].rstrip().endswith(("=", "(", ",", "&&", "||", "?:"))): break
+                j += 1
+            out.append((j - i + 1, f"{p.relative_to(root).as_posix()}:{i + 1}", m.group(1)))
+    out.sort(reverse=True)
+    print("## Funciones más largas")
+    for n, where, name in out[:args.top]: print(f"{n:5}  {name:32} {where}")
+
 def build_parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(description="Grafo de referencias Kotlin mediante Kotlin PSI")
     p.add_argument("--root",default=".",help="raíz del proyecto Android (por defecto: directorio actual)")
@@ -414,11 +466,19 @@ def build_parser() -> argparse.ArgumentParser:
     dot=sub.add_parser("dot");dot.add_argument("name");dot.add_argument("depth",nargs="?",type=int,default=2)
     u=sub.add_parser("unused");u.add_argument("paths",nargs="*");u.add_argument("--apply-imports",action="store_true");u.add_argument("--yes",action="store_true")
     pr=sub.add_parser("prune");pr.add_argument("paths",nargs="*");pr.add_argument("--apply",action="store_true");pr.add_argument("--yes",action="store_true")
+    for name in ("dups","big"):
+        x=sub.add_parser(name,help="bloques de código repetidos" if name=="dups" else "funciones más largas")
+        x.add_argument("--scope",default="app/src/main");x.add_argument("--top",type=int,default=40 if name=="dups" else 25)
+        if name=="dups": x.add_argument("--min",type=int,default=6)
     return p
 
 def main() -> int:
     args=build_parser().parse_args()
     try:
+        if args.command in {"dups","big"}:  # solo texto: no necesitan el análisis PSI
+            sys.stdout.reconfigure(encoding="utf-8")
+            {"dups":cmd_dups,"big":cmd_big}[args.command](pathlib.Path(args.root),args)
+            return 0
         analyzer=Analyzer(pathlib.Path(args.root))
         if args.command=="stats":cmd_stats(analyzer,args)
         elif args.command=="dead":cmd_dead(analyzer,args)
