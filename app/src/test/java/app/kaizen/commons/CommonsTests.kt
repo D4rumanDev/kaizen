@@ -520,6 +520,20 @@ class HostGateTest {
     }
 
     @Test
+    fun unaPeticionCortadaPorLaAppNoPausaElServidor() {
+        // Control malo: dos fallos de red sí pausan, así que la prueba puede fallar.
+        repeat(2) { runCatching { HostGate.call("https://corta.example/") { throw IOException("timeout") } } }
+        assertTrue(HostGate.downUntil("corta.example") > 0)
+        // Control bueno: al salir de la app OkHttp corta todo con «Canceled»; da igual cuántas, no es un servidor caído ni da aviso.
+        repeat(10) { runCatching { HostGate.call("https://salida.example/") { throw IOException("Canceled") } } }
+        assertEquals(0L, HostGate.downUntil("salida.example"))
+        assertEquals(1, warnings.size)
+        // Tras una pausa un solo fallo vuelve a pausar, pero una cancelación no cuenta.
+        HostGate.reportFailure("https://corta.example/", IOException("Canceled"))
+        assertEquals(1, warnings.size)
+    }
+
+    @Test
     fun unDestinoPrivadoBloqueadoNoPausaElServidor() {
         // Control malo: un ConnectException (servidor que no acepta) pausa a la primera, así que la prueba sí puede fallar.
         runCatching { HostGate.call("https://mal.example/") { throw java.net.ConnectException("refused") } }

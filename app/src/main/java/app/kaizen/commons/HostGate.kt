@@ -251,7 +251,12 @@ object HostGate {
         sourceOf(name)?.let { app.kaizen.domain.ConnectionStats.record(app.kaizen.domain.ConnectionStats.Kind.SOURCE, it, ok, AppErrors.connectionCause(failure)) }
     }
 
+    /** OkHttp termina con `IOException("Canceled")` la petición que la propia app corta (al salir, al cambiar de pantalla): no es un fallo de la web. */
+    private fun isCancelled(e: IOException) = e.message == "Canceled"
+
     private fun noteFailure(name: String, host: Host, e: IOException, label: String = name) {
+        // Ni suma fallos, ni abre pausa, ni avisa, ni entra en la detección de red ni en el registro de errores.
+        if (isCancelled(e)) return
         // Primero a la detección de red: si con este fallo se da Internet por perdido, el `isNetworkUp()` de abajo ya dice que no
         // y este fallo no abre una pausa (y las que abrieron los anteriores se borran).
         if (!name.startsWith(SERVER_PREFIX)) NetworkState.noteFailure(name, e)
