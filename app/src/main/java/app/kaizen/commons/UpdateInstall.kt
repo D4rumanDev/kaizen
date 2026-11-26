@@ -38,11 +38,11 @@ internal object UpdateInstall {
 
     @Suppress("DEPRECATION")
     private fun facts(info: android.content.pm.PackageInfo): UpdateInstaller.PackageFacts {
-        // Primero las firmas actuales (API 28+); si el sistema no las da (algunas teles no las leen de un APK por instalar), las clásicas. Las dos app se leen igual, así que se comparan como siempre.
-        val current = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.signingInfo?.apkContentsSigners else null
-        val signers = current?.takeIf { it.isNotEmpty() } ?: info.signatures
-        val certs = signers.orEmpty().map { sig -> MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) } }.toSet()
-        return UpdateInstaller.PackageFacts(info.packageName, PackageInfoCompat.getLongVersionCode(info), certs)
+        // La app instalada y el APK por instalar se leen igual, así que se comparan como siempre ([UpdateInstaller.chooseCerts]).
+        fun certs(signers: Array<out android.content.pm.Signature>?) =
+            signers.orEmpty().map { sig -> MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) } }.toSet()
+        val current = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) certs(info.signingInfo?.apkContentsSigners) else emptySet()
+        return UpdateInstaller.PackageFacts(info.packageName, PackageInfoCompat.getLongVersionCode(info), UpdateInstaller.chooseCerts(current, certs(info.signatures)))
     }
 
     /** Lo de la app instalada; si no se puede leer, sin firmas (y [UpdateInstaller.verifyPackage] no deja instalar). */

@@ -252,7 +252,7 @@ object HostGate {
     }
 
     /** OkHttp termina con `IOException("Canceled")` la petición que la propia app corta (al salir, al cambiar de pantalla): no es un fallo de la web. */
-    private fun isCancelled(e: IOException) = e.message == "Canceled"
+    internal fun isCancelled(e: IOException) = e.message == "Canceled"
 
     private fun noteFailure(name: String, host: Host, e: IOException, label: String = name) {
         // Ni suma fallos, ni abre pausa, ni avisa, ni entra en la detección de red ni en el registro de errores.

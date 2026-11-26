@@ -52,6 +52,13 @@ class UpdateInstallerTest {
     }
 
     @Test
+    fun `las firmas actuales mandan y las clasicas solo entran si no hay actuales`() {
+        assertEquals(setOf("a"), UpdateInstaller.chooseCerts(setOf("a"), setOf("b")))
+        assertEquals(setOf("b"), UpdateInstaller.chooseCerts(emptySet(), setOf("b")))
+        assertEquals(emptySet<String>(), UpdateInstaller.chooseCerts(emptySet(), emptySet()))
+    }
+
+    @Test
     fun `describe da paquete version y firmas abreviadas y distingue lo ilegible`() {
         assertEquals("app.kaizen v254, firmas: e9a4e8d5", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 254, setOf("e9a4e8d5f688fc18"))))
         assertEquals("app.kaizen v1, firmas: ninguna", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 1, emptySet())))

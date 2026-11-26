@@ -125,7 +125,7 @@ object Taste {
      * en otra fuente. [seriesIdentity] sola no ve, p. ej., la misma serie en dos fuentes con el título escrito distinto. [dedupe] puede traer ya registrado lo que no debe repetirse.
      */
     fun distinctSeries(items: List<SeriesSummary>, dedupe: SeriesDedupe = SeriesDedupe()): List<SeriesSummary> =
-        items.filter { dedupe.isNew(it.slug, it.name, it.source) }
+        items.filter { dedupe.isNew(it.slug, it.name, it.source, year = it.year) }
 
     private fun <T> weightedPick(options: List<T>, random: Random, weight: (T) -> Double): T {
         var target = random.nextDouble() * options.sumOf(weight)

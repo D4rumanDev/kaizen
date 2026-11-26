@@ -431,6 +431,17 @@ class HostGateInterceptorTest {
     }
 
     @Test
+    fun `OkHttp da Canceled en la llamada cancelada y HostGate la reconoce`() {
+        // El criterio de HostGate.isCancelled depende del texto de OkHttp: si una versión nueva lo cambia, esta prueba lo dice.
+        // Cliente OkHttp de verdad (sin el doble de pruebas): cancela la llamada antes de proceder y OkHttp la corta sin tocar la red.
+        val real = OkHttpClient.Builder().addInterceptor(Interceptor { chain -> chain.call().cancel(); chain.proceed(chain.request()) }).build()
+        val error = runCatching { real.newCall(okhttp3.Request.Builder().url("https://h.example/x").build()).execute() }.exceptionOrNull()
+        assertTrue("excepción real: $error", error is IOException)
+        assertTrue("mensaje real: ${error?.message}", HostGate.isCancelled(error as IOException))
+        assertTrue(!HostGate.isCancelled(IOException("timeout")))
+    }
+
+    @Test
     fun `una interrupcion del reproductor no es un fallo pero un timeout si`() {
         // Cortes que provoca el propio reproductor (saltar, parar): no cuentan.
         assertTrue(isInterruption(java.io.InterruptedIOException("cancelado"), threadInterrupted = false))

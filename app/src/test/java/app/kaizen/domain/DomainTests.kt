@@ -4,6 +4,7 @@ import app.kaizen.commons.KaizenProgress
 import app.kaizen.pojos.av1.Chapter
 import app.kaizen.pojos.av1.Record
 import app.kaizen.pojos.av1.SeriesSummary
+import app.kaizen.source.SeriesDedupe
 import app.kaizen.source.TestLedger
 import app.kaizen.source.normalizeTitle
 import kotlin.random.Random
@@ -248,6 +249,17 @@ class TasteTest {
         val b = SeriesSummary(2, "Doctor Piedra", "dr-stone-latino", 1, "animeflv", 4.0)
         val result = Taste.distinctSeries(listOf(a, b, summary("Otra", 4.0)))
         assertEquals(listOf("Dr Stone", "Otra"), result.map { it.name })
+    }
+
+    @Test
+    fun `con otro año no es la misma serie y con un dedupe previo no repite lo ya puesto`() {
+        val a = SeriesSummary(1, "Dr Stone", "dr-stone", 1, "animeav1", 4.0, year = 2019)
+        val otroAño = SeriesSummary(2, "Dr Stone", "dr-stone-latino", 1, "animeflv", 4.0, year = 2025)
+        assertEquals(2, Taste.distinctSeries(listOf(a, otroAño)).size)
+        // Es la ruta de `staffWithout`: lo ya enseñado se registra antes y lo del staff que lo repite sale.
+        val dedupe = SeriesDedupe().also { it.isNew(a.slug, a.name, a.source, year = a.year) }
+        val repetida = SeriesSummary(3, "Dr Stone", "dr-stone-latino", 1, "animeflv", 4.0, year = 2019)
+        assertEquals(listOf("Otra"), Taste.distinctSeries(listOf(repetida, summary("Otra", 4.0)), dedupe).map { it.name })
     }
 
     @Test

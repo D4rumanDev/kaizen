@@ -67,7 +67,10 @@ object Recommendations {
         return Taste.distinctSeries(saved.filter { it.source in enabled && !NotRecommended.isExcluded(excluded, it.name, it.source, it.slug) }).takeIf { it.size >= MIN_PERSONAL }
     }
 
-    /** Las del [staff] que no repiten ninguna de las [personal] (ni entre sí), con la misma regla de «misma serie» que el resto. */
+    /**
+     * Las del [staff] que no repiten ninguna de las [personal] (ni entre sí), con la misma regla de «misma serie» que el resto. Una sin fuente resuelta
+     * no se puede comparar y se deja pasar; hoy [staff] solo devuelve resueltas (las demás no tienen portada ni ficha donde abrir).
+     */
     private fun staffWithout(personal: List<SeriesSummary>, staff: List<Recommended>): List<Recommended> {
         val dedupe = SeriesDedupe().also { d -> personal.forEach { d.isNew(it.slug, it.name, it.source) } }
         return staff.filter { recommended -> recommended.resolved?.let { (source, slug) -> dedupe.isNew(slug, recommended.name, source.id) } ?: true }
