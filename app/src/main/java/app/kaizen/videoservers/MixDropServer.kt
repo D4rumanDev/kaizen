@@ -7,13 +7,7 @@ import app.kaizen.videoservers.VideoServer.Names.MIXDROP
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class MixDropServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = HOSTS.any { baseLink.contains(it) }
-
-    override val name: String
-        get() = MIXDROP
+class MixDropServer(context: Context, baseLink: String) : Server(context, baseLink, MIXDROP, *HOSTS.toTypedArray()) {
 
     override suspend fun videoServer(): VideoServer? {
         // /f/ es la página de descarga; el reproductor con MDCore es /e/ (comprobado con curl, 2026-11-06).

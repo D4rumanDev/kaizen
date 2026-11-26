@@ -8,13 +8,7 @@ import app.kaizen.videoservers.VideoServer.Names.SIBNET
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class SibnetServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("sibnet.ru")
-
-    override val name: String
-        get() = SIBNET
+class SibnetServer(context: Context, baseLink: String) : Server(context, baseLink, SIBNET, "sibnet.ru") {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

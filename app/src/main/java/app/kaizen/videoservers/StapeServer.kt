@@ -9,13 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 
-class StapeServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("streamtape.com")
-
-    override val name: String
-        get() = STAPE
+class StapeServer(context: Context, baseLink: String) : Server(context, baseLink, STAPE, "streamtape.com") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

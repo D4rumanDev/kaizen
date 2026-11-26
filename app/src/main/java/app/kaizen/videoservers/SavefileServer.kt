@@ -8,13 +8,7 @@ import app.kaizen.videoservers.VideoServer.Names.SAVEFILE
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class SavefileServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("savefiles")
-
-    override val name: String
-        get() = SAVEFILE
+class SavefileServer(context: Context, baseLink: String) : Server(context, baseLink, SAVEFILE, "savefiles") {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

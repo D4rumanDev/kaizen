@@ -3,13 +3,9 @@ package app.kaizen.videoservers
 import android.content.Context
 import app.kaizen.commons.PatternUtil
 
-class WebServer (context: Context, baseLink: String, val serverName: String) : Server(context, baseLink) {
+class WebServer (context: Context, baseLink: String, val serverName: String) : Server(context, baseLink, "$serverName (WEB)") {
 
-    override val isValid: Boolean
-        get() = true
-
-    override val name: String
-        get() = "$serverName (WEB)"
+    override val isValid get() = true
 
     override val canStream: Boolean
         get() = false

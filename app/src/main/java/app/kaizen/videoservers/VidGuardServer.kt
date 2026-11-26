@@ -15,13 +15,7 @@ import org.jsoup.Jsoup
  */
 
 /** VidGuard: la página trae un script ofuscado cuyo resultado (`svg.stream`) lleva la firma de la lista HLS desordenada. */
-class VidGuardServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = HOSTS.any { baseLink.contains(it) }
-
-    override val name: String
-        get() = VIDGUARD
+class VidGuardServer(context: Context, baseLink: String) : Server(context, baseLink, VIDGUARD, *HOSTS.toTypedArray()) {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

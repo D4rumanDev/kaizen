@@ -8,13 +8,7 @@ import org.jsoup.Jsoup
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class SendvidServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("sendvid.com")
-
-    override val name: String
-        get() = SENDVID
+class SendvidServer(context: Context, baseLink: String) : Server(context, baseLink, SENDVID, "sendvid.com") {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

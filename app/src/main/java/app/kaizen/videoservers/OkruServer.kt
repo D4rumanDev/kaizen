@@ -9,13 +9,7 @@ import app.kaizen.videoservers.VideoServer.Names.OKRU
 import org.json.JSONObject
 import org.jsoup.parser.Parser
 
-class OkruServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("ok.ru")
-
-    override val name: String
-        get() = OKRU
+class OkruServer(context: Context, baseLink: String) : Server(context, baseLink, OKRU, "ok.ru") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

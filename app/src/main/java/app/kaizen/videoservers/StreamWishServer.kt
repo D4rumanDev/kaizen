@@ -7,13 +7,7 @@ import app.kaizen.commons.executeGated
 import app.kaizen.commons.jsoupCookies
 import app.kaizen.videoservers.VideoServer.Names.STREAMWISH
 
-class StreamWishServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("streamwish.to") || baseLink.contains("sfastwish.com")
-
-    override val name: String
-        get() = STREAMWISH
+class StreamWishServer(context: Context, baseLink: String) : Server(context, baseLink, STREAMWISH, "streamwish.to", "sfastwish.com") {
 
     override val canStream: Boolean
         get() = true

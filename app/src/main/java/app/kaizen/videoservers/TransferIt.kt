@@ -5,13 +5,7 @@ import android.webkit.WebSettings
 import app.kaizen.videoservers.VideoServer.Names.TRANSFERIT
 import kotlin.time.Duration.Companion.seconds
 
-class TransferIt(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("transfer.it")
-
-    override val name: String
-        get() = TRANSFERIT
+class TransferIt(context: Context, baseLink: String) : Server(context, baseLink, TRANSFERIT, "transfer.it") {
 
     override suspend fun videoServer(): VideoServer? {
         var ua = WebSettings.getDefaultUserAgent(context)

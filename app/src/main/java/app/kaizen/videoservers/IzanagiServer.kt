@@ -7,13 +7,7 @@ import app.kaizen.commons.jsoupCookies
 import app.kaizen.videoservers.VideoServer.Names.IZANAGI
 import org.json.JSONObject
 
-class IzanagiServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("s=izanagi")
-
-    override val name: String
-        get() = IZANAGI
+class IzanagiServer(context: Context, baseLink: String) : Server(context, baseLink, IZANAGI, "s=izanagi") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

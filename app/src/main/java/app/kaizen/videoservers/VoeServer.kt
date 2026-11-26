@@ -11,13 +11,7 @@ import org.json.JSONObject
  * guarda las fuentes ofuscadas en `<script type="application/json">`. El HLS que sale no pide
  * Referer (comprobado con curl, 2026-10-11).
  */
-class VoeServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("voe.sx/")
-
-    override val name: String
-        get() = VideoServer.Names.VOE
+class VoeServer(context: Context, baseLink: String) : Server(context, baseLink, VideoServer.Names.VOE, "voe.sx/") {
 
     override suspend fun videoServer(): VideoServer? {
         val first = fetch(baseLink)

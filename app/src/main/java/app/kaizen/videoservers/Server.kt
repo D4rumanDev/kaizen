@@ -12,12 +12,14 @@ import android.content.Context
 import android.util.Log
 import kotlin.time.Duration.Companion.seconds
 
-abstract class Server(val context: Context, val baseLink: String) : Comparable<Server> {
+/**
+ * Un servidor de vídeo. [name] es el nombre que ve el usuario y [hosts] los trozos de dirección que lo identifican (basta que el enlace contenga uno);
+ * quien necesite otra regla sobrescribe [isValid] o [name].
+ */
+abstract class Server(val context: Context, val baseLink: String, open val name: String, private vararg val hosts: String) : Comparable<Server> {
     @Volatile private var server: VideoServer? = null
 
-    abstract val isValid: Boolean
-
-    abstract val name: String
+    open val isValid: Boolean get() = hosts.any { baseLink.contains(it) }
 
     /** Extrae el vídeo del servidor; puede pedir páginas o ejecutar JavaScript (se llama en un hilo de IO). */
     abstract suspend fun videoServer(): VideoServer?

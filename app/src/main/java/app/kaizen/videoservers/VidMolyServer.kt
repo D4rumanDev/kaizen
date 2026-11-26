@@ -7,13 +7,7 @@ import app.kaizen.videoservers.VideoServer.Names.VIDMOLY
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class VidMolyServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("vidmoly")
-
-    override val name: String
-        get() = VIDMOLY
+class VidMolyServer(context: Context, baseLink: String) : Server(context, baseLink, VIDMOLY, "vidmoly") {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

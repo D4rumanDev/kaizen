@@ -17,13 +17,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 
 /** Filemoon: su API da la lista HLS en claro o cifrada con AES-GCM (la clave llega en partes dentro de la misma respuesta). */
-class FilemoonServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = HOSTS.any { baseLink.contains(it) }
-
-    override val name: String
-        get() = FILEMOON
+class FilemoonServer(context: Context, baseLink: String) : Server(context, baseLink, FILEMOON, *HOSTS.toTypedArray()) {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

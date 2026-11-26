@@ -4,13 +4,7 @@ import android.content.Context
 import app.kaizen.videoservers.VideoServer.Names.UPNServer
 import kotlin.time.Duration.Companion.seconds
 
-class UPNServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("animeav1.uns.bio")
-
-    override val name: String
-        get() = UPNServer
+class UPNServer(context: Context, baseLink: String) : Server(context, baseLink, UPNServer, "animeav1.uns.bio") {
 
     override suspend fun videoServer(): VideoServer? {
         val url = run {

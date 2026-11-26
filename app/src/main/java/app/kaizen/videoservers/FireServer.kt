@@ -8,13 +8,7 @@ import app.kaizen.commons.getGated
 import app.kaizen.commons.jsoupCookies
 import app.kaizen.videoservers.VideoServer.Names.FIRE
 
-class FireServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("efire.php")
-
-    override val name: String
-        get() = FIRE
+class FireServer(context: Context, baseLink: String) : Server(context, baseLink, FIRE, "efire.php") {
 
     override suspend fun videoServer(): VideoServer? {
         val frame = PatternUtil.extractLink(baseLink)

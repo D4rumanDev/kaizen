@@ -12,13 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlin.time.Duration.Companion.seconds
 
-class YUServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("yourupload.com")
-
-    override val name: String
-        get() = YOURUPLOAD
+class YUServer(context: Context, baseLink: String) : Server(context, baseLink, YOURUPLOAD, "yourupload.com") {
 
     override suspend fun videoServer(): VideoServer? {
         val yuLink = PatternUtil.extractLink(baseLink)

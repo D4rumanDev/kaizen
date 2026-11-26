@@ -3,12 +3,9 @@ package app.kaizen.videoservers
 import android.content.Context
 import app.kaizen.videoservers.VideoServer.Names.MEGA
 
-class MegaServer(context: Context, baseLink: String) : Server(context, baseLink) {
+class MegaServer(context: Context, baseLink: String) : Server(context, baseLink, MEGA, "mega.nz") {
     private val DOWNLOAD = "D"
     private val STREAM = "S"
-
-    override val isValid: Boolean
-        get() = baseLink.contains("mega.nz")
 
     override val name: String
         get() = "$MEGA $type (WEB)"

@@ -10,13 +10,7 @@ import app.kaizen.videoservers.VideoServer.Names.DOOD
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class DoodServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = HOSTS.any { baseLink.contains(it) }
-
-    override val name: String
-        get() = DOOD
+class DoodServer(context: Context, baseLink: String) : Server(context, baseLink, DOOD, *HOSTS.toTypedArray()) {
 
     override suspend fun videoServer(): VideoServer? {
         // Las webs dan a veces la página de descarga (/d/): el reproductor, con el enlace al vídeo (pass_md5), es /e/ (comprobado con curl, 2026-11-06).

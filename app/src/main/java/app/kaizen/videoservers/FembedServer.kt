@@ -8,13 +8,7 @@ import app.kaizen.commons.iterator
 import app.kaizen.videoservers.VideoServer.Names.FEMBED
 import org.json.JSONObject
 
-class FembedServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("fembed") || baseLink.contains("embedsito.com")
-
-    override val name: String
-        get() = FEMBED
+class FembedServer(context: Context, baseLink: String) : Server(context, baseLink, FEMBED, "fembed", "embedsito.com") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

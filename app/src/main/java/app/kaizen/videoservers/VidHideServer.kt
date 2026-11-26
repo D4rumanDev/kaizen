@@ -10,13 +10,7 @@ import app.kaizen.videoservers.VideoServer.Names.VIDHIDE
  */
 
 /** VidHide y sus espejos (EarnVids, FileLions): el mismo reproductor empaquetado que StreamWish, con la lista HLS dentro. */
-class VidHideServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = HOSTS.any { baseLink.contains(it) }
-
-    override val name: String
-        get() = VIDHIDE
+class VidHideServer(context: Context, baseLink: String) : Server(context, baseLink, VIDHIDE, *HOSTS.toTypedArray()) {
 
     override suspend fun videoServer(): VideoServer? {
         val link = PatternUtil.extractLink(baseLink)

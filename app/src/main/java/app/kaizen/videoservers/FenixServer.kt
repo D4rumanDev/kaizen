@@ -7,13 +7,7 @@ import app.kaizen.commons.jsoupCookies
 import app.kaizen.videoservers.VideoServer.Names.FENIX
 import org.json.JSONObject
 
-class FenixServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("s=fenix")
-
-    override val name: String
-        get() = FENIX
+class FenixServer(context: Context, baseLink: String) : Server(context, baseLink, FENIX, "s=fenix") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

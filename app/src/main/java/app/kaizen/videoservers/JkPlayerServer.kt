@@ -11,13 +11,7 @@ import app.kaizen.commons.decodeBase64Text
  * .m3u8 no pide Referer ni cookies, pero sí un User-Agent de navegador: con el de ExoPlayer el CDN da 403
  * (comprobado con curl, 2026-10-12).
  */
-class JkPlayerServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("jkanime.net/jkplayer/")
-
-    override val name: String
-        get() = nameOf(baseLink)
+class JkPlayerServer(context: Context, baseLink: String) : Server(context, baseLink, nameOf(baseLink), "jkanime.net/jkplayer/") {
 
     override suspend fun videoServer(): VideoServer? {
         val html = HostGate.call(baseLink) {

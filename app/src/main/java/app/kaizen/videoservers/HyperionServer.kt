@@ -8,13 +8,7 @@ import app.kaizen.commons.jsoupCookies
 import app.kaizen.videoservers.VideoServer.Names.HYPERION
 import org.json.JSONObject
 
-class HyperionServer(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("server=hyperion")
-
-    override val name: String
-        get() = HYPERION
+class HyperionServer(context: Context, baseLink: String) : Server(context, baseLink, HYPERION, "server=hyperion") {
 
     override suspend fun videoServer(): VideoServer? {
         val downLink = PatternUtil.extractLink(baseLink)

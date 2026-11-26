@@ -7,13 +7,7 @@ import app.kaizen.videoservers.VideoServer.Names.STREAMHUB
 /*
  * Basado en los extractores de Aniyomi (Kohi-den/extensions-source, licencia Apache 2.0); ver THIRD_PARTY.md. Reescrito sobre SourceHttp/HostGate de la app.
  */
-class StreamHubServer internal constructor(context: Context, baseLink: String) : Server(context, baseLink) {
-
-    override val isValid: Boolean
-        get() = baseLink.contains("streamhub")
-
-    override val name: String
-        get() = STREAMHUB
+class StreamHubServer(context: Context, baseLink: String) : Server(context, baseLink, STREAMHUB, "streamhub") {
 
     override suspend fun videoServer(): VideoServer? {
         val unpacked = Unpacker.unpack(PatternUtil.extractLink(baseLink)).unpacked
