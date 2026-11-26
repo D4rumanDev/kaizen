@@ -19,8 +19,8 @@ import app.kaizen.source.seriesIdentity
 object RecentsArchive {
     private const val KEY = "items"
 
-    // A igual fecha el orden no depende de qué fuente contestó antes: episodio más alto primero y, si aún empatan, id y después fuente y slug.
-    private val TIE_BREAK = compareByDescending<Entry> { it.number }.thenByDescending { it.eid }.thenBy { it.source.orEmpty() }.thenBy { it.slug }
+    // A igual fecha el orden no depende de qué fuente contestó antes: episodio más alto primero y, si aún empatan, fuente, slug y por último el id (que solo se puede comparar dentro de una misma fuente).
+    private val TIE_BREAK = compareByDescending<Entry> { it.number }.thenBy { it.source.orEmpty() }.thenBy { it.slug }.thenByDescending { it.eid }
 
     // Nombres fijos: el APK se ofusca (R8) y el JSON guardado debe sobrevivir a las actualizaciones.
     // addedAt = momento en que se vio por primera vez: el orden de «recientes» es ese, no el id del episodio.
@@ -69,7 +69,7 @@ object RecentsArchive {
             // («2nd Season» / «2nda Temporada»): mismo slug, mismo id de serie o mismo título normalizado (ver [SeriesDedupe]).
             .filter { entry -> dedupe.isNew(entry.slug, entry.name, entry.source ?: AnimeAv1.ID, scope = entry.number.toString()) }
             .take(KaizenSettings.recentsCount)
-            // Orden final por fecha y hora, de más nuevo a más viejo (a igual fecha se conserva el orden de la fuente).
+            // Orden final por fecha y hora, de más nuevo a más viejo (a igual fecha manda [TIE_BREAK]).
             .let { newestFirst(it, { e -> e.released }, { e -> e.addedAt }, identity, TIE_BREAK) }
         if (merged != stored) prefs.edit { putString(KEY, gson.toJson(merged)) }
         return merged.mapIndexed { index, entry ->

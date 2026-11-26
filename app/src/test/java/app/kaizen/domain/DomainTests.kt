@@ -242,6 +242,15 @@ class TasteTest {
     }
 
     @Test
+    fun `la misma serie en dos fuentes con el titulo distinto sale una vez`() {
+        // seriesIdentity (título normalizado) las ve distintas; SeriesDedupe las une por el slug sin sufijos.
+        val a = summary("Dr Stone", 4.0)
+        val b = SeriesSummary(2, "Doctor Piedra", "dr-stone-latino", 1, "animeflv", 4.0)
+        val result = Taste.distinctSeries(listOf(a, b, summary("Otra", 4.0)))
+        assertEquals(listOf("Dr Stone", "Otra"), result.map { it.name })
+    }
+
+    @Test
     fun `sin secuelas salen solo los recomendados`() {
         val recommended = (1..5).map { summary("Otra $it", 4.0) }
         assertEquals(recommended, Taste.withSequels(emptyList(), recommended, 15, Random(1)))

@@ -297,5 +297,5 @@ internal fun RecentCard(data: RecentEpisode, onClick: () -> Unit, onLongClick: (
     // Empezado y sin acabar: la barra de lo visto y el triángulo azul, no el check verde (la misma regla que en la ficha y el reproductor).
     val watch = rememberChapterWatch(data.source, data.slug, data.number, data.eid)
     val covers = rememberCovers(data.source, data.slug, remember(data.aid, data.slug) { coverCandidates(data.aid, data.slug, data.animeImageUrl) })
-    MediaCard(covers, data.name, data.chapter, onClick, onLongClick, seen = watch.state == CardWatch.SEEN, progress = watch.started?.fraction?.toFloat(), resuming = watch.state == CardWatch.RESUMING,favorite = isFavoriteSeries(data.name, data.aid, data.source, data.slug), source = data.source, slug = data.slug, isNew = data.number == 1.0, chapterNumber = data.number)
+    MediaCard(covers, data.name, data.chapter, onClick, onLongClick, seen = watch.state == CardWatch.SEEN, progress = watch.started?.fraction?.toFloat(), resuming = watch.state == CardWatch.RESUMING, favorite = isFavoriteSeries(data.name, data.aid, data.source, data.slug), source = data.source, slug = data.slug, isNew = data.number == 1.0, chapterNumber = data.number)
 }

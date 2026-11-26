@@ -1,5 +1,6 @@
 package app.kaizen.domain
 
+import app.kaizen.source.SeriesDedupe
 import app.kaizen.source.seriesIdentity
 import app.kaizen.pojos.av1.SeriesSummary
 import kotlin.random.Random
@@ -116,8 +117,15 @@ object Taste {
     fun withSequels(sequels: List<SeriesSummary>, recommended: List<SeriesSummary>, limit: Int, random: Random): List<SeriesSummary> {
         val extras = sequels.shuffled(random).take(SEQUELS_SHOWN)
         val taken = extras.map { seriesIdentity(it.name, it.source, it.slug) }.toSet()
-        return (extras + recommended.filter { seriesIdentity(it.name, it.source, it.slug) !in taken }).take(limit)
+        return distinctSeries(extras + recommended.filter { seriesIdentity(it.name, it.source, it.slug) !in taken }).take(limit)
     }
+
+    /**
+     * [items] sin series repetidas, con la misma regla que los demás listados ([SeriesDedupe]): el mismo id de serie, el mismo slug sin sufijos o el mismo título
+     * en otra fuente. [seriesIdentity] sola no ve, p. ej., la misma serie en dos fuentes con el título escrito distinto. [dedupe] puede traer ya registrado lo que no debe repetirse.
+     */
+    fun distinctSeries(items: List<SeriesSummary>, dedupe: SeriesDedupe = SeriesDedupe()): List<SeriesSummary> =
+        items.filter { dedupe.isNew(it.slug, it.name, it.source) }
 
     private fun <T> weightedPick(options: List<T>, random: Random, weight: (T) -> Double): T {
         var target = random.nextDouble() * options.sumOf(weight)

@@ -569,9 +569,10 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun EpisodesRow(state: FichaViewModel.State.Ready, actions: FichaActions, openMenu: (Any) -> Unit) {
-    // 0 = todos, 1 = vistos, 2 = pendientes (con lo visto al abrir o refrescar la ficha). «Visto» es lo acabado: un capítulo empezado (triángulo azul) sigue pendiente.
+    // 0 = todos, 1 = vistos, 2 = pendientes. «Visto» es lo acabado: un capítulo empezado (triángulo azul) sigue pendiente. Se rehace al cambiar el progreso, como las tarjetas.
     var filter by remember { mutableStateOf(0) }
-    val shown = remember(state.episodes, state.watch.seenEids, state.version, filter) {
+    val progressChanges = app.kaizen.commons.KaizenProgress.changes.collectAsStateWithLifecycle().value
+    val shown = remember(state.episodes, state.watch.seenEids, state.version, progressChanges, filter) {
         val finished = { chapter: Chapter -> chapter.eid in state.watch.seenEids && app.kaizen.commons.KaizenProgress.startedOf(chapter.progressKey(), chapter.eid) == null }
         when (filter) {
             1 -> state.episodes.filter(finished)

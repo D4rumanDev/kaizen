@@ -3,11 +3,13 @@ package app.kaizen.home
 import app.kaizen.source.AnimeAv1
 import app.kaizen.commons.runCatchingCoop
 import app.kaizen.domain.Taste
+import app.kaizen.pojos.av1.Recommended
 import app.kaizen.pojos.av1.SeriesSummary
 import app.kaizen.source.AnimeSources
 import app.kaizen.source.Catalog
 import app.kaizen.source.SearchEngine
 import app.kaizen.source.SearchQuery
+import app.kaizen.source.SeriesDedupe
 import app.kaizen.source.SortBy
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -51,7 +53,7 @@ object Recommendations {
         val fresh = personalized(SECTION_SIZE, recent)
         val personal = if (fresh.size >= MIN_PERSONAL || recent.isEmpty()) fresh else personalized(SECTION_SIZE)
         // Una tanda personal completa se guarda y se enseña igual todo el día; la que se completa con la lista general no (es un parche mientras no hay gusto conocido).
-        if (personal.size >= MIN_PERSONAL) personal.also { DailyRecommendations.save(today, it) } else personal + staff.await().take(SECTION_SIZE - personal.size)
+        if (personal.size >= MIN_PERSONAL) personal.also { DailyRecommendations.save(today, it) } else personal + staffWithout(personal, staff.await()).take(SECTION_SIZE - personal.size)
     }
 
     /**
@@ -62,7 +64,13 @@ object Recommendations {
         val saved = DailyRecommendations.savedFor(day) ?: return null
         val excluded = exclusions(TasteRepository.snapshot().known)
         val enabled = AnimeSources.enabled.map { it.id }.toSet()
-        return saved.filter { it.source in enabled && !NotRecommended.isExcluded(excluded, it.name, it.source, it.slug) }.takeIf { it.size >= MIN_PERSONAL }
+        return Taste.distinctSeries(saved.filter { it.source in enabled && !NotRecommended.isExcluded(excluded, it.name, it.source, it.slug) }).takeIf { it.size >= MIN_PERSONAL }
+    }
+
+    /** Las del [staff] que no repiten ninguna de las [personal] (ni entre sí), con la misma regla de «misma serie» que el resto. */
+    private fun staffWithout(personal: List<SeriesSummary>, staff: List<Recommended>): List<Recommended> {
+        val dedupe = SeriesDedupe().also { d -> personal.forEach { d.isNew(it.slug, it.name, it.source) } }
+        return staff.filter { recommended -> recommended.resolved?.let { (source, slug) -> dedupe.isNew(slug, recommended.name, source.id) } ?: true }
     }
 
     /** Lo que no debe salir en Recomendados: lo [known], lo de «No recomendar» y las series con estado (por título y por el id de su serie). */
@@ -72,7 +80,7 @@ object Recommendations {
     }
 
     /** Sugerencias del staff, solo las series que tiene alguna fuente activa (son de animeav1); si no, saldrían sin portada. */
-    private suspend fun staff(): List<Any> = coroutineScope {
+    private suspend fun staff(): List<Recommended> = coroutineScope {
         // Sin las favoritas ni las que ya se han visto enteras (se consulta a la vez que la lista).
         val hadAsync = async { runCatchingCoop { AlreadyHad.current() }.getOrDefault(Had.NONE) }
         val list = StaffRecommendations.createList(60)
