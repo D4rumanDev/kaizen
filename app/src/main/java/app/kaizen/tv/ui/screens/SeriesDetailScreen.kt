@@ -569,12 +569,13 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun EpisodesRow(state: FichaViewModel.State.Ready, actions: FichaActions, openMenu: (Any) -> Unit) {
-    // 0 = todos, 1 = vistos, 2 = pendientes (con lo visto al abrir o refrescar la ficha).
+    // 0 = todos, 1 = vistos, 2 = pendientes (con lo visto al abrir o refrescar la ficha). «Visto» es lo acabado: un capítulo empezado (triángulo azul) sigue pendiente.
     var filter by remember { mutableStateOf(0) }
-    val shown = remember(state.episodes, state.watch.seenEids, filter) {
+    val shown = remember(state.episodes, state.watch.seenEids, state.version, filter) {
+        val finished = { chapter: Chapter -> chapter.eid in state.watch.seenEids && app.kaizen.commons.KaizenProgress.startedOf(chapter.progressKey(), chapter.eid) == null }
         when (filter) {
-            1 -> state.episodes.filter { it.eid in state.watch.seenEids }
-            2 -> state.episodes.filter { it.eid !in state.watch.seenEids }
+            1 -> state.episodes.filter(finished)
+            2 -> state.episodes.filterNot(finished)
             else -> state.episodes
         }
     }
@@ -590,7 +591,8 @@ private fun EpisodesRow(state: FichaViewModel.State.Ready, actions: FichaActions
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = if (filter == 0) state.startIndex else 0)
             LazyRow(state = listState, contentPadding = PaddingValues(horizontal = GutterStart, vertical = ROW_VERTICAL_PADDING), horizontalArrangement = Arrangement.spacedBy(PosterHorizontalSpacing)) {
                 items(shown, key = { it.eid }) { chapter ->
-                    EpisodeCard(chapter, state.version, onLongClick = { openMenu(chapter.asRecord()) }) { actions.onPlay(chapter, ServerChoice.SETTING) }
+                    // Empezado: se reanuda con el servidor recordado, como en «Recientes» y «Seguir viendo».
+                    EpisodeCard(chapter, onLongClick = { openMenu(chapter.asRecord()) }) { resuming -> actions.onPlay(chapter, if (resuming) ServerChoice.REMEMBERED else ServerChoice.SETTING) }
                 }
             }
         }

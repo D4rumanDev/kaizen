@@ -40,7 +40,8 @@ import kotlinx.coroutines.delay
 
 /*
  * Las piezas comunes de todas las tarjetas. Marcas sobre la imagen: el estado (con su nombre) arriba a la izquierda y el favorito abajo a la derecha; debajo, título y
- * capítulo o nota. Un capítulo visto lleva un check verde junto al capítulo y uno empezado, el triángulo azul y la barra de lo visto. Cada tarjeta se monta en un solo sitio y solo cambia la forma:
+ * capítulo o nota. Un capítulo acabado lleva el círculo verde con el check y uno empezado, el triángulo azul y la barra de lo visto, abajo a la derecha de la imagen ([WatchMark], con el estado de
+ * [rememberChapterWatch]: el mismo en Recientes, la ficha y el reproductor). Cada tarjeta se monta en un solo sitio y solo cambia la forma:
  *  - de serie (portada vertical): [MediaCard] (en KaizenUi.kt; la usan SeriesCard, RecordCard, RecentCard, RecommendedCard y «Más como esto»);
  *  - horizontal (portada pequeña y texto al lado): [WideCard] («Seguir viendo», relaciones y series unidas);
  *  - de capítulo (imagen ancha): [EpisodeCard].
@@ -55,16 +56,11 @@ internal fun focusPanelDelayMs(): Long = app.kaizen.commons.KaizenSettings.focus
  * borde del foco. Las tarjetas de serie llevan aquí el capítulo o la nota.
  */
 @Composable
-internal fun ColumnScope.CardTexts(title: String, detail: String? = null, detailColor: Color = White60, titleLines: Int = 1, seen: Boolean = false) {
+internal fun ColumnScope.CardTexts(title: String, detail: String? = null, detailColor: Color = White60, titleLines: Int = 1) {
     Text(title, color = Color.White, fontSize = PosterTitleText, minLines = titleLines, maxLines = titleLines, overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(start = CardTextInset, end = CardTextInset, top = 6.dp, bottom = if (detail == null && !seen) 6.dp else 0.dp))
-    if (detail != null || seen) Row(
-        Modifier.padding(start = CardTextInset, end = CardTextInset, top = 2.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        if (seen) SeenCheck()
-        if (detail != null) Text(detail, color = detailColor, fontSize = PosterSubtitleText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-    }
+        modifier = Modifier.padding(start = CardTextInset, end = CardTextInset, top = 6.dp, bottom = if (detail == null) 6.dp else 0.dp))
+    if (detail != null) Text(detail, color = detailColor, fontSize = PosterSubtitleText, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(start = CardTextInset, end = CardTextInset, top = 2.dp, bottom = 6.dp))
 }
 
 

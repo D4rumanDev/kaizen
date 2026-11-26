@@ -139,10 +139,9 @@ object CardMenu {
 
     private fun targetFor(item: Any): Target? = when (item) {
         is ContinueItem -> chapterTarget(item.record, isContinue = true)
-        is Record -> chapterTarget(item)
-        // Un capítulo reciente que ya se empezó se trata como uno de «Seguir viendo»: mismo servidor recordado y opción de quitarlo.
-        is RecentEpisode -> chapterTarget(item.asRecord(),
-            isContinue = KaizenProgress.startedOf(KaizenProgress.Key(app.kaizen.source.seriesIdOf(item.source, item.slug), item.number), item.eid) != null)
+        // Un capítulo que ya se empezó (en Recientes, en la ficha o en el historial) se trata como uno de «Seguir viendo»: mismo servidor recordado y opción de quitarlo.
+        is Record -> chapterTarget(item, isContinue = isStarted(item))
+        is RecentEpisode -> item.asRecord().let { chapterTarget(it, isContinue = isStarted(it)) }
         is FavoriteAV1 -> Target(item.aid, item.name, item.animeUrl(), item.slug, item)
         is Recommended -> slugOfUrl(item.animeUrl).let { slug -> Target(item.aid, item.name, item.animeUrl, slug, favoriteOf(item.aid, item.name, slug, item.type, AnimeSources.forUrl(item.animeUrl).id)) }
         is SeriesSummary -> Target(item.aid, item.name, item.animeUrl, item.slug, favoriteOf(item.aid, item.name, item.slug, item.type, item.source))
@@ -152,6 +151,9 @@ object CardMenu {
     /** La clave del progreso del capítulo: un capítulo de Recientes llega sin id de serie (0), así que se busca por su ficha, como hace la tarjeta. */
     private fun progressKeyOf(record: Record) =
         KaizenProgress.Key(record.seriesId.takeIf { it != 0L } ?: app.kaizen.source.seriesIdOf(record.source, record.slug), record.number)
+
+    /** Si el capítulo está empezado y sin acabar (el progreso guardado), el mismo criterio que la marca de la tarjeta. */
+    private fun isStarted(record: Record) = KaizenProgress.startedOf(progressKeyOf(record), record.eid) != null
 
     private fun chapterTarget(record: Record, isContinue: Boolean = false) =
         Target(record.aid, record.name, record.animeUrl(), record.slug, null, record, isContinue)

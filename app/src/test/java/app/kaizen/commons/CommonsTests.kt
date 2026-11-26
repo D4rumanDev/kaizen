@@ -1202,6 +1202,23 @@ class RecentsOrderTest {
         assertEquals(listOf("otra", "av1", "flv"), order(item("flv", 0, 9999, "a|1"), item("av1", 500, 0, "a|1"), item("otra", 700, 0, "b|1")))
     }
 
+    private val byNumber = compareByDescending<Item> { it.name }
+
+    @Test
+    fun `con desempate a igual fecha el orden no depende del orden de llegada`() {
+        val items = listOf(item("a", 500, 0, "a|1"), item("b", 500, 0, "b|1"), item("c", 500, 0, "c|1"), item("d", 900, 0, "d|1"))
+        val expected = listOf("d", "c", "b", "a")
+        listOf(items, items.reversed(), listOf(items[1], items[3], items[0], items[2])).forEach { arrival ->
+            assertEquals(expected, newestFirst(arrival, { it.released }, { it.added }, { it.keys }, byNumber).map { it.name })
+        }
+    }
+
+    @Test
+    fun `el desempate no pasa por delante de la fecha`() {
+        val sorted = newestFirst(listOf(item("z", 100, 0, "z|1"), item("a", 200, 0, "a|1")), { it.released }, { it.added }, { it.keys }, byNumber)
+        assertEquals(listOf("a", "z"), sorted.map { it.name })
+    }
+
     @Test
     fun `no falla aunque las claves de identidad cambien mientras se ordena`() {
         // El id de serie puede cargarse en otro hilo en mitad de la ordenación (las claves salen de él): la fecha heredada de una entrada

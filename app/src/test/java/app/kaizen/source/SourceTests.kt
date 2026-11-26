@@ -8150,4 +8150,27 @@ class AniSkipTest {
         val times = AniSkip.parse("""{"found":true,"results":[{"interval":{"startTime":10,"endTime":90},"skipType":"op","episodeLength":0}]}""")!!
         assertNull(times.forDuration(1_400_000L))
     }
+
+    @Test
+    fun `el veredicto guardado de un enlace cambia si cambian los titulos de su anime`() {
+        val ova = AnimeFuente("animeflv", "black-clover-ova", 97940, AnimeFuente.APLICADO, AnimeFuente.AUTO, "seguro", 1.0, 1L)
+        val asTv = mapOf(97940L to AnimeFichaDao.Titles(97940, "black clover", "black clover", "TV"))
+        val asOva = mapOf(97940L to AnimeFichaDao.Titles(97940, "black clover", "black clover", "OVA"))
+        // Dos veces lo mismo (la segunda sale del veredicto guardado) y, con otros títulos, otro resultado: la clave incluye los títulos.
+        repeat(2) { assertEquals(listOf(ova), AnilistLinkCheck.inconsistent(listOf(ova), asTv)) }
+        assertTrue(AnilistLinkCheck.inconsistent(listOf(ova), asOva).isEmpty())
+        assertEquals(listOf(ova), AnilistLinkCheck.inconsistent(listOf(ova), asTv))
+    }
+
+    @Test
+    fun `el comprobador lee la ficha completa una vez por fila y no guarda lo que depende de ella o del MAL de la web`() {
+        val titles = mapOf(2L to AnimeFichaDao.Titles(2L, "totally different title", null))
+        val auto = AnimeFuente("verani", "slug-cache-mal", 2, AnimeFuente.APLICADO, AnimeFuente.AUTO, "seguro", 1.03, 1L)
+        val full = AnilistFichaRaw(2, 77L, """{"id":2,"synonyms":[]}""", "totally different title", null, null, 2020, "TV", 70, "FINISHED").toFicha(1L, null)
+        var loads = 0
+        assertEquals(listOf(auto), AnilistLinkCheck.inconsistent(listOf(auto), titles, { _, _ -> 78L }) { loads++; full })
+        assertEquals(1, loads)
+        // El MAL de la web cambia entre dos comprobaciones: el resultado cambia (no quedó guardado el anterior).
+        assertTrue(AnilistLinkCheck.inconsistent(listOf(auto), titles, { _, _ -> 77L }) { full }.isEmpty())
+    }
 }

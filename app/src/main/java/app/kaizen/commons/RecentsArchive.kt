@@ -19,6 +19,9 @@ import app.kaizen.source.seriesIdentity
 object RecentsArchive {
     private const val KEY = "items"
 
+    // A igual fecha el orden no depende de qué fuente contestó antes: episodio más alto primero y, si aún empatan, id y después fuente y slug.
+    private val TIE_BREAK = compareByDescending<Entry> { it.number }.thenByDescending { it.eid }.thenBy { it.source.orEmpty() }.thenBy { it.slug }
+
     // Nombres fijos: el APK se ofusca (R8) y el JSON guardado debe sobrevivir a las actualizaciones.
     // addedAt = momento en que se vio por primera vez: el orden de «recientes» es ese, no el id del episodio.
     // source puede faltar en datos guardados antes de multifuente: se trata como animeav1.
@@ -61,13 +64,13 @@ object RecentsArchive {
         val dedupe = SeriesDedupe()
         // Un mismo episodio por su serie (id o título) y, aparte, por su slug sin sufijos: con otro título en otra fuente sigue siendo el mismo.
         val identity = { e: Entry -> listOf("${seriesIdentity(e.name, e.source ?: AnimeAv1.ID, e.slug)}|${e.number}", "s:${SeriesMatch.slugBase(e.slug)}|${e.number}") }
-        val merged = newestFirst(fresh + stored, { it.released }, { it.addedAt }, identity)
+        val merged = newestFirst(fresh + stored, { it.released }, { it.addedAt }, identity, TIE_BREAK)
             // Un episodio por serie y número, aunque venga de dos plataformas con nombre distinto
             // («2nd Season» / «2nda Temporada»): mismo slug, mismo id de serie o mismo título normalizado (ver [SeriesDedupe]).
             .filter { entry -> dedupe.isNew(entry.slug, entry.name, entry.source ?: AnimeAv1.ID, scope = entry.number.toString()) }
             .take(KaizenSettings.recentsCount)
             // Orden final por fecha y hora, de más nuevo a más viejo (a igual fecha se conserva el orden de la fuente).
-            .let { newestFirst(it, { e -> e.released }, { e -> e.addedAt }, identity) }
+            .let { newestFirst(it, { e -> e.released }, { e -> e.addedAt }, identity, TIE_BREAK) }
         if (merged != stored) prefs.edit { putString(KEY, gson.toJson(merged)) }
         return merged.mapIndexed { index, entry ->
             RecentEpisode(index, entry.aid, entry.eid, entry.name, entry.number, entry.slug, entry.source ?: AnimeAv1.ID, entry.released)
@@ -90,9 +93,9 @@ object RecentsArchive {
  * [items] del más nuevo al más viejo por su fecha y hora de publicación ([released], 0 = la fuente no la da). Una entrada sin fecha usa la de
  * otra fuente para el mismo episodio ([identity] = serie y número) y solo si ninguna la tiene, cuándo se vio por primera vez ([added]):
  * así un episodio sin fecha no se cuela por delante de los que sí la tienen solo porque se leyó hace poco. A igual fecha gana el que
- * trae fecha propia, y después se conserva el orden de entrada.
+ * trae fecha propia, y después manda [tieBreak] (sin él se conserva el orden de entrada).
  */
-internal fun <T> newestFirst(items: List<T>, released: (T) -> Long, added: (T) -> Long, identity: (T) -> List<String>): List<T> {
+internal fun <T> newestFirst(items: List<T>, released: (T) -> Long, added: (T) -> Long, identity: (T) -> List<String>, tieBreak: Comparator<T>? = null): List<T> {
     // Cada dato se lee una sola vez: las claves salen del id de serie, que otro hilo puede cargar o cambiar mientras se ordena, y un
     // comparador que da fechas distintas a la misma entrada hace fallar la ordenación («Comparison method violates its general contract»).
     val releasedAt = items.map(released)
@@ -100,5 +103,7 @@ internal fun <T> newestFirst(items: List<T>, released: (T) -> Long, added: (T) -
     val known = HashMap<String, Long>()
     items.indices.forEach { i -> if (releasedAt[i] > 0) keys[i].forEach { key -> known.merge(key, releasedAt[i]) { a, b -> maxOf(a, b) } } }
     val dates = items.indices.map { i -> if (releasedAt[i] > 0) releasedAt[i] else keys[i].mapNotNull { known[it] }.maxOrNull() ?: added(items[i]) }
-    return items.indices.sortedWith(compareByDescending<Int> { dates[it] }.thenByDescending { releasedAt[it] > 0 }).map { items[it] }
+    val byDate = compareByDescending<Int> { dates[it] }.thenByDescending { releasedAt[it] > 0 }
+    val order = if (tieBreak == null) byDate else byDate.then { a, b -> tieBreak.compare(items[a], items[b]) }
+    return items.indices.sortedWith(order).map { items[it] }
 }

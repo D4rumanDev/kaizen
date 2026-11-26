@@ -433,76 +433,83 @@ class TVServersFactory private constructor(
     fun analyzeServer(chosen: Server) {
         background {
             try {
-                if (cancelled) return@background
-                val text = chosen.name
-                progress.begin(LoadStep.SERVER, text)
-                track(chosen)
-                // Una marca de un corte anterior ya no vale: este es un intento nuevo y debe anotarse.
-                timedOut.remove(chosen)
-                val server = chosen.verified()
-                if (cancelled) return@background
-                val works = server != null && server.options.isNotEmpty()
-                // Si lo apartado ahora abre, deja de estar apartado.
-                if (works) clearBroken(chosen)
-                // Con un solo servidor y ninguno apartado no hay lista que enseñar; si no, vuelve la lista con este con el aviso.
-                if (server == null && isOnlyCandidate(chosen)) {
-                    progress.fail(LoadStep.SERVER, "$text no responde")
-                    KaizenToast.toast(appString(R.string.ui_error_en_servidor_intente_mas_tarde))
-                    finish(false, false)
-                } else if (server == null) {
-                    progress.fail(LoadStep.SERVER, "$text no responde")
-                    attemptFailed = true
-                    setBroken(chosen)
-                    KaizenToast.toast(appString(R.string.ui_error_en_servidor))
-                    showServerList()
-                } else if (server.options.isEmpty()) {
-                    progress.fail(LoadStep.SERVER, "$text sin vídeo")
-                    attemptFailed = true
-                    setBroken(chosen)
-                    KaizenToast.toast(appString(R.string.ui_error_en_servidor))
-                    showServerList()
-                } else if (server.haveOptions()) {
-                    useServer(text, chosen)
-                    progress.done(LoadStep.SERVER, text)
-                    showOptions(server)
-                } else if (chosen is WebServer) {
-                    try {
-                        if (cancelled) return@background
-                        progress.done(LoadStep.SERVER, text)
-                        openWebPlayer(activity, checkNotNull(server.option.url) { "Servidor web sin URL" }, name)
-                        progress.done(LoadStep.CHAPTER, "Abriendo el navegador")
-                        background(onError = { logError(it); KaizenToast.toast("No se pudo marcar el capítulo como visto") }) {
-                            Library.addChapter(record)
-                            SeriesStatuses.autoWatching(record.name, record.source, record.slug, record.aid)
-                        }
-                        finish(false, true)
-                    } catch (_: Exception) {
-                        KaizenToast.toast(appString(R.string.ui_error_al_abrir_explorador_web))
-                        showServerList()
-                    }
-
-                } else {
-                    val serverName = text.lowercase(Locale.getDefault())
-                    when {
-                        serverName.contains("mega") -> {
-                            KaizenToast.toast(appString(R.string.ui_no_se_puede_usar_mega_en_tv))
-                            showServerList()
-                        }
-                        else -> {
-                            useServer(text, chosen)
-                            progress.done(LoadStep.SERVER, text)
-                            startStreaming(server.option)
-                        }
-                    }
-                }
+                openServer(chosen)
             } catch (e: Exception) {
                 // Kaizen: antes la excepción se tragaba y no volvía a salir la lista de servidores.
                 logUnlessCancelled(e)
                 progress.fail(LoadStep.SERVER, "Error en el servidor")
-                KaizenToast.toast(appString(R.string.ui_error_en_servidor))
-                attemptFailed = true
+                failAttempt(R.string.ui_error_en_servidor)
+            }
+        }
+    }
+
+    private suspend fun openServer(chosen: Server) {
+        if (cancelled) return
+        val text = chosen.name
+        progress.begin(LoadStep.SERVER, text)
+        track(chosen)
+        // Una marca de un corte anterior ya no vale: este es un intento nuevo y debe anotarse.
+        timedOut.remove(chosen)
+        val server = chosen.verified()
+        if (cancelled) return
+        // Si lo apartado ahora abre, deja de estar apartado.
+        if (server != null && server.options.isNotEmpty()) clearBroken(chosen)
+        when {
+            // Con un solo servidor y ninguno apartado no hay lista que enseñar; si no, vuelve la lista con este con el aviso.
+            server == null && isOnlyCandidate(chosen) -> {
+                progress.fail(LoadStep.SERVER, "$text no responde")
+                KaizenToast.toast(appString(R.string.ui_error_en_servidor_intente_mas_tarde))
+                finish(false, false)
+            }
+            server == null -> {
+                progress.fail(LoadStep.SERVER, "$text no responde")
+                setBroken(chosen)
+                failAttempt(R.string.ui_error_en_servidor)
+            }
+            server.options.isEmpty() -> {
+                progress.fail(LoadStep.SERVER, "$text sin vídeo")
+                setBroken(chosen)
+                failAttempt(R.string.ui_error_en_servidor)
+            }
+            server.haveOptions() -> {
+                useServer(text, chosen)
+                progress.done(LoadStep.SERVER, text)
+                showOptions(server)
+            }
+            chosen is WebServer -> openInBrowser(chosen, server, text)
+            text.lowercase(Locale.getDefault()).contains("mega") -> {
+                KaizenToast.toast(appString(R.string.ui_no_se_puede_usar_mega_en_tv))
                 showServerList()
             }
+            else -> {
+                useServer(text, chosen)
+                progress.done(LoadStep.SERVER, text)
+                startStreaming(server.option)
+            }
+        }
+    }
+
+    /** El intento falló: se anota, se avisa y vuelve la lista de servidores. */
+    private fun failAttempt(message: Int) {
+        attemptFailed = true
+        KaizenToast.toast(appString(message))
+        showServerList()
+    }
+
+    private fun openInBrowser(chosen: Server, server: VideoServer, text: String) {
+        try {
+            if (cancelled) return
+            progress.done(LoadStep.SERVER, text)
+            openWebPlayer(activity, checkNotNull(server.option.url) { "Servidor web sin URL" }, name)
+            progress.done(LoadStep.CHAPTER, "Abriendo el navegador")
+            background(onError = { logError(it); KaizenToast.toast("No se pudo marcar el capítulo como visto") }) {
+                Library.addChapter(record)
+                SeriesStatuses.autoWatching(record.name, record.source, record.slug, record.aid)
+            }
+            finish(false, true)
+        } catch (_: Exception) {
+            KaizenToast.toast(appString(R.string.ui_error_al_abrir_explorador_web))
+            showServerList()
         }
     }
 

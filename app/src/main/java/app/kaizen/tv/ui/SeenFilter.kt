@@ -56,8 +56,26 @@ internal fun rememberSeen(source: String, slug: String, number: Double): Boolean
     return remember(source, slug, number, ledger, seen) { seen?.contains(app.kaizen.source.seriesIdOf(source, slug) to number) == true }
 }
 
-/** Cómo se marca un capítulo en «Recientes»: sin marca, visto (acabado) o empezado y sin acabar (se puede seguir). */
+/** Cómo se marca un capítulo en todas las tarjetas (Recientes, ficha, reproductor): sin marca, visto (acabado) o empezado y sin acabar (se puede seguir). */
 internal enum class CardWatch { NONE, SEEN, RESUMING }
+
+/** Lo que dicen las tarjetas de un capítulo: la marca ([state]) y, si está empezado, su progreso ([started], para la barra). */
+internal class ChapterWatch(val state: CardWatch, val started: app.kaizen.commons.KaizenProgress.Progress?)
+
+/**
+ * El estado de un capítulo para pintarlo, igual en todas las tarjetas: [rememberSeen] y el progreso guardado, que se relee cuando cambia (al salir del reproductor) o cuando el
+ * libro de series conoce la serie. Un capítulo se guarda como visto al empezar, así que lo empezado es [CardWatch.RESUMING] y no lleva el check.
+ */
+@androidx.compose.runtime.Composable
+internal fun rememberChapterWatch(source: String, slug: String, number: Double, eid: Int): ChapterWatch {
+    val ledger = app.kaizen.source.SeriesLedger.version.collectAsStateWithLifecycle().value
+    val changes = app.kaizen.commons.KaizenProgress.changes.collectAsStateWithLifecycle().value
+    val seen = rememberSeen(source, slug, number)
+    return remember(source, slug, number, eid, ledger, changes, seen) {
+        val started = app.kaizen.commons.KaizenProgress.startedOf(app.kaizen.commons.KaizenProgress.Key(app.kaizen.source.seriesIdOf(source, slug), number), eid)
+        ChapterWatch(cardWatchOf(seen, started), started)
+    }
+}
 
 /**
  * Un capítulo se guarda como visto en cuanto empieza a reproducirse, así que «visto» solo no dice si se acabó: con progreso a medias ([progress] de

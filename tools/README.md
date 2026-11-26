@@ -256,7 +256,7 @@ Analizador estático de dependencias y código muerto sobre `app/src/main`:
 python tools/audit/code_graph.py dead [--apply]
 python tools/audit/code_graph.py unused [--apply-imports --yes]
 python tools/audit/code_graph.py dups [--min 6] [--top 40] [--scope app/src/main]
-python tools/audit/code_graph.py big [--top 25] [--scope app/src/main]
+python tools/audit/code_graph.py big [--top 25] [--by lines|depth] [--scope app/src/main]
 python tools/audit/code_graph.py html [--out backups/code-graph/]
 python tools/audit/code_graph.py who <CLASE_O_FUNCION>
 python tools/audit/code_graph.py deps <CLASE_O_FUNCION>
@@ -264,7 +264,7 @@ python tools/audit/code_graph.py deps <CLASE_O_FUNCION>
 - `dead`: Localiza funciones, clases y constantes inalcanzables. Con `--apply` elimina el código muerto. Respeta las excepciones definidas en `tools/audit/code_graph_keep.txt`.
 - `unused`: Detecta imports sin referencias. Ignora los que Kotlin usa sin nombrarlos (`getValue`, `setValue`, `iterator`, operadores, `componentN`). Solo borra con `--apply-imports --yes` y deja copia en `backups/code-graph/`. Cuidado: puede marcar uno que se usa por una extensión (hoy `SpecSources` en `AnilistSeed` y `CatalogSeed`); compilar tras aplicar.
 - `dups`: Bloques de código idénticos en 2 o más sitios (sin comentarios ni imports) y las líneas que se ahorrarían extrayéndolos. Solo texto, no necesita el análisis PSI.
-- `big`: Las funciones más largas, para decidir dónde mirar al recortar. Heurística por llaves.
+- `big`: Las funciones más largas (`--by lines`) o más anidadas (`--by depth`: nivel máximo de llaves), para decidir dónde mirar al refactorizar. Heurística por llaves; en Compose la interfaz anida por naturaleza (`Column { Row { … } }`), así que la profundidad importa sobre todo en lógica.
 - `html`: Genera un visualizador web interactivo de dependencias del proyecto.
 
 ### `release.js`

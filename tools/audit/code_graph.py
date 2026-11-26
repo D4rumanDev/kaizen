@@ -444,15 +444,16 @@ def cmd_big(root: pathlib.Path, args: argparse.Namespace) -> None:
         for i, l in enumerate(L):
             m = fun.match(l)
             if not m: continue
-            depth, opened, j = 0, False, i
+            depth, deepest, opened, j = 0, 0, False, i
             while j < len(L):
-                depth += L[j].count("{") - L[j].count("}"); opened = opened or "{" in L[j]
+                depth += L[j].count("{") - L[j].count("}"); deepest = max(deepest, depth); opened = opened or "{" in L[j]
                 if (opened and depth <= 0) or (not opened and j > i and not L[j - 1].rstrip().endswith(("=", "(", ",", "&&", "||", "?:"))): break
                 j += 1
-            out.append((j - i + 1, f"{p.relative_to(root).as_posix()}:{i + 1}", m.group(1)))
-    out.sort(reverse=True)
-    print("## Funciones más largas")
-    for n, where, name in out[:args.top]: print(f"{n:5}  {name:32} {where}")
+            out.append((j - i + 1, deepest, f"{p.relative_to(root).as_posix()}:{i + 1}", m.group(1)))
+    out.sort(key=lambda r: (r[1], r[0]) if args.by == "depth" else (r[0], r[1]), reverse=True)
+    print("## Funciones más largas" if args.by == "lines" else "## Funciones más anidadas (llaves)")
+    print("lineas  anidado  funcion                          donde")
+    for n, deep, where, name in out[:args.top]: print(f"{n:6}  {deep:7}  {name:32} {where}")
 
 def build_parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(description="Grafo de referencias Kotlin mediante Kotlin PSI")
@@ -469,6 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("dups","big"):
         x=sub.add_parser(name,help="bloques de código repetidos" if name=="dups" else "funciones más largas")
         x.add_argument("--scope",default="app/src/main");x.add_argument("--top",type=int,default=40 if name=="dups" else 25)
+        if name=="big": x.add_argument("--by",choices=["lines","depth"],default="lines")
         if name=="dups": x.add_argument("--min",type=int,default=6)
     return p
 

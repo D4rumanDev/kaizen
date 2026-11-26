@@ -16,6 +16,7 @@ internal object AnilistReviewRepository {
 
     /** Las series con un candidato dudoso de AniList, leídas de la base (sin red). Antes enlaza las de un anime que ya has confirmado en otra ficha. */
     suspend fun pending(adopt: Boolean = true): List<PendingSeries> = withContext(Dispatchers.IO) {
+        val start = System.nanoTime()
         val work = AnilistSyncRunner.work()
         var rows = links.all().associateBy { it.fuente to it.slug }
         // Con adopt = false (la prueba por ADB) no se escribe nada.
@@ -25,7 +26,9 @@ internal object AnilistReviewRepository {
             links.put(adopted)
             rows = links.all().associateBy { it.fuente to it.slug }
         }
-        onlyActive(AnilistReview.pending(work) { f, s -> rows[f to s] }, activeSourceIds())
+        onlyActive(AnilistReview.pending(work) { f, s -> rows[f to s] }, activeSourceIds()).also {
+            DebugLog.info("Medición", "Series por revisar: ${work.size} series, ${rows.size} filas, ${it.size} pendientes, ${(System.nanoTime() - start) / 1_000_000} ms")
+        }
     }
 
     /** Los ids de las fuentes activas (marcadas en Configuración). */

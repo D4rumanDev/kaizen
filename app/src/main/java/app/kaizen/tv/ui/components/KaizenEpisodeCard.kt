@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
-import app.kaizen.commons.KaizenProgress
 import app.kaizen.pojos.av1.Chapter
 import app.kaizen.tv.ui.*
 import app.kaizen.tv.ui.theme.*
@@ -71,19 +70,18 @@ internal fun WideCard(
 }
 
 /**
- * La tarjeta de un capítulo (imagen ancha con su miniatura): el ojo sigue a Room, así que se actualiza al marcarlo o desmarcarlo desde cualquier pantalla, y la barra muestra
- * los empezados y sin terminar (se relee cuando cambia [version], al refrescarse la ficha).
+ * La tarjeta de un capítulo (imagen ancha con su miniatura): la marca (triángulo azul si está empezado, check verde si acabado) y la barra de lo visto salen de [rememberChapterWatch],
+ * igual que en «Recientes», y se actualizan al ver o marcar desde cualquier pantalla. [onClick] dice si el capítulo está empezado, para reanudarlo con el servidor recordado.
  */
 @Composable
-internal fun EpisodeCard(chapter: Chapter, version: Int, onLongClick: () -> Unit, onClick: () -> Unit) {
-    // Lo visto en memoria, compartido por todas las tarjetas (antes una consulta de Room por capítulo, cientos en una serie larga).
-    val seen = app.kaizen.tv.ui.rememberSeen(chapter.source, chapter.slug, chapter.number)
-    val progress = remember(chapter, version) { KaizenProgress.get(chapter.progressKey(), chapter.eid)?.takeIf { it.isInProgress }?.fraction }
-    FocusCard(Modifier.width(EpisodeCardWidth), onClick, onLongClick) {
+internal fun EpisodeCard(chapter: Chapter, onLongClick: () -> Unit, onClick: (resuming: Boolean) -> Unit) {
+    val watch = rememberChapterWatch(chapter.source, chapter.slug, chapter.number, chapter.eid)
+    FocusCard(Modifier.width(EpisodeCardWidth), { onClick(watch.state == CardWatch.RESUMING) }, onLongClick) {
         Box(Modifier.fillMaxWidth().height(EpisodeImageHeight).clip(CardImageShape).background(White10)) {
             Cover(listOf(chapter.thumbnail), Modifier.fillMaxSize(), under = remember(chapter) { chapter.coverUnderThumbnail })
-            if (progress != null) CardProgressBar(progress.toFloat(), Modifier.align(Alignment.BottomStart))
+            watch.started?.let { CardProgressBar(it.fraction.toFloat(), Modifier.align(Alignment.BottomStart)) }
+            WatchMark(watch.state, Modifier.align(Alignment.BottomEnd))
         }
-        CardTexts(chapter.name, chapter.episodeName, titleLines = 1, seen = seen)
+        CardTexts(chapter.name, chapter.episodeName, titleLines = 1)
     }
 }

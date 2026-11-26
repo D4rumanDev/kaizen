@@ -77,13 +77,20 @@ class WebJS(context: Context) {
         var response = false
         val handler = Handler(Looper.getMainLooper())
         val run = Runnable {
-            webView.post {
-                webView.loadUrl("about:blank")
-            }
+            webView.post { webView.loadUrl("about:blank") }
             if (!response) {
                 response = true
                 callback(null, null)
             }
+        }
+        // Primera petición que cumple `onRequest`: se entrega una sola vez y se vacía la página.
+        fun foundBy(request: WebResourceRequest?) {
+            if (response || request == null || !onRequest(request.url.toString())) return
+            logger("WebJS", "Found: ${request.url}")
+            handler.removeCallbacks(run)
+            response = true
+            callback(request.url.toString(), request.requestHeaders)
+            webView.post { webView.loadUrl("about:blank") }
         }
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         webView.settings.apply {
@@ -94,96 +101,27 @@ class WebJS(context: Context) {
             userAgentString = userAgent
         }
         webView.webViewClient = object : WebViewClient() {
-            override fun onReceivedSslError(
-                view: WebView?,
-                handler: SslErrorHandler?,
-                error: SslError?
-            ) {
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
                 // Solo se continúa con un certificado inválido si el usuario activó el modo permisivo (Ajustes).
                 if (TlsPolicy.isPermissive) handler?.proceed() else handler?.cancel()
             }
 
-            override fun shouldOverrideUrlLoading(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 logger("WebJS", "shouldOverrideUrlLoading: ${request?.url}")
-                if (!response && request != null && onRequest(request.url.toString())) {
-                    logger("WebJS", "Found: ${request.url}")
-                    handler.removeCallbacks(run)
-                    response = true
-                    callback(request.url.toString(), request.requestHeaders)
-                    webView.post {
-                        webView.loadUrl("about:blank")
-                    }
-                }
+                foundBy(request)
                 return true
             }
 
-            /*override fun shouldInterceptRequest(
-                view: WebView?,
-                url: String?
-            ): WebResourceResponse? {
-                if (!response && url?.matches(regex) == true) {
-                    logger("WebJS", "Found: $url")
-                    handler.removeCallbacks(run)
-                    response = true
-                    callback(url, cookieManager.getCookie(link).let {
-                        if (it.isNullOrBlank() || !it.contains("=")) {
-                            emptyMap()
-                        } else {
-                            it.split(";").associate {
-                                it.trim().split("=").let {
-                                    it[0] to it[1]
-                                }
-                            }
-                        }
-                    })
-                    webView.post {
-                        webView.loadUrl("about:blank")
-                    }
-                }
-                return if (response) {
-                    WebResourceResponse("text/plain", "UTF-8", null)
-                } else {
-                    logger("WebJS", "shouldInterceptRequest: $url")
-                    super.shouldInterceptRequest(view, url)
-                }
-            }*/
-
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): WebResourceResponse? {
-                if (!response && request != null && onRequest(request.url.toString())) {
-                    logger("WebJS", "Found: ${request.url}")
-                    handler.removeCallbacks(run)
-                    response = true
-                    callback(request.url.toString(), request.requestHeaders)
-                    webView.post {
-                        webView.loadUrl("about:blank")
-                    }
-                }
-                return if (response) {
-                    WebResourceResponse("text/plain", "UTF-8", null)
-                } else {
-                    logger("WebJS", "shouldInterceptRequest: ${request?.url}")
-                    super.shouldInterceptRequest(view, request)
-                }
+            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                foundBy(request)
+                if (response) return WebResourceResponse("text/plain", "UTF-8", null)
+                logger("WebJS", "shouldInterceptRequest: ${request?.url}")
+                return super.shouldInterceptRequest(view, request)
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
-                val javascript = """
-            (function() {
-                document.querySelectorAll('video, audio').forEach(function(media) {
-                    media.muted = true;
-                });
-            })();
-        """.trimIndent()
-                view?.evaluateJavascript(javascript, null)
-                if (executeOnFinish != null) {
-                    webView.loadUrl(executeOnFinish)
-                }
+                view?.evaluateJavascript(MUTE_MEDIA, null)
+                if (executeOnFinish != null) webView.loadUrl(executeOnFinish)
             }
         }
         handler.postDelayed(run, timeout)
@@ -196,5 +134,9 @@ class WebJS(context: Context) {
         fun returnResult(result: String) {
             callback(result)
         }
+    }
+
+    private companion object {
+        const val MUTE_MEDIA = "(function() { document.querySelectorAll('video, audio').forEach(function(media) { media.muted = true; }); })();"
     }
 }

@@ -517,10 +517,14 @@ private fun ChaptersRow(controller: PlaybackController) {
                     .padding(CardInset),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val seen = app.kaizen.tv.ui.rememberSeen(chapter.source, chapter.slug, chapter.number)
-                Cover(covers, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(CardImageShape), showLabel = false, under = remember(chapter) { chapter.coverUnderThumbnail })
+                // La misma marca y barra que las demás tarjetas de capítulo (triángulo azul si está empezado, check verde si acabado).
+                val watch = app.kaizen.tv.ui.rememberChapterWatch(chapter.source, chapter.slug, chapter.number, chapter.eid)
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(CardImageShape)) {
+                    Cover(covers, Modifier.fillMaxSize(), showLabel = false, under = remember(chapter) { chapter.coverUnderThumbnail })
+                    watch.started?.let { app.kaizen.tv.ui.components.CardProgressBar(it.fraction.toFloat(), Modifier.align(Alignment.BottomStart)) }
+                    app.kaizen.tv.ui.components.WatchMark(watch.state, Modifier.align(Alignment.BottomEnd))
+                }
                 Row(Modifier.padding(horizontal = CardTextInset, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (seen) SeenCheck()
                     Text(if (playing) "▶ ${chapter.episodeName}" else chapter.episodeName, color = if (focused || playing) Color.White else White80,
                         fontSize = Text15, fontWeight = if (focused) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

@@ -212,7 +212,7 @@ internal object AnilistReview {
     /** Las series sin enlace aplicado y con un candidato dudoso (el de mayor puntuación), con favoritos y vistos primero y las más parecidas antes. */
     fun pending(series: Collection<SeriesWork>, row: (String, String) -> AnimeFuente?): List<PendingSeries> =
         series.mapNotNull { work ->
-            val rows = work.fichas.mapNotNull { (f, s) -> row(f, s) }
+            val rows = rowsOf(work, row)
             if (rows.any { it.estado == AnimeFuente.APLICADO }) return@mapNotNull null
             // Los que ya se guardaron con un parecido tan bajo (antes todo lo no descartado era dudoso) no se preguntan.
             val best = rows.filter { it.estado == AnimeFuente.PENDIENTE && it.anilistId != null && it.puntuacion >= AnilistMatcher.DUDOSO_FROM }
@@ -231,14 +231,20 @@ internal object AnilistReview {
      */
     fun adoptions(series: Collection<SeriesWork>, row: (String, String) -> AnimeFuente?, applied: Set<Long>, at: Long): List<AnimeFuente> =
         series.flatMap { work ->
-            val rows = work.fichas.mapNotNull { (f, s) -> row(f, s) }
+            val rows = rowsOf(work, row)
             if (rows.any { it.estado == AnimeFuente.APLICADO }) return@flatMap emptyList()
             // El mejor candidato de la serie, como en [pending]: solo se adopta si ese ya está enlazado y es lo bastante parecido.
             val best = rows.filter { it.estado == AnimeFuente.PENDIENTE && it.anilistId != null }.maxByOrNull { it.puntuacion }
                 ?.takeIf { it.anilistId in applied && it.puntuacion >= CONFIRMED_FROM } ?: return@flatMap emptyList()
-            work.fichas.filter { (f, s) -> row(f, s)?.origen != AnimeFuente.USUARIO }
-                .map { (f, s) -> AnimeFuente(f, s, best.anilistId, AnimeFuente.APLICADO, AnimeFuente.AUTO, "mismo-id", best.puntuacion, at) }
+            notDecidedByUser(work.fichas, row).map { (f, s) -> AnimeFuente(f, s, best.anilistId, AnimeFuente.APLICADO, AnimeFuente.AUTO, "mismo-id", best.puntuacion, at) }
         }
+
+    /** Las filas guardadas de las fichas de la serie (las que no tienen fila no salen). */
+    private fun rowsOf(work: SeriesWork, row: (String, String) -> AnimeFuente?): List<AnimeFuente> = work.fichas.mapNotNull { (f, s) -> row(f, s) }
+
+    /** Las fichas [fichas] cuya fila no es una decisión del usuario: lo que decidió el usuario no lo toca ningún trabajo automático. */
+    private fun notDecidedByUser(fichas: List<Pair<String, String>>, row: (String, String) -> AnimeFuente?): List<Pair<String, String>> =
+        fichas.filter { (f, s) -> row(f, s)?.origen != AnimeFuente.USUARIO }
 
     /** El anime candidato tal como lo da AniList (una petición, con el ritmo de [AnilistHttp]); null si no lo da. */
     suspend fun candidate(anilistId: Long): AnilistFichaRaw? {
@@ -278,16 +284,13 @@ internal object AnilistReview {
      * (origen auto, nivel «datos») y guarda la ficha de AniList. No toca lo que decidió el usuario.
      */
     fun accept(series: PendingSeries, score: Double, fuentes: AnimeFuenteDao, fichas: AnimeFichaDao, raw: AnilistFichaRaw, at: Long) {
-        fuentes.put(series.fichas.filter { (fuente, slug) -> fuentes.get(fuente, slug)?.origen != AnimeFuente.USUARIO }
-            .map { (fuente, slug) -> AnimeFuente(fuente, slug, series.anilistId, AnimeFuente.APLICADO, AnimeFuente.AUTO, "datos", score, at) })
+        fuentes.put(notDecidedByUser(series.fichas, fuentes::get).map { (fuente, slug) -> AnimeFuente(fuente, slug, series.anilistId, AnimeFuente.APLICADO, AnimeFuente.AUTO, "datos", score, at) })
         fichas.put(listOf(raw.toFicha(at, fichas.get(raw.id)?.es)))
     }
 
     /** Guarda como «sin resultado» (origen auto, lo puede volver a mirar el emparejado) una serie cuyo candidato ya no pasa el corte del matcher. */
     fun discard(series: PendingSeries, fuentes: AnimeFuenteDao, at: Long) {
-        // Lo que decidió el usuario no se toca.
-        fuentes.put(series.fichas.filter { (fuente, slug) -> fuentes.get(fuente, slug)?.origen != AnimeFuente.USUARIO }
-            .map { (fuente, slug) -> AnimeFuente(fuente, slug, null, AnimeFuente.SIN_RESULTADO, AnimeFuente.AUTO, "descartado", 0.0, at) })
+        fuentes.put(notDecidedByUser(series.fichas, fuentes::get).map { (fuente, slug) -> AnimeFuente(fuente, slug, null, AnimeFuente.SIN_RESULTADO, AnimeFuente.AUTO, "descartado", 0.0, at) })
     }
 
     /** Deshace [decide]: cada ficha vuelve a lo que tenía ([before]); la que no tenía fila vuelve a quedar como candidato dudoso. */
@@ -385,21 +388,52 @@ internal object AnilistLinkCheck {
     fun doubtful(rows: Collection<AnimeFuente>): Set<Pair<String, String>> {
         val fichas = app.kaizen.database.CatalogDB.INSTANCE.animeFichaDao()
         val web = app.kaizen.database.CatalogDB.INSTANCE.webFichaDao()
-        return inconsistent(rows, fichas.titles().associateBy { it.anilistId }, { f, s -> web.get(f, s)?.malId }, fichas::get).map { it.fuente to it.slug }.toSet()
+        val start = System.nanoTime()
+        var loads = 0
+        val doubtful = inconsistent(rows, fichas.titles().associateBy { it.anilistId }, { f, s -> web.get(f, s)?.malId }, { id -> loads++; fichas.get(id) }).map { it.fuente to it.slug }.toSet()
+        app.kaizen.commons.DebugLog.info("Medición", "Enlaces dudosos: ${rows.size} filas, ${doubtful.size} dudosos, $loads fichas leídas enteras, ${(System.nanoTime() - start) / 1_000_000} ms")
+        return doubtful
     }
 
     /**
      * Las filas automáticas que no valen: las aplicadas cuyo anime no se parece a su ficha (según los nombres guardados) y las aplicadas o por revisar cuya ficha es una
      * película, un OVA o un especial enlazada a una serie de TV. El emparejado las rehace; las del usuario no se tocan.
      */
-    fun inconsistent(rows: Collection<AnimeFuente>, titles: Map<Long, AnimeFichaDao.Titles>, webMal: (String, String) -> Long? = { _, _ -> null }, ficha: (Long) -> AnimeFicha? = { null }): List<AnimeFuente> =
-        rows.filter {
-            it.origen == AnimeFuente.AUTO && it.anilistId != null && (it.estado == AnimeFuente.APLICADO || it.estado == AnimeFuente.PENDIENTE) && (
-                formatClashes(it.slug, titles[it.anilistId]) ||
-                    (it.estado == AnimeFuente.APLICADO && it.nivel != AnimeFuente.NIVEL_MAL && it.nivel != AnimeFuente.NIVEL_WEB && consistent(it.slug, titles[it.anilistId]) { ficha(it.anilistId) } == false &&
-                        !sameMal(webMal(it.fuente, it.slug), ficha(it.anilistId)))
-                )
-        }
+    fun inconsistent(rows: Collection<AnimeFuente>, titles: Map<Long, AnimeFichaDao.Titles>, webMal: (String, String) -> Long? = { _, _ -> null }, ficha: (Long) -> AnimeFicha? = { null }): List<AnimeFuente> {
+        if (verdicts.size > MAX_VERDICTS) verdicts.clear()
+        return rows.filter { isInconsistent(it, titles, webMal, ficha) }
+    }
+
+    /** Todo lo que decide el veredicto de una fila sin mirar la ficha completa ni el MAL de la web: la fila, y los títulos guardados de su anime. */
+    private data class VerdictKey(val slug: String, val anilistId: Long, val estado: String, val nivel: String, val titles: AnimeFichaDao.Titles?)
+
+    /**
+     * Los veredictos ya calculados: comprobar los ~28.000 enlaces costaba unos 23 s de CPU cada vez (se repetía varias veces al día con el mismo resultado), y casi todos se deciden
+     * solo con el slug y los títulos guardados. Solo se guardan esos; los que necesitan la ficha completa o el MAL de la web (pocos) se rehacen siempre, porque eso puede cambiar sin que cambie la clave.
+     */
+    private val verdicts = java.util.concurrent.ConcurrentHashMap<VerdictKey, Boolean>()
+    private const val MAX_VERDICTS = 100_000
+
+    private fun decided(key: VerdictKey, value: Boolean): Boolean { verdicts[key] = value; return value }
+
+    /** Si el enlace automático [row] no vale (ver [inconsistent]): una regla por línea, de la más barata a la más cara. */
+    private fun isInconsistent(row: AnimeFuente, titles: Map<Long, AnimeFichaDao.Titles>, webMal: (String, String) -> Long?, ficha: (Long) -> AnimeFicha?): Boolean {
+        val id = row.anilistId ?: return false
+        if (row.origen != AnimeFuente.AUTO || (row.estado != AnimeFuente.APLICADO && row.estado != AnimeFuente.PENDIENTE)) return false
+        val key = VerdictKey(row.slug, id, row.estado, row.nivel, titles[id])
+        verdicts[key]?.let { return it }
+        // Película, OVA o especial enlazada a una serie de TV: se decide por el slug y los títulos.
+        if (formatClashes(row.slug, key.titles)) return decided(key, true)
+        // Solo los aplicados por nombre se comprueban con el título: los de MAL y los de la web ya tienen una prueba mejor.
+        if (row.estado != AnimeFuente.APLICADO || row.nivel == AnimeFuente.NIVEL_MAL || row.nivel == AnimeFuente.NIVEL_WEB) return decided(key, false)
+        var usedFicha = false
+        val full by lazy { ficha(id) }
+        val consistent = consistent(row.slug, key.titles) { usedFicha = true; full }
+        // Con los títulos guardados bastó (o no hay con qué juzgar): el veredicto no depende de nada más y se guarda.
+        if (!usedFicha) return decided(key, false)
+        // Con la ficha completa: no vale si no se parece y la web no comparte el MAL (la ficha se lee una vez).
+        return consistent == false && !sameMal(webMal(row.fuente, row.slug), full)
+    }
 }
 
 /**

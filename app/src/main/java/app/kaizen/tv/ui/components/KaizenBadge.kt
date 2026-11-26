@@ -28,12 +28,6 @@ import app.kaizen.commons.appString
 import app.kaizen.tv.ui.*
 import app.kaizen.tv.ui.theme.*
 
-/** El check verde de «visto», junto al capítulo y fuera de la imagen: la portada no cambia. */
-@Composable
-internal fun SeenCheck(modifier: Modifier = Modifier) {
-    Text("✓", color = SeenGreen, fontSize = PosterSubtitleText, fontWeight = FontWeight.Bold, modifier = modifier.semantics { contentDescription = appString(R.string.ui_visto) })
-}
-
 /** El corazón arriba a la derecha de la imagen: relleno si la serie es favorita y solo el contorno si no. */
 @Composable
 internal fun FavoriteMark(modifier: Modifier = Modifier, favorite: Boolean = true) {
@@ -57,6 +51,16 @@ internal fun ChapterPill(text: String, color: Color, modifier: Modifier = Modifi
 internal fun ResumeBadge(modifier: Modifier = Modifier) {
     Box(modifier.padding(8.dp).size(20.dp).clip(CircleShape).background(Accent).semantics { contentDescription = "Seguir viendo" }, contentAlignment = Alignment.Center) {
         Icon(painterResource(R.drawable.ic_play_arrow_kaizen), contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+    }
+}
+
+/** La marca de un capítulo sobre su imagen, abajo a la derecha, la misma en todas las tarjetas: triángulo azul si está empezado, check verde si está acabado y nada si no. */
+@Composable
+internal fun WatchMark(watch: CardWatch, modifier: Modifier = Modifier) {
+    when (watch) {
+        CardWatch.RESUMING -> ResumeBadge(modifier)
+        CardWatch.SEEN -> SeenBadge(modifier)
+        CardWatch.NONE -> Unit
     }
 }
 

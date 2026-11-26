@@ -2,9 +2,6 @@
 
 package app.kaizen.tv.ui.components
 
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.kaizen.commons.KaizenProgress
-import app.kaizen.source.seriesIdOf
 import app.kaizen.tv.ui.theme.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -51,7 +48,6 @@ import app.kaizen.source.AnilistCards
 import app.kaizen.source.AnimeAv1
 import app.kaizen.source.AnimeSources
 import app.kaizen.source.Catalog
-import app.kaizen.source.SeriesLedger
 import app.kaizen.source.coverCandidates
 import app.kaizen.source.userCover
 import app.kaizen.tv.cards.SCORE_LOADING
@@ -298,13 +294,8 @@ internal fun ContinueCard(record: Record, onClick: () -> Unit, onLongClick: (() 
 /** Capítulo reciente: el ojo sigue a Room (por [app.kaizen.tv.ui.SeenChapters], una suscripción para todas), así que se actualiza al marcarlo o desmarcarlo desde cualquier pantalla. */
 @Composable
 internal fun RecentCard(data: RecentEpisode, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
-    // El id de serie sale del registro en memoria, que se carga al arrancar: al cambiar se vuelve a mirar el visto.
-    val ledger by SeriesLedger.version.collectAsStateWithLifecycle()
-    val seen = app.kaizen.tv.ui.rememberSeen(data.source, data.slug, data.number)
-    // Empezado y sin acabar: la barra de lo visto y el triángulo azul, no el check verde. Se relee cuando cambia el progreso guardado (al salir del reproductor).
-    val changes by KaizenProgress.changes.collectAsStateWithLifecycle()
-    val started = remember(data, ledger, changes) { KaizenProgress.startedOf(KaizenProgress.Key(seriesIdOf(data.source, data.slug), data.number), data.eid) }
-    val watch = cardWatchOf(seen, started)
+    // Empezado y sin acabar: la barra de lo visto y el triángulo azul, no el check verde (la misma regla que en la ficha y el reproductor).
+    val watch = rememberChapterWatch(data.source, data.slug, data.number, data.eid)
     val covers = rememberCovers(data.source, data.slug, remember(data.aid, data.slug) { coverCandidates(data.aid, data.slug, data.animeImageUrl) })
-    MediaCard(covers, data.name, data.chapter, onClick, onLongClick, seen = watch == CardWatch.SEEN, progress = started?.fraction?.toFloat(), resuming = watch == CardWatch.RESUMING, favorite = isFavoriteSeries(data.name, data.aid, data.source, data.slug), source = data.source, slug = data.slug, isNew = data.number == 1.0, chapterNumber = data.number)
+    MediaCard(covers, data.name, data.chapter, onClick, onLongClick, seen = watch.state == CardWatch.SEEN, progress = watch.started?.fraction?.toFloat(), resuming = watch.state == CardWatch.RESUMING,favorite = isFavoriteSeries(data.name, data.aid, data.source, data.slug), source = data.source, slug = data.slug, isNew = data.number == 1.0, chapterNumber = data.number)
 }

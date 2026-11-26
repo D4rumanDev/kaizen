@@ -3,21 +3,44 @@ package app.kaizen.control
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
+import app.kaizen.commons.AppErrors
 import app.kaizen.commons.AppScope
+import app.kaizen.commons.CacheCleaner
 import app.kaizen.commons.DebugLog
+import app.kaizen.commons.HostGate
+import app.kaizen.commons.ImageMisses
 import app.kaizen.commons.KaizenBackup
 import app.kaizen.commons.KaizenSettings
+import app.kaizen.commons.KaizenStore
+import app.kaizen.commons.LaLigaBlock
+import app.kaizen.commons.RequestCounter
+import app.kaizen.commons.Tuning
+import app.kaizen.commons.background
 import app.kaizen.commons.logError
 import app.kaizen.commons.runCatchingCoop
+import app.kaizen.commons.warp.WarpTunnel
+import app.kaizen.database.CacheDB
+import app.kaizen.database.CatalogDB
+import app.kaizen.database.UserDB
+import app.kaizen.source.AnilistAutoRunner
+import app.kaizen.source.AnimeSources
 import app.kaizen.source.CatalogBuilder
 import app.kaizen.source.FichaExport
 import app.kaizen.source.FichaFill
+import app.kaizen.source.FichaResuelta
 import app.kaizen.source.SeriesLedger
 import app.kaizen.source.WebFichaQuery
+import app.kaizen.tv.settings.setSourceActive
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
-import app.kaizen.database.CacheDB
-import app.kaizen.commons.background
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Control por ADB (`adb shell am broadcast -a app.kaizen.action.BACKUP -n app.kaizen/.control.AdbControlReceiver`), pensado para hacer
@@ -28,205 +51,287 @@ import app.kaizen.commons.background
  * El resultado vuelve en `data=` de `am broadcast` y se anota en el registro.
  */
 class AdbControlReceiver : BroadcastReceiver() {
+    /** Lo que se devuelve a `am broadcast`: el código y el texto de `data=`. */
+    private class Reply(val code: Int, val text: String)
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action !in ACTIONS) return
         val pending = goAsync()
-        fun answer(code: Int, text: String) {
-            DebugLog.info("ControlADB", "$action: ${text.take(300)}")
-            pending.setResultCode(code)
-            pending.setResultData(text)
+        fun answer(reply: Reply) {
+            DebugLog.info("ControlADB", "$action: ${reply.text.take(300)}")
+            pending.setResultCode(reply.code)
+            pending.setResultData(reply.text)
             pending.finish()
         }
-        if (!KaizenSettings.adbControl) return answer(CODE_DISABLED, "Control por ADB desactivado (Configuración › Depuración)")
-        background(onError = { logError(it); answer(CODE_ERROR, "Error: ${it.javaClass.simpleName}") }) {
-            if (action == ACTION_BACKUP) {
-                val (file, summary) = KaizenBackup.export()
-                answer(CODE_OK, "Copia creada: ${file.name} ($summary)")
-            } else if (action == ACTION_SETTINGS) {
-                // Todos los ajustes que se pueden tocar por ADB con su valor y sus opciones: JSON en base64 (como FICHA_GET).
-                val json = org.json.JSONArray(AdbSettings.all.map { s ->
-                    org.json.JSONObject().put("nombre", s.name).put("valor", s.get()).put("opciones", org.json.JSONArray(s.options)).put("tipo", s.kind.name)
-                }).toString()
-                answer(CODE_OK, android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP))
-            } else if (action == ACTION_SETTING_GET) {
-                val name = intent.getStringExtra("name").orEmpty()
-                val setting = AdbSettings.find(name) ?: return@background answer(CODE_ERROR, "Ajuste desconocido: $name (lista: SETTINGS)")
-                answer(CODE_OK, "$name=${setting.get()}" + if (setting.options.isNotEmpty()) " (admite: ${setting.options.joinToString(", ")})" else "")
-            } else if (action == ACTION_SETTING_SET) {
-                val (ok, text) = AdbSettings.set(intent.getStringExtra("name").orEmpty(), intent.getStringExtra("value").orEmpty())
-                answer(if (ok) CODE_OK else CODE_ERROR, text)
-            } else if (action == ACTION_SOURCES) {
-                // Sin --es set: la lista de fuentes con su estado. Con `--es set id --ez on true|false`: activa o desactiva una (siempre queda al menos una).
-                val all = app.kaizen.source.AnimeSources.all
-                val id = intent.getStringExtra("set")
-                if (id != null) {
-                    if (all.none { it.id == id }) return@background answer(CODE_ERROR, "Fuente desconocida: $id (" + all.joinToString(", ") { it.id } + ")")
-                    val on = intent.getBooleanExtra("on", true)
-                    if (!app.kaizen.tv.settings.setSourceActive(id, on)) return@background answer(CODE_ERROR, "Debe quedar al menos una fuente activa")
-                }
-                val selected = app.kaizen.source.AnimeSources.selected.map { it.id }.toSet()
-                answer(CODE_OK, all.joinToString(" | ") { source ->
-                    val until = app.kaizen.commons.HostGate.downUntil(source.host)
-                    "${source.id}=" + (if (source.id in selected) "activa" else "desactivada") + if (until > 0) " (en pausa hasta " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(until)) + ")" else ""
-                })
-            } else if (action == ACTION_SOURCES_CHECK) {
-                // Mide cada fuente activa sin tocar pausas (HostGate.probe), como al abrir «Fuentes».
-                val results = app.kaizen.source.AnimeSources.selected.map { source -> source.id to app.kaizen.commons.HostGate.probe("https://${source.host}/") }
-                answer(CODE_OK, results.joinToString(" | ") { (id, r) -> "$id=" + if (r.ok) "responde ${r.millis} ms" + (r.code?.takeIf { it >= 400 }?.let { " (HTTP $it)" } ?: "") else "no responde" + (r.error?.let { " ($it)" } ?: "") })
-            } else if (action == ACTION_ERRORS) {
-                // La sesión del gestor único de errores: cuántos de cada número y el último detalle (el detalle puede llevar la web, nunca la URL entera).
-                val summary = app.kaizen.commons.AppErrors.summary()
-                answer(CODE_OK, if (summary.isEmpty()) "Esta sesión: sin errores" else summary.sortedByDescending { it.count }.joinToString(" | ") { "${it.count}x ${it.cause.tag} ${it.cause.label}: ${it.lastDetail.take(80)}" }.replace('"', '\''))
-            } else if (action == ACTION_BYPASS) {
-                val b = app.kaizen.bypass.BypassStatus.snapshot.value
-                answer(CODE_OK, "estado=${b.state} hace=" + (if (b.at > 0) ((System.currentTimeMillis() - b.at) / 1000).toString() + " s" else "nunca") + " tardo=${b.millis} ms" + if (b.pausedUntil > System.currentTimeMillis()) " en pausa" else "")
-            } else if (action == ACTION_CACHE_CLEAR) {
-                if (!intent.getBooleanExtra("confirm", false)) return@background answer(CODE_ERROR, "Borra respuestas guardadas, catálogo interno y portadas (favoritos, historial y progreso se conservan). Repite con --ez confirm true")
-                app.kaizen.commons.CacheCleaner.clearAll(context.applicationContext)
-                answer(CODE_OK, "Caché vaciada")
-            } else if (action == ACTION_LOG_CLEAR) {
-                if (!intent.getBooleanExtra("confirm", false)) return@background answer(CODE_ERROR, "Vacía el registro de depuración. Repite con --ez confirm true")
-                DebugLog.clear()
-                answer(CODE_OK, "Registro vaciado")
-            } else if (action == ACTION_SETTINGS_RESET) {
-                if (!intent.getBooleanExtra("confirm", false)) return@background answer(CODE_ERROR, "Vuelve todos los ajustes a los de fábrica (favoritos, historial y progreso se conservan). Repite con --ez confirm true")
-                KaizenSettings.resetToDefaults()
-                app.kaizen.commons.Tuning.apply()
-                answer(CODE_OK, "Ajustes restablecidos (la interfaz se ve al reabrir la app)")
-            } else if (action == ACTION_STORE) {
-                // Qué ficheros de preferencias hay, de qué clase y cuántas claves (solo lectura, sin valores: ningún ajuste ni secreto sale por aquí). JSON en base64.
-                val json = org.json.JSONArray(app.kaizen.commons.KaizenStore.report().map { r ->
-                    org.json.JSONObject().put("fichero", r.file).put("clase", r.scope?.label ?: "SIN REGISTRAR").put("claves", r.keys).put("bytes", r.bytes).put("que", r.what ?: "")
-                }).toString()
-                answer(CODE_OK, android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP))
-            } else if (action == ACTION_CALLS) {
-                // Peticiones reales a cada web en un día (hoy por defecto, o `--es day AAAA-MM-DD`): para conocimiento interno, ¿saturamos alguna? JSON en base64.
-                val day = intent.getStringExtra("day")?.takeIf { Regex("\\d{4}-\\d{2}-\\d{2}").matches(it) }
-                val report = app.kaizen.commons.RequestCounter.report(day)
-                val sourceHosts = app.kaizen.source.AnimeSources.all.map { it.host.removePrefix("www.") }
-                val json = org.json.JSONObject().put("dia", report.day)
-                    .put("hosts", org.json.JSONArray(report.hosts.take(60).map { h ->
-                        org.json.JSONObject().put("host", h.host).put("uso", h.foreground).put("fondo", h.background)
-                            .put("fuente", sourceHosts.any { h.host == it || h.host.endsWith(".$it") })
-                    }))
-                    .put("urls", org.json.JSONArray(report.urls.take(25).map { org.json.JSONObject().put("url", it.url).put("n", it.count) })).toString()
-                answer(CODE_OK, android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP))
-            } else if (action == ACTION_ANILIST_AUTO) {
-                // Sin extras: cómo va. `--ez start true` empieza (por defecto solo cuenta y no escribe nada); `--ez apply true --ez confirm true` guarda de verdad los enlaces claros
-                // (la app hace antes una copia); `--ei limit N` acota las series (hasta 5000). Sigue en segundo plano, una serie a la vez.
-                if (intent.getBooleanExtra("start", false)) {
-                    val apply = intent.getBooleanExtra("apply", false)
-                    // Aplicar escribe enlaces y reagrupa el catálogo: como las demás acciones que cambian cosas, exige confirmar.
-                    if (apply && !intent.getBooleanExtra("confirm", false)) return@background answer(CODE_ERROR, "Aplicar guarda los enlaces claros y reagrupa el catálogo (antes se hace una copia). Repite con --ez confirm true")
-                    val limit = intent.getIntExtra("limit", 5000).coerceIn(1, 5000)
-                    if (!app.kaizen.source.AnilistAutoRunner.start(apply, limit)) return@background answer(CODE_ERROR, "Ya hay una revisión en curso: " + app.kaizen.source.AnilistAutoRunner.progress.line)
-                }
-                answer(CODE_OK, app.kaizen.source.AnilistAutoRunner.progress.line)
-            } else if (action == ACTION_WARP) {
-                // Sin extras: el estado. Con `--ez evaluate true`: aplica ahora el modo (sube o baja el túnel). El aviso de VPN solo lo puede aceptar una persona en la TV.
-                val note = if (intent.getBooleanExtra("evaluate", false)) app.kaizen.commons.warp.WarpTunnel.evaluate() else null
-                answer(CODE_OK, app.kaizen.commons.warp.WarpTunnel.status(context) + (note?.let { " | aviso=$it" } ?: ""))
-            } else if (action == ACTION_LALIGA) {
-                // Solo lectura: qué fuentes activas resuelven hoy a una IP que algún operador bloquea (hayahora.futbol).
-                val hosts = app.kaizen.source.AnimeSources.selected.map { it.host }
-                val blocked = app.kaizen.commons.LaLigaBlock.blockedHosts(hosts)
-                answer(CODE_OK, if (blocked.isEmpty()) "Ninguna fuente bloqueada ahora (o hayahora.futbol no responde)" else "Bloqueadas por LaLiga: ${blocked.joinToString(", ")}")
-            } else if (action == ACTION_IMAGE_MISSES) {
-                val before = app.kaizen.commons.ImageMisses.count()
-                if (intent.getBooleanExtra("clear", false)) app.kaizen.commons.ImageMisses.clear()
-                answer(CODE_OK, "Imágenes no disponibles anotadas: $before" + if (intent.getBooleanExtra("clear", false)) " (olvidadas)" else "")
-            } else if (action == ACTION_FILL_FICHAS) {
-                if (!FichaFill.tryLock()) return@background answer(CODE_ERROR, "Ya hay un relleno de fichas en curso")
-                val todo = try {
-                    FichaFill.planNow(intent.getIntExtra("limit", 20), intent.getStringExtra("fuente"))
-                } catch (e: Throwable) { FichaFill.unlock(); throw e }
-                AppScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    try {
-                        val report = FichaFill.runNow(todo)
-                        DebugLog.info("ControlADB", "Relleno de fichas: ${report.total} de ${todo.size} (${report})")
-                    } catch (e: Throwable) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
-                        logError(e)
-                        DebugLog.info("ControlADB", "Relleno de fichas fallido: ${e.javaClass.simpleName}: ${e.message}")
-                    } finally {
-                        FichaFill.unlock()
-                    }
-                }
-                answer(CODE_OK, "Relleno de fichas iniciado: ${todo.size} fichas")
-            } else if (action == ACTION_FICHA_GET) {
-                // Solo lectura. El nombre va en base64 (los nombres japoneses no pasan por la línea de órdenes) y la ruta, la de WebFichaQuery, con caracteres de ruta.
-                val name = runCatching { String(android.util.Base64.decode(intent.getStringExtra("name64").orEmpty(), android.util.Base64.DEFAULT), Charsets.UTF_8) }.getOrDefault("")
-                val path = intent.getStringExtra("path").orEmpty()
-                if (name.trim().length < 2 || !PATH_OK.matches(path) || (path.isEmpty() && intent.getBooleanExtra("resuelta", false))) return@background answer(CODE_ERROR, "Falta el nombre (name64, al menos 2 caracteres) o la ruta no es válida (con resuelta hace falta un campo): $path")
-                val dao = app.kaizen.database.CatalogDB.INSTANCE.webFichaDao()
-                // Con `--ez resuelta true` el dato sale de AniList si la ficha está enlazada y, si no lo tiene, de la web.
-                val rows = if (intent.getBooleanExtra("resuelta", false)) {
-                    val links = app.kaizen.database.UserDB.INSTANCE.animeFuenteDao()
-                    val fichas = app.kaizen.database.CatalogDB.INSTANCE.animeFichaDao()
-                    WebFichaQuery.resolved(dao, name, path, MAX_FICHA_ROWS) { web -> app.kaizen.source.FichaResuelta.anilistOf(links.get(web.fuente, web.slug), fichas::get) }
-                } else WebFichaQuery.get(dao, name, path, MAX_FICHA_ROWS)
-                val json = org.json.JSONArray(rows.map { org.json.JSONObject().put("fuente", it.fuente).put("slug", it.slug).put("value", it.value ?: org.json.JSONObject.NULL).put("origen", it.origen ?: org.json.JSONObject.NULL) }).toString()
-                if (json.length > MAX_FICHA_BYTES) return@background answer(CODE_ERROR, "Resultado demasiado grande (${json.length} caracteres): pide un campo concreto con path")
-                answer(CODE_OK, android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP))
-            } else if (action == ACTION_EXPORT_FICHAS) {
-                // Como el recorrido: puede tardar más de lo que Android deja a un receptor, así que responde ya con el nombre del fichero y sigue en segundo plano.
-                if (!exporting.compareAndSet(false, true)) return@background answer(CODE_ERROR, "Ya hay una exportación de fichas en curso")
-                val name = FichaExport.nameFor(System.currentTimeMillis())
-                AppScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    try {
-                        val result = FichaExport.exportAll(KaizenBackup.directory, name)
-                        DebugLog.info("ControlADB", "Fichas de AniList exportadas: ${result.rows} en ${result.file.name} (${result.file.length() / 1024} KB, comprobado)")
-                    } catch (e: Throwable) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
-                        logError(e)
-                        DebugLog.info("ControlADB", "Exportación de fichas fallida: ${e.javaClass.simpleName}: ${e.message}")
-                    } finally {
-                        exporting.set(false)
-                    }
-                }
-                answer(CODE_OK, "Exportación de fichas iniciada → $name")
-            } else if (action == ACTION_WALK) {
-                // El recorrido dura minutos: la respuesta no espera. Su avance se ve en el registro de la app.
-                AppScope.launch { runCatchingCoop { CatalogBuilder.ensureFresh(force = true) }.onFailure(::logError) }
-                answer(CODE_OK, "Recorrido del catálogo iniciado")
-            } else if (action == ACTION_SPLIT) {
-                // Deshace una unión equivocada: cada grupo de fichas del fichero `{"groups":[[["fuente","slug"],…],…]}` pasa a una serie propia.
-                val name = intent.getStringExtra("file").orEmpty()
-                val file = File(KaizenBackup.directory, name)
-                if (name.isBlank() || '/' in name || '\\' in name || !name.endsWith(".json") || !file.isFile || file.length() > MAX_FILE_BYTES) return@background answer(CODE_ERROR, "Fichero no válido: $name")
-                val groups = org.json.JSONObject(file.readText()).getJSONArray("groups")
-                if (groups.length() > MAX_GROUPS) return@background answer(CODE_ERROR, "Demasiados grupos: ${groups.length()}")
-                // Se lee y se valida todo el fichero antes de tocar nada: una entrada mal formada no deja el trabajo a medias.
-                val parsed = (0 until groups.length()).map { g ->
-                    val members = groups.getJSONArray(g)
-                    (0 until members.length()).map { members.getJSONArray(it).let { f -> f.getString(0) to f.getString(1) } }
-                }
-                val oversized = parsed.count { it.size > MAX_GROUP_SIZE }
-                var moved = 0
-                for (fichas in parsed) if (fichas.size <= MAX_GROUP_SIZE && SeriesLedger.detachGroup(fichas) != null) moved++
-                // Cambian los grupos de varias series: se rehace el catálogo agrupado en segundo plano (la respuesta no espera).
-                if (moved > 0 && intent.getBooleanExtra("regroup", true)) AppScope.launch { runCatchingCoop { CatalogBuilder.regroup() }.onFailure(::logError) }
-                answer(CODE_OK, "Series separadas: $moved de ${parsed.size} grupos" + if (oversized > 0) " ($oversized omitidos por tener más de $MAX_GROUP_SIZE fichas)" else "")
-            } else if (action == ACTION_IMPORT) {
-                // Solo un fichero .json de la carpeta de copias, por su nombre: ninguna ruta.
-                val name = intent.getStringExtra("file").orEmpty()
-                val file = File(KaizenBackup.directory, name)
-                if (name.isBlank() || '/' in name || '\\' in name || !name.endsWith(".json") || !file.isFile) return@background answer(CODE_ERROR, "Fichero no válido: $name")
-                val summary = KaizenBackup.import(file)
-                answer(if (summary == null) CODE_ERROR else CODE_OK, if (summary == null) "La copia no es válida: $name" else "Añadido desde $name: $summary")
-            } else {
-                val db = CacheDB.INSTANCE
-                // Abrir `catalog-db` es lo que ejecuta su migración la primera vez: si falla, el recuento lo dice y no tumba el resto.
-                val catalog = runCatchingCoop {
-                    val catalogDb = app.kaizen.database.CatalogDB.INSTANCE
-                    "fichas=${catalogDb.animeFichaDao().count()} webfichas=${catalogDb.webFichaDao().count()} webfichas_con_idmal=${catalogDb.webFichaDao().countWithMal()} " +
-                        "webfichas_por_fuente=" + catalogDb.webFichaDao().countByFuente().joinToString(",") { "${it.fuente}:${it.total}" }.ifEmpty { "-" }
-                }.getOrElse { "catalog-db=error:${it.javaClass.simpleName}" }
-                answer(CODE_OK, "favoritos=${db.favoriteAV1DAO().allRaw.size} vistos=${db.recordAV1DAO().count} $catalog ultima=${KaizenBackup.latest()?.name}")
+        if (!KaizenSettings.adbControl) return answer(fail("Control por ADB desactivado (Configuración › Depuración)", CODE_DISABLED))
+        background(onError = { logError(it); answer(fail("Error: ${it.javaClass.simpleName}")) }) {
+            answer(handle(context, intent, action))
+        }
+    }
+
+    private suspend fun handle(context: Context, intent: Intent, action: String): Reply = when (action) {
+        ACTION_BACKUP -> backup()
+        ACTION_SETTINGS -> settings()
+        ACTION_SETTING_GET -> settingGet(intent)
+        ACTION_SETTING_SET -> settingSet(intent)
+        ACTION_SOURCES -> sources(intent)
+        ACTION_SOURCES_CHECK -> sourcesCheck()
+        ACTION_ERRORS -> errors()
+        ACTION_BYPASS -> bypass()
+        ACTION_CACHE_CLEAR -> cacheClear(context, intent)
+        ACTION_LOG_CLEAR -> logClear(intent)
+        ACTION_SETTINGS_RESET -> settingsReset(intent)
+        ACTION_STORE -> store()
+        ACTION_CALLS -> calls(intent)
+        ACTION_ANILIST_AUTO -> anilistAuto(intent)
+        ACTION_WARP -> warp(context, intent)
+        ACTION_LALIGA -> laLiga()
+        ACTION_IMAGE_MISSES -> imageMisses(intent)
+        ACTION_FILL_FICHAS -> fillFichas(intent)
+        ACTION_FICHA_GET -> fichaGet(intent)
+        ACTION_EXPORT_FICHAS -> exportFichas()
+        ACTION_WALK -> walk()
+        ACTION_SPLIT -> split(intent)
+        ACTION_IMPORT -> import(intent)
+        else -> status()
+    }
+
+    private suspend fun backup(): Reply {
+        val (file, summary) = KaizenBackup.export()
+        return ok("Copia creada: ${file.name} ($summary)")
+    }
+
+    /** Todos los ajustes que se pueden tocar por ADB con su valor y sus opciones: JSON en base64 (como FICHA_GET). */
+    private fun settings(): Reply = base64(JSONArray(AdbSettings.all.map { s ->
+        JSONObject().put("nombre", s.name).put("valor", s.get()).put("opciones", JSONArray(s.options)).put("tipo", s.kind.name)
+    }))
+
+    private fun settingGet(intent: Intent): Reply {
+        val name = intent.getStringExtra("name").orEmpty()
+        val setting = AdbSettings.find(name) ?: return fail("Ajuste desconocido: $name (lista: SETTINGS)")
+        return ok("$name=${setting.get()}" + if (setting.options.isNotEmpty()) " (admite: ${setting.options.joinToString(", ")})" else "")
+    }
+
+    private fun settingSet(intent: Intent): Reply {
+        val (done, text) = AdbSettings.set(intent.getStringExtra("name").orEmpty(), intent.getStringExtra("value").orEmpty())
+        return if (done) ok(text) else fail(text)
+    }
+
+    /** Sin --es set: la lista de fuentes con su estado. Con `--es set id --ez on true|false`: activa o desactiva una (siempre queda al menos una). */
+    private fun sources(intent: Intent): Reply {
+        val all = AnimeSources.all
+        val id = intent.getStringExtra("set")
+        if (id != null) {
+            if (all.none { it.id == id }) return fail("Fuente desconocida: $id (" + all.joinToString(", ") { it.id } + ")")
+            if (!setSourceActive(id, intent.getBooleanExtra("on", true))) return fail("Debe quedar al menos una fuente activa")
+        }
+        val selected = AnimeSources.selected.map { it.id }.toSet()
+        return ok(all.joinToString(" | ") { source ->
+            val until = HostGate.downUntil(source.host)
+            "${source.id}=" + (if (source.id in selected) "activa" else "desactivada") + if (until > 0) " (en pausa hasta " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(until)) + ")" else ""
+        })
+    }
+
+    /** Mide cada fuente activa sin tocar pausas (HostGate.probe), como al abrir «Fuentes». */
+    private suspend fun sourcesCheck(): Reply {
+        val results = AnimeSources.selected.map { source -> source.id to HostGate.probe("https://${source.host}/") }
+        return ok(results.joinToString(" | ") { (id, r) -> "$id=" + if (r.ok) "responde ${r.millis} ms" + (r.code?.takeIf { it >= 400 }?.let { " (HTTP $it)" } ?: "") else "no responde" + (r.error?.let { " ($it)" } ?: "") })
+    }
+
+    /** La sesión del gestor único de errores: cuántos de cada número y el último detalle (el detalle puede llevar la web, nunca la URL entera). */
+    private fun errors(): Reply {
+        val summary = AppErrors.summary()
+        return ok(if (summary.isEmpty()) "Esta sesión: sin errores" else summary.sortedByDescending { it.count }.joinToString(" | ") { "${it.count}x ${it.cause.tag} ${it.cause.label}: ${it.lastDetail.take(80)}" }.replace('"', '\''))
+    }
+
+    private fun bypass(): Reply {
+        val b = app.kaizen.bypass.BypassStatus.snapshot.value
+        return ok("estado=${b.state} hace=" + (if (b.at > 0) ((System.currentTimeMillis() - b.at) / 1000).toString() + " s" else "nunca") + " tardo=${b.millis} ms" + if (b.pausedUntil > System.currentTimeMillis()) " en pausa" else "")
+    }
+
+    private suspend fun cacheClear(context: Context, intent: Intent): Reply {
+        if (!intent.confirmed()) return fail("Borra respuestas guardadas, catálogo interno y portadas (favoritos, historial y progreso se conservan). Repite con --ez confirm true")
+        CacheCleaner.clearAll(context.applicationContext)
+        return ok("Caché vaciada")
+    }
+
+    private fun logClear(intent: Intent): Reply {
+        if (!intent.confirmed()) return fail("Vacía el registro de depuración. Repite con --ez confirm true")
+        DebugLog.clear()
+        return ok("Registro vaciado")
+    }
+
+    private fun settingsReset(intent: Intent): Reply {
+        if (!intent.confirmed()) return fail("Vuelve todos los ajustes a los de fábrica (favoritos, historial y progreso se conservan). Repite con --ez confirm true")
+        KaizenSettings.resetToDefaults()
+        Tuning.apply()
+        return ok("Ajustes restablecidos (la interfaz se ve al reabrir la app)")
+    }
+
+    /** Qué ficheros de preferencias hay, de qué clase y cuántas claves (solo lectura, sin valores: ningún ajuste ni secreto sale por aquí). JSON en base64. */
+    private fun store(): Reply = base64(JSONArray(KaizenStore.report().map { r ->
+        JSONObject().put("fichero", r.file).put("clase", r.scope?.label ?: "SIN REGISTRAR").put("claves", r.keys).put("bytes", r.bytes).put("que", r.what ?: "")
+    }))
+
+    /** Peticiones reales a cada web en un día (hoy por defecto, o `--es day AAAA-MM-DD`): para conocimiento interno, ¿saturamos alguna? JSON en base64. */
+    private fun calls(intent: Intent): Reply {
+        val day = intent.getStringExtra("day")?.takeIf { DAY_OK.matches(it) }
+        val report = RequestCounter.report(day)
+        val sourceHosts = AnimeSources.all.map { it.host.removePrefix("www.") }
+        return base64(JSONObject().put("dia", report.day)
+            .put("hosts", JSONArray(report.hosts.take(60).map { h ->
+                JSONObject().put("host", h.host).put("uso", h.foreground).put("fondo", h.background)
+                    .put("fuente", sourceHosts.any { h.host == it || h.host.endsWith(".$it") })
+            }))
+            .put("urls", JSONArray(report.urls.take(25).map { JSONObject().put("url", it.url).put("n", it.count) })))
+    }
+
+    /**
+     * Sin extras: cómo va. `--ez start true` empieza (por defecto solo cuenta y no escribe nada); `--ez apply true --ez confirm true` guarda de verdad los enlaces claros
+     * (la app hace antes una copia); `--ei limit N` acota las series (hasta 5000). Sigue en segundo plano, una serie a la vez.
+     */
+    private fun anilistAuto(intent: Intent): Reply {
+        if (intent.getBooleanExtra("start", false)) {
+            val apply = intent.getBooleanExtra("apply", false)
+            // Aplicar escribe enlaces y reagrupa el catálogo: como las demás acciones que cambian cosas, exige confirmar.
+            if (apply && !intent.confirmed()) return fail("Aplicar guarda los enlaces claros y reagrupa el catálogo (antes se hace una copia). Repite con --ez confirm true")
+            val limit = intent.getIntExtra("limit", 5000).coerceIn(1, 5000)
+            if (!AnilistAutoRunner.start(apply, limit)) return fail("Ya hay una revisión en curso: " + AnilistAutoRunner.progress.line)
+        }
+        return ok(AnilistAutoRunner.progress.line)
+    }
+
+    /** Sin extras: el estado. Con `--ez evaluate true`: aplica ahora el modo (sube o baja el túnel). El aviso de VPN solo lo puede aceptar una persona en la TV. */
+    private suspend fun warp(context: Context, intent: Intent): Reply {
+        val note = if (intent.getBooleanExtra("evaluate", false)) WarpTunnel.evaluate() else null
+        return ok(WarpTunnel.status(context) + (note?.let { " | aviso=$it" } ?: ""))
+    }
+
+    /** Solo lectura: qué fuentes activas resuelven hoy a una IP que algún operador bloquea (hayahora.futbol). */
+    private suspend fun laLiga(): Reply {
+        val blocked = LaLigaBlock.blockedHosts(AnimeSources.selected.map { it.host })
+        return ok(if (blocked.isEmpty()) "Ninguna fuente bloqueada ahora (o hayahora.futbol no responde)" else "Bloqueadas por LaLiga: ${blocked.joinToString(", ")}")
+    }
+
+    private fun imageMisses(intent: Intent): Reply {
+        val before = ImageMisses.count()
+        val clear = intent.getBooleanExtra("clear", false)
+        if (clear) ImageMisses.clear()
+        return ok("Imágenes no disponibles anotadas: $before" + if (clear) " (olvidadas)" else "")
+    }
+
+    private suspend fun fillFichas(intent: Intent): Reply {
+        if (!FichaFill.tryLock()) return fail("Ya hay un relleno de fichas en curso")
+        val todo = try {
+            FichaFill.planNow(intent.getIntExtra("limit", 20), intent.getStringExtra("fuente"))
+        } catch (e: Throwable) { FichaFill.unlock(); throw e }
+        launchLogged("Relleno de fichas fallido", release = FichaFill::unlock) {
+            "Relleno de fichas: ${FichaFill.runNow(todo).let { "${it.total} de ${todo.size} ($it)" }}"
+        }
+        return ok("Relleno de fichas iniciado: ${todo.size} fichas")
+    }
+
+    /**
+     * Solo lectura. El nombre va en base64 (los nombres japoneses no pasan por la línea de órdenes) y la ruta, la de WebFichaQuery, con caracteres de ruta.
+     * Con `--ez resuelta true` el dato sale de AniList si la ficha está enlazada y, si no lo tiene, de la web.
+     */
+    private suspend fun fichaGet(intent: Intent): Reply {
+        val name = runCatching { String(Base64.decode(intent.getStringExtra("name64").orEmpty(), Base64.DEFAULT), Charsets.UTF_8) }.getOrDefault("")
+        val path = intent.getStringExtra("path").orEmpty()
+        val resolved = intent.getBooleanExtra("resuelta", false)
+        if (name.trim().length < 2 || !PATH_OK.matches(path) || (path.isEmpty() && resolved)) return fail("Falta el nombre (name64, al menos 2 caracteres) o la ruta no es válida (con resuelta hace falta un campo): $path")
+        val dao = CatalogDB.INSTANCE.webFichaDao()
+        val rows = if (resolved) {
+            val links = UserDB.INSTANCE.animeFuenteDao()
+            val fichas = CatalogDB.INSTANCE.animeFichaDao()
+            WebFichaQuery.resolved(dao, name, path, MAX_FICHA_ROWS) { web -> FichaResuelta.anilistOf(links.get(web.fuente, web.slug), fichas::get) }
+        } else WebFichaQuery.get(dao, name, path, MAX_FICHA_ROWS)
+        val json = JSONArray(rows.map { JSONObject().put("fuente", it.fuente).put("slug", it.slug).put("value", it.value ?: JSONObject.NULL).put("origen", it.origen ?: JSONObject.NULL) }).toString()
+        if (json.length > MAX_FICHA_BYTES) return fail("Resultado demasiado grande (${json.length} caracteres): pide un campo concreto con path")
+        return base64(json)
+    }
+
+    /** Como el recorrido: puede tardar más de lo que Android deja a un receptor, así que responde ya con el nombre del fichero y sigue en segundo plano. */
+    private fun exportFichas(): Reply {
+        if (!exporting.compareAndSet(false, true)) return fail("Ya hay una exportación de fichas en curso")
+        val name = FichaExport.nameFor(System.currentTimeMillis())
+        launchLogged("Exportación de fichas fallida", release = { exporting.set(false) }) {
+            val result = FichaExport.exportAll(KaizenBackup.directory, name)
+            "Fichas de AniList exportadas: ${result.rows} en ${result.file.name} (${result.file.length() / 1024} KB, comprobado)"
+        }
+        return ok("Exportación de fichas iniciada → $name")
+    }
+
+    /** El recorrido dura minutos: la respuesta no espera. Su avance se ve en el registro de la app. */
+    private fun walk(): Reply {
+        AppScope.launch { runCatchingCoop { CatalogBuilder.ensureFresh(force = true) }.onFailure(::logError) }
+        return ok("Recorrido del catálogo iniciado")
+    }
+
+    /** Deshace una unión equivocada: cada grupo de fichas del fichero `{"groups":[[["fuente","slug"],…],…]}` pasa a una serie propia. */
+    private fun split(intent: Intent): Reply {
+        val name = intent.getStringExtra("file").orEmpty()
+        val file = backupFile(name)
+        if (file == null || file.length() > MAX_FILE_BYTES) return fail("Fichero no válido: $name")
+        val groups = JSONObject(file.readText()).getJSONArray("groups")
+        if (groups.length() > MAX_GROUPS) return fail("Demasiados grupos: ${groups.length()}")
+        // Se lee y se valida todo el fichero antes de tocar nada: una entrada mal formada no deja el trabajo a medias.
+        val parsed = (0 until groups.length()).map { g ->
+            val members = groups.getJSONArray(g)
+            (0 until members.length()).map { members.getJSONArray(it).let { f -> f.getString(0) to f.getString(1) } }
+        }
+        val oversized = parsed.count { it.size > MAX_GROUP_SIZE }
+        val moved = parsed.count { it.size <= MAX_GROUP_SIZE && SeriesLedger.detachGroup(it) != null }
+        // Cambian los grupos de varias series: se rehace el catálogo agrupado en segundo plano (la respuesta no espera).
+        if (moved > 0 && intent.getBooleanExtra("regroup", true)) AppScope.launch { runCatchingCoop { CatalogBuilder.regroup() }.onFailure(::logError) }
+        return ok("Series separadas: $moved de ${parsed.size} grupos" + if (oversized > 0) " ($oversized omitidos por tener más de $MAX_GROUP_SIZE fichas)" else "")
+    }
+
+    /** Solo un fichero .json de la carpeta de copias, por su nombre: ninguna ruta. */
+    private suspend fun import(intent: Intent): Reply {
+        val name = intent.getStringExtra("file").orEmpty()
+        val file = backupFile(name) ?: return fail("Fichero no válido: $name")
+        val summary = KaizenBackup.import(file) ?: return fail("La copia no es válida: $name")
+        return ok("Añadido desde $name: $summary")
+    }
+
+    private suspend fun status(): Reply {
+        val db = CacheDB.INSTANCE
+        // Abrir `catalog-db` es lo que ejecuta su migración la primera vez: si falla, el recuento lo dice y no tumba el resto.
+        val catalog = runCatchingCoop {
+            val catalogDb = CatalogDB.INSTANCE
+            "fichas=${catalogDb.animeFichaDao().count()} webfichas=${catalogDb.webFichaDao().count()} webfichas_con_idmal=${catalogDb.webFichaDao().countWithMal()} " +
+                "webfichas_por_fuente=" + catalogDb.webFichaDao().countByFuente().joinToString(",") { "${it.fuente}:${it.total}" }.ifEmpty { "-" }
+        }.getOrElse { "catalog-db=error:${it.javaClass.simpleName}" }
+        return ok("favoritos=${db.favoriteAV1DAO().allRaw.size} vistos=${db.recordAV1DAO().count} $catalog ultima=${KaizenBackup.latest()?.name}")
+    }
+
+    /** Segundo plano de una acción larga: lo que devuelve [work] va al registro; si falla, se anota; [release] siempre se ejecuta al acabar. */
+    private fun launchLogged(failure: String, release: () -> Unit, work: suspend () -> String) {
+        AppScope.launch(Dispatchers.IO) {
+            try {
+                DebugLog.info("ControlADB", work())
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                logError(e)
+                DebugLog.info("ControlADB", "$failure: ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                release()
             }
         }
     }
+
+    /** El `.json` de la carpeta de copias con ese nombre, o null si el nombre lleva ruta, no acaba en .json o el fichero no existe. */
+    private fun backupFile(name: String): File? {
+        if (name.isBlank() || '/' in name || '\\' in name || !name.endsWith(".json")) return null
+        return File(KaizenBackup.directory, name).takeIf { it.isFile }
+    }
+
+    private fun Intent.confirmed() = getBooleanExtra("confirm", false)
+    private fun ok(text: String) = Reply(CODE_OK, text)
+    private fun fail(text: String, code: Int = CODE_ERROR) = Reply(code, text)
+    private fun base64(json: Any) = ok(Base64.encodeToString(json.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP))
 
     companion object {
         const val ACTION_BACKUP = "app.kaizen.action.BACKUP"
@@ -259,6 +364,7 @@ class AdbControlReceiver : BroadcastReceiver() {
             ACTION_CALLS, ACTION_STORE, ACTION_ANILIST_AUTO, ACTION_WARP, ACTION_SOURCES, ACTION_SOURCES_CHECK, ACTION_ERRORS, ACTION_BYPASS, ACTION_CACHE_CLEAR, ACTION_LOG_CLEAR, ACTION_SETTINGS_RESET
         )
         private val PATH_OK = Regex("[A-Za-z0-9_.\\[\\]]{0,80}")
+        private val DAY_OK = Regex("\\d{4}-\\d{2}-\\d{2}")
         private const val MAX_FICHA_ROWS = 20
         private const val MAX_FICHA_BYTES = 200_000
         private val exporting = java.util.concurrent.atomic.AtomicBoolean(false)
