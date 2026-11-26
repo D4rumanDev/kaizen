@@ -67,7 +67,8 @@ internal object UpdateInstaller {
         installed.signatures.isEmpty() -> "No se pudo leer la firma de la app instalada"
         archive.packageName != installed.packageName -> "El paquete descargado no es Kaizen"
         archive.versionCode <= installed.versionCode -> "El paquete descargado no es más nuevo que el instalado"
-        archive.signatures.isEmpty() || archive.signatures != installed.signatures -> "La firma del paquete descargado no es la de Kaizen"
+        archive.signatures.isEmpty() -> "No se pudo leer la firma del paquete descargado"
+        archive.signatures != installed.signatures -> "La firma del paquete descargado no es la de Kaizen"
         else -> null
     }
 

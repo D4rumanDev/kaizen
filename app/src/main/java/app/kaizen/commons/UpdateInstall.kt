@@ -33,11 +33,14 @@ internal object UpdateInstall {
     }
 
     @Suppress("DEPRECATION")
-    private fun signingFlag(): Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+    private fun signingFlag(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES else PackageManager.GET_SIGNATURES
 
     @Suppress("DEPRECATION")
     private fun facts(info: android.content.pm.PackageInfo): UpdateInstaller.PackageFacts {
-        val signers = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.signingInfo?.apkContentsSigners else info.signatures
+        // Primero las firmas actuales (API 28+); si el sistema no las da (algunas teles no las leen de un APK por instalar), las clásicas. Las dos app se leen igual, así que se comparan como siempre.
+        val current = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.signingInfo?.apkContentsSigners else null
+        val signers = current?.takeIf { it.isNotEmpty() } ?: info.signatures
         val certs = signers.orEmpty().map { sig -> MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) } }.toSet()
         return UpdateInstaller.PackageFacts(info.packageName, PackageInfoCompat.getLongVersionCode(info), certs)
     }

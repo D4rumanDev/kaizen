@@ -26,8 +26,8 @@ android {
         applicationId "app.kaizen"
         minSdkVersion 26
         targetSdkVersion 36
-        versionCode 255
-        versionName "6.2.12"
+        versionCode 256
+        versionName "6.2.13"
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -45,6 +45,13 @@ class UpdateInstallerTest {
 
     // ---- 1. el asset
     @Test
+    fun `una firma ilegible y una firma distinta dan motivos distintos`() {
+        val installed = UpdateInstaller.PackageFacts("app.kaizen", 1, setOf("aa"))
+        assertEquals("No se pudo leer la firma del paquete descargado", UpdateInstaller.verifyPackage(installed, UpdateInstaller.PackageFacts("app.kaizen", 2, emptySet())))
+        assertEquals("La firma del paquete descargado no es la de Kaizen", UpdateInstaller.verifyPackage(installed, UpdateInstaller.PackageFacts("app.kaizen", 2, setOf("bb"))))
+    }
+
+    @Test
     fun `describe da paquete version y firmas abreviadas y distingue lo ilegible`() {
         assertEquals("app.kaizen v254, firmas: e9a4e8d5", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 254, setOf("e9a4e8d5f688fc18"))))
         assertEquals("app.kaizen v1, firmas: ninguna", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 1, emptySet())))

@@ -218,8 +218,16 @@ object SeriesLedger {
         // Con el libro vacío, la copia en disco.
         runCatching { restoreBackupIfEmpty(store) }.onFailure { app.kaizen.commons.logError(it) }
         val next = State()
-        store.allMap().forEach { next.ids[it.sourceId to it.slug] = it.seriesId; next.bySlug.putIfAbsent(it.slug, it.seriesId) }
-        for ((ficha, id) in next.ids) next.index(ficha, id)
+        val readStart = System.nanoTime()
+        val rows = store.allMap()
+        val buildStart = System.nanoTime()
+        for (row in rows) {
+            val ficha = row.sourceId to row.slug
+            next.ids[ficha] = row.seriesId
+            next.bySlug.putIfAbsent(row.slug, row.seriesId)
+            next.index(ficha, row.seriesId)
+        }
+        DebugLog.info("Medición", "Libro de series: ${rows.size} fichas, lectura de la base de datos ${(buildStart - readStart) / 1_000_000} ms, mapas ${(System.nanoTime() - buildStart) / 1_000_000} ms")
         state = next
         loaded = true
         _version.update { it + 1 }
