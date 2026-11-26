@@ -45,6 +45,13 @@ class UpdateInstallerTest {
 
     // ---- 1. el asset
     @Test
+    fun `describe da paquete version y firmas abreviadas y distingue lo ilegible`() {
+        assertEquals("app.kaizen v254, firmas: e9a4e8d5", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 254, setOf("e9a4e8d5f688fc18"))))
+        assertEquals("app.kaizen v1, firmas: ninguna", UpdateInstaller.describe(UpdateInstaller.PackageFacts("app.kaizen", 1, emptySet())))
+        assertEquals("ilegible", UpdateInstaller.describe(null))
+    }
+
+    @Test
     fun eligeElAssetCorrectoConSuHuella() {
         val ok = pick(release(asset())) as UpdateInstaller.AssetResult.Ok
         assertEquals("v6.3.0", ok.asset.tag)

@@ -57,6 +57,10 @@ internal object UpdateInstaller {
     /** Nombre, versión y certificados (SHA-256 en hexadecimal) de un paquete, instalado o por instalar. */
     data class PackageFacts(val packageName: String, val versionCode: Long, val signatures: Set<String>)
 
+    /** Un paquete en una línea para el registro: nombre, versión y las firmas abreviadas (8 primeros caracteres de cada huella pública; «ninguna» si no se pudo leer). */
+    fun describe(facts: PackageFacts?): String =
+        facts?.let { "${it.packageName} v${it.versionCode}, firmas: ${it.signatures.sorted().joinToString(",") { cert -> cert.take(8) }.ifEmpty { "ninguna" }}" } ?: "ilegible"
+
     /** Null si [archive] puede actualizar a [installed]: mismo paquete, versión mayor y exactamente las mismas firmas; si no, el motivo. */
     fun verifyPackage(installed: PackageFacts, archive: PackageFacts?): String? = when {
         archive == null -> "No se pudo leer el paquete descargado"

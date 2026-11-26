@@ -110,6 +110,7 @@ internal object UpdateFlow {
     }
 
     private fun fail(env: Env, message: String) {
+        DebugLog.info("Actualizaciones", "Actualización detenida: $message")
         cleanup(env)
         _ui.value = Ui.Failed(message)
     }
@@ -139,7 +140,9 @@ internal object UpdateFlow {
         }
         _ui.value = Ui.Verifying
         if (hash != asset.sha256) return fail(env, "La huella del fichero no coincide con la de GitHub: no se instala")
-        UpdateInstaller.verifyPackage(env.installedFacts(), env.archiveFacts(apk))?.let { return fail(env, "$it: no se instala") }
+        val installed = env.installedFacts()
+        val archive = env.archiveFacts(apk)
+        UpdateInstaller.verifyPackage(installed, archive)?.let { return fail(env, "$it: no se instala (instalada: ${UpdateInstaller.describe(installed)}; descargada: ${UpdateInstaller.describe(archive)})") }
         DebugLog.info("Actualizaciones", "Paquete verificado (${asset.tag}); se pasa al instalador del sistema")
         env.install(apk)
         _ui.value = Ui.Installing
