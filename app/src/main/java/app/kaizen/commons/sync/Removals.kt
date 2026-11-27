@@ -141,6 +141,16 @@ object Removals {
         @Suppress("USELESS_ELVIS") return State(read.base, read.removed ?: emptyMap(), read.seen ?: emptyList())
     }
 
+    /**
+     * El estado que sigue a separar series: las claves de lo guardado cambian (la ficha que representa a una serie puede pasar a otra y, mirada por su serie de ahora, su clave
+     * antigua parece «quitada»), así que la próxima sincronización parte de lo que haya entonces: sin base no hay nada «quitado aquí» ni se aplican lápidas ajenas (la primera
+     * de siempre). Se conservan las lápidas propias y las ya vistas.
+     */
+    internal fun rebased(state: State): State = State(null, state.removed, state.seen)
+
+    /** Guarda [rebased] del estado actual. Hay que llamarlo con el candado de la sincronización ([SyncManager.rebase]) para no pisar el de una sincronización en curso. */
+    fun rebase() = save(rebased(load()))
+
     fun save(state: State) {
         val temp = File(file.parentFile, "sync-state.json.tmp")
         temp.writeText(SharedGson.gson.toJson(state))

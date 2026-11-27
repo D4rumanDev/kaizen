@@ -11,6 +11,7 @@ import app.kaizen.commons.DebugLog
 import app.kaizen.commons.HostGate
 import app.kaizen.commons.ImageMisses
 import app.kaizen.commons.KaizenBackup
+import app.kaizen.commons.sync.SyncManager
 import app.kaizen.commons.KaizenSettings
 import app.kaizen.commons.KaizenStore
 import app.kaizen.commons.LaLigaBlock
@@ -270,7 +271,7 @@ class AdbControlReceiver : BroadcastReceiver() {
     }
 
     /** Deshace una unión equivocada: cada grupo de fichas del fichero `{"groups":[[["fuente","slug"],…],…]}` pasa a una serie propia. */
-    private fun split(intent: Intent): Reply {
+    private suspend fun split(intent: Intent): Reply {
         val name = intent.getStringExtra("file").orEmpty()
         val file = backupFile(name)
         if (file == null || file.length() > MAX_FILE_BYTES) return fail("Fichero no válido: $name")
@@ -287,6 +288,8 @@ class AdbControlReceiver : BroadcastReceiver() {
         }
         val oversized = parsed.count { it.size > MAX_GROUP_SIZE }
         val moved = parsed.count { it.size <= MAX_GROUP_SIZE && SeriesLedger.detachGroup(it) != null }
+        // Las claves de la sincronización cambian al separar: que lo movido no se tome por «quitado» y viaje como lápida a la otra tele.
+        if (moved > 0) runCatchingCoop { SyncManager.rebase() }.onFailure(::logError)
         // Cambian los grupos de varias series: se rehace el catálogo agrupado en segundo plano (la respuesta no espera).
         if (moved > 0 && intent.getBooleanExtra("regroup", true)) AppScope.launch { runCatchingCoop { CatalogBuilder.regroup() }.onFailure(::logError) }
         return ok("Series separadas: $moved de ${parsed.size} grupos" + if (oversized > 0) " ($oversized omitidos por tener más de $MAX_GROUP_SIZE fichas)" else "")

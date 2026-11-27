@@ -98,4 +98,32 @@ class RemovalsTest {
         assertNull(SecretStore.open("en claro", key))
         assertNull(SecretStore.open("v1:", key))
     }
+
+    @Test fun `tras separar series la base se vacia y se conservan las lapidas y las vistas`() {
+        val before = Removals.State(listOf(fav, rec), mapOf(fav to 5L), listOf("x@5"))
+        val after = Removals.rebased(before)
+        assertNull(after.base)
+        assertEquals(before.removed, after.removed)
+        assertEquals(before.seen, after.seen)
+    }
+
+    @Test fun `sin base una clave que solo cambio de ficha no se da por quitada y no se aplican lapidas ajenas`() = runTest {
+        // La serie tenia la ficha «a» como representante; al separarla la clave f/animeav1:a deja de estar presente aunque el favorito siga.
+        val keyA = Removals.favoriteKey("animeav1:a")
+        val local = object : Removals.Local<Unit> {
+            override suspend fun presence() = object : Removals.Presence {
+                override val keys = setOf<String>()
+                override fun isPresent(key: String): Boolean? = false
+            }
+            override suspend fun join(item: Unit) {}
+            override suspend fun merge(item: Unit, skip: (String) -> Boolean) {}
+            override suspend fun remove(keys: List<String>): Int = keys.size
+            override fun canon(key: String): String? = key
+        }
+        val now = 1_000_000_000_000L
+        val withBase = Removals.step(Removals.State(listOf(keyA)), now, local, emptyList<Unit>(), { 0L }, { emptyMap() })
+        assertEquals("con base, la clave que cambio parece quitada: hay lapida", setOf(keyA), withBase.removed.keys)
+        val rebased = Removals.step(Removals.rebased(Removals.State(listOf(keyA))), now, local, emptyList<Unit>(), { 0L }, { emptyMap() })
+        assertTrue("sin base no se anota nada como quitado", rebased.removed.isEmpty())
+    }
 }

@@ -88,6 +88,9 @@ object SyncManager {
         return if (parts.isEmpty()) null else "Sincronización de estados: " + parts.joinToString("; ")
     }
 
+    /** Tras separar series (ver [Removals.rebased]): la siguiente sincronización parte de lo de ahora. Espera a la que esté en curso para no pisar su estado. */
+    suspend fun rebase() = lock.withLock { withContext(Dispatchers.IO) { Removals.rebase() } }
+
     /**
      * Sincroniza ahora (una a la vez: la del botón y la diaria no se pisan). Falla (con el motivo) si no hay destino o el servidor no responde. Lee las copias de los demás, las
      * funde (añade lo que falta y quita lo que otro quitó a propósito, ver [Removals.step]) y sube la propia con las lápidas de lo que se quitó aquí. Las copias de dispositivos
