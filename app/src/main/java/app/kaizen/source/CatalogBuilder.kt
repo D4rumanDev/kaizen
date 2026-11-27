@@ -116,7 +116,7 @@ object CatalogBuilder {
      * Versión de la lógica de agrupar: súbela cuando cambie cómo se agrupan las series (el catálogo se reagrupa una vez al primer arranque). Antes la firma llevaba la fecha de
      * instalación y cada actualización de la app reescribía el catálogo entero (de 35 a 60 s de CPU y memoria en el tvbox, con «Últimos vistos» en esqueleto todo ese rato).
      */
-    private const val REGROUP_LOGIC_VERSION = 1L
+    private const val REGROUP_LOGIC_VERSION = 2L
 
     private val regroupPrefs by lazy { app.kaizen.commons.KaizenStore.prefs("kaizen_regroup") }
     private const val REGROUP_KEY = "signature"

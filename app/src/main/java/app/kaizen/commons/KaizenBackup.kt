@@ -253,8 +253,17 @@ object KaizenBackup {
     }
 
     // Una copia ajena o corrupta no puede inventar fichas ni unir sin tope: solo grupos con «fuente:slug» de una fuente conocida.
-    private fun joinGroupsNow(data: Data) =
-        SeriesLedger.join(SyncKeys.groups(data.groups, app.kaizen.source.AnimeSources.all.map { it.id }.toSet(), MAX_GROUPS, MAX_GROUP_SIZE))
+    // Y, además, solo los que no contradicen una separación del usuario ni juntan fichas de animes distintos de AniList ([JoinRules.safeGroups]).
+    private fun joinGroupsNow(data: Data) {
+        val groups = SyncKeys.groups(data.groups, app.kaizen.source.AnimeSources.all.map { it.id }.toSet(), MAX_GROUPS, MAX_GROUP_SIZE)
+        val links = app.kaizen.database.UserDB.INSTANCE.animeFuenteDao()
+        val safe = app.kaizen.source.JoinRules.safeGroups(groups, SeriesLedger::peek, app.kaizen.source.UserTitles.rules::isSplit) { source, slug ->
+            links.get(source, slug)?.takeIf { it.estado == app.kaizen.source.AnimeFuente.APLICADO }?.anilistId
+        }
+        val dropped = groups.count { it.size > 1 } - safe.count { it.size > 1 }
+        if (dropped > 0) app.kaizen.commons.DebugLog.info("Copias", "Uniones de la copia descartadas por contradecir una separación o enlaces de AniList distintos: $dropped")
+        SeriesLedger.join(safe)
+    }
 
     /** Funde [data] añadiendo lo que falta; [skip] deja fuera un favorito o un capítulo (por su clave portable): lo que una lápida más nueva que la copia dice que se quitó. */
     suspend fun merge(data: Data, skip: (String) -> Boolean = { false }): Summary = withContext(Dispatchers.IO) {

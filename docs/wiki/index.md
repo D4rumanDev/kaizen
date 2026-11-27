@@ -58,6 +58,6 @@ Ver el manual completo en [Herramientas de Kaizen (`tools/README.md`)](../../too
 - **[sign-sources.sh](../../tools/README.md#sign-sourcessh)**: Firma criptográfica del manifiesto `index.json` de fuentes.
 - **[probe_servers.py](../../tools/README.md#probe_serverspy) / [ficha-preview.sh](../../tools/README.md#ficha-previewsh)**: Pruebas de vídeo y previsualización de scraping desde el PC sin instalar APK.
 - **[retrace.js](../../tools/README.md#retracejs)**: Desofuscación automática de pilas de error minificadas con R8.
-- **[Suite de Auditorías (`tools/audit/`)](../../tools/README.md#7-suite-de-auditorías-toolsaudit)**: Orquestador `audit.py` (uniones, slugs, match, pending, unmerge, check-migration) y analizador estático `code_graph.py` (código muerto y grafo de dependencias).
+- **[Suite de Auditorías (`tools/audit/`)](../../tools/README.md#7-suite-de-auditorías-toolsaudit)**: Orquestador `audit.py` (uniones, groups, slugs, match, pending, unmerge, check-migration) y analizador estático `code_graph.py` (código muerto y grafo de dependencias).
 - **[ADB Device](../../tools/adb-device/README.md)**: Conexión TCP/IP y scripts de prueba para Android TV.
 - **[Basic Memory MCP](../../tools/basic-memory/README.md)**: Réplica continua de documentación hacia servidor MCP en `<IP_BM>:8765`.

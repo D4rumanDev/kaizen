@@ -20,7 +20,10 @@ internal object AnilistReviewRepository {
         val work = AnilistSyncRunner.work()
         var rows = links.all().associateBy { it.fuente to it.slug }
         // Con adopt = false (la prueba por ADB) no se escribe nada.
-        val adopted = if (adopt) AnilistReview.adoptions(work, { f, s -> rows[f to s] }, links.appliedIds().toSet(), System.currentTimeMillis()) else emptyList()
+        val titles by lazy { fichas.titles().associateBy { it.anilistId } }
+        // La fila tal como se guardaría: si el comprobador de enlaces la quitaría en el siguiente arranque, no se adopta.
+        val sound = { row: AnimeFuente -> AnilistLinkCheck.inconsistent(listOf(row), titles).isEmpty() }
+        val adopted = if (adopt) AnilistReview.adoptions(work, { f, s -> rows[f to s] }, links.appliedIds().toSet(), System.currentTimeMillis(), sound) else emptyList()
         if (adopted.isNotEmpty()) {
             DebugLog.info("AniList", "Enlazadas por anime ya confirmado: ${adopted.size} fichas (${adopted.map { it.anilistId }.distinct().joinToString()})")
             links.put(adopted)

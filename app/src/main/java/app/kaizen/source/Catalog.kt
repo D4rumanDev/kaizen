@@ -3,6 +3,7 @@ package app.kaizen.source
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.filter
 import androidx.paging.map
 import app.kaizen.pojos.av1.SeriesSummary
 import app.kaizen.commons.logError
@@ -46,7 +47,19 @@ object Catalog {
                 query.years?.first, query.years?.last,
                 if (query.sort == SortBy.RATING) 1 else 0
             )
-        }.flow.map { data -> data.map { entry -> toCard(entry, sources) } }
+        }.flow.map { data ->
+            // Un filtro nuevo por lista: lo ya mostrado en una página no vuelve a salir en la siguiente.
+            val isNewSeries = newSeriesFilter()
+            data.map { entry -> toCard(entry, sources) }.filter(isNewSeries)
+        }
+    }
+
+    /**
+     * Filtro con memoria para un listado: deja pasar una serie la primera vez y rechaza las siguientes, aunque el catálogo las tenga en dos entradas
+     * (misma regla de «misma serie» que el resto de listados, [SeriesDedupe]).
+     */
+    internal fun newSeriesFilter(dedupe: SeriesDedupe = SeriesDedupe()): (SeriesSummary) -> Boolean = { card ->
+        synchronized(dedupe) { dedupe.isNew(card.slug, card.name, card.source, year = card.year) }
     }
 
     /** Series que casan con el texto de [query] (por nombre plegado o por fragmento de slug), con sus filtros de nota y año, como tarjetas. */
@@ -293,6 +306,11 @@ object Catalog {
             votes = entry.votes,
             year = entry.year
         )
+    }
+
+    /** El aid de la ficha ([source], [slug]) que guarda el catálogo (el de la web), o el derivado del slug si no lo conoce. */
+    suspend fun aidOf(source: String, slug: String): Int = withContext(Dispatchers.IO) {
+        dao.keyOf(source, slug)?.let { key -> dao.links(key).firstOrNull { it.sourceId == source && it.slug == slug }?.aid }?.takeIf { it > 0 } ?: AnimeIds.forSlug(slug, source)
     }
 
     /** Si alguna fuente activa está recorrida y hay datos (se puede confiar en los enlaces de esas fuentes). */

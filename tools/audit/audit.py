@@ -17,6 +17,8 @@ HERE = Path(__file__).resolve().parent
 # tema -> (módulo, para qué sirve)
 TEMAS = {
     'unions': ('unions.py', 'separa las uniones de series en manuales y automáticas (CARPETA_DE_COPIAS [--backup …] [--out …])'),
+    'groups': ('wrong_groups.py', 'grupos de fichas que juntan animes distintos de AniList, con los JSON para la acción ADB SPLIT (CARPETA_DE_COPIAS [--backup …] [--out …])'),
+    'quality': ('join_quality.py', 'calidad de las uniones con AniList: porcentaje de error y errores agrupados por tipo A1/A2/B/C/D (CARPETA_DE_COPIAS [--cache …] [--out …])'),
     'slugs': ('slugs.py', 'cuenta los marcadores de temporada, parte y versión de los slugs y los que el analizador no entiende (CARPETA_DE_COPIAS)'),
     'match': ('match.py', 'mide cuántas series se podrían emparejar con AniList, con una muestra (LIBRO.json.gz [--sample N])'),
     'pending': ('pending.py', 'por qué quedan fichas «por revisar» en AniList y cuántas resolvería el criterio del matcher (anilist-links.json.gz)'),

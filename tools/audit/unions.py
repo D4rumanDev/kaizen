@@ -57,11 +57,19 @@ def main():
     for (src, slug), sid in ficha_id.items():
         by_id[sid].append(f'{src}:{slug}')
 
+    # Los libros recientes ya no traen `redirects` (las uniones automáticas viven en el catálogo, por clave de serie). Sin ellos no se
+    # pueden calcular las series unidas: se avisa y se informa solo de las reglas del usuario, en vez de dar un 0 que parezca cierto.
+    redirects = ledger.get('redirects')
+    sin_redirects = redirects is None
+    redirects = redirects or []
+    if sin_redirects:
+        print('AVISO: el libro de series no trae «redirects»; «series_unidas» y los cruces con merges/splits salen vacíos. '
+              'Las reglas del usuario (merges, splits, grupos) sí se cuentan.')
     uf = UF()
-    for r in ledger['redirects']:
+    for r in redirects:
         uf.union(str(r['fromId']), str(r['toId']))
     members = defaultdict(set)
-    for sid in list(by_id) + [str(r['fromId']) for r in ledger['redirects']] + [str(r['toId']) for r in ledger['redirects']]:
+    for sid in list(by_id) + [str(r['fromId']) for r in redirects] + [str(r['toId']) for r in redirects]:
         members[uf.find(sid)].add(sid)
     unidas = {root: ids for root, ids in members.items() if len(ids) > 1}
 
@@ -88,18 +96,19 @@ def main():
     split_vs_union = [s for s in splits if len({uf.find(i) for i in s}) < len(s)]
     merges_huerfanos = [m for m in merges if len({uf.find(i) for i in m}) == len(m)]
     resumen = {
-        'copia': backup_file.name, 'libro_fichas': len(ledger['map']), 'redirecciones': len(ledger['redirects']),
+        'copia': backup_file.name, 'libro_fichas': len(ledger['map']), 'redirecciones': None if sin_redirects else len(redirects),
+        'merges_distintos': len(set(merges)), 'merges_repetidos': len(merges) - len(set(merges)),
         'series_unidas': len(rows), 'manuales': sum(r['origen'] == 'manual' for r in rows), 'automaticas': sum(r['origen'] == 'auto' for r in rows),
         'fichas_en_uniones_manuales': sum(r['fichas'] for r in rows if r['origen'] == 'manual'),
         'fichas_en_uniones_automaticas': sum(r['fichas'] for r in rows if r['origen'] == 'auto'),
-        'merges_del_usuario': len(merges), 'merges_que_ya_no_estan_unidos': len(merges_huerfanos),
-        'splits_del_usuario': len(splits), 'splits_que_chocan_con_una_union': len(split_vs_union), 'grupos_de_fichas_del_usuario': len(groups),
+        'merges_del_usuario': len(merges), 'merges_que_ya_no_estan_unidos': None if sin_redirects else len(merges_huerfanos),
+        'splits_del_usuario': len(splits), 'splits_que_chocan_con_una_union': None if sin_redirects else len(split_vs_union), 'grupos_de_fichas_del_usuario': len(groups),
     }
     out = Path(a.out) if a.out else folder / 'informe-uniones'
     out.mkdir(parents=True, exist_ok=True)
     (out / 'INFORME.json').write_text(json.dumps(resumen, indent=2, ensure_ascii=False), encoding='utf8')
     with open(out / 'uniones.csv', 'w', newline='', encoding='utf8') as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w = csv.DictWriter(f, fieldnames=['serie', 'origen', 'ids', 'fichas', 'merges_manuales', 'grupos_manuales', 'lista'])
         w.writeheader()
         w.writerows(sorted(rows, key=lambda r: (r['origen'], -r['fichas'])))
     print(json.dumps(resumen, indent=2, ensure_ascii=False))

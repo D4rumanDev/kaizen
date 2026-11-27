@@ -66,7 +66,8 @@ class TitleRules private constructor(
     /** Estas reglas más las de [other] que no choquen: portada propia manda, uniones y separaciones se suman. */
     fun fillFrom(other: TitleRules): TitleRules = TitleRules(
         covers = other.covers + covers,
-        merges = merges + other.merges,
+        // Sin repetir: importar o sincronizar la misma copia otra vez no debe añadir de nuevo las mismas uniones.
+        merges = (merges + other.merges).unique(),
         // Una separación de la copia no se suma si estas reglas ya unen esas dos series (la unión es más reciente que la copia).
         splits = splits + other.splits.filterNot { (x, y) -> canonical(x) == canonical(y) }
     )
@@ -125,7 +126,7 @@ class TitleRules private constructor(
         val joined = allKeys.filter { it.all(Char::isDigit) }.map(::to).filter { it.size > 1 }
         return TitleRules(
             covers.entries.survivorLast().mapNotNull { (key, value) -> to(key).firstOrNull()?.let { it to value } }.toMap(),
-            merges.map { group -> group.flatMap(::to).distinct() }.filter { it.size > 1 } + joined,
+            (merges.map { group -> group.flatMap(::to).distinct() }.filter { it.size > 1 } + joined).unique(),
             splits.flatMap { (x, y) -> to(x).flatMap { a -> to(y).filter { it != a }.map { b -> ordered(a, b) } } }.toSet()
         )
     }
@@ -148,7 +149,7 @@ class TitleRules private constructor(
         if (!touched) return this
         return copy(
             covers = covers[old]?.let { covers - old + mapOf(to.first() to (covers[to.first()] ?: it)) } ?: covers,
-            merges = oldMerges + joined,
+            merges = (oldMerges + joined).unique(),
             splits = splits.flatMap { (x, y) ->
                 val xs = if (x == old) to else listOf(x)
                 val ys = if (y == old) to else listOf(y)
@@ -180,6 +181,9 @@ class TitleRules private constructor(
 
         private fun ordered(a: String, b: String) = if (a <= b) a to b else b to a
 
+        /** Los grupos de unión sin repetir: dos grupos con las mismas claves (en cualquier orden) son la misma unión; se queda el primero. */
+        private fun List<List<String>>.unique(): List<List<String>> = distinctBy { it.toSet() }
+
         private fun Map<String, String>.updated(key: String, value: String?) = if (value == null) this - key else this + (key to value)
 
         /** Lee el fichero; lo que no cumple el formato (claves raras, portadas que no son https, textos largos) se ignora. */
@@ -202,7 +206,8 @@ class TitleRules private constructor(
             }
             return TitleRules(
                 covers = strings(json.optJSONObject("covers"), MAX_URL) { it.startsWith("https://") },
-                merges = lists(json.optJSONArray("merges"), 2),
+                // Un fichero que ya se infló con uniones repetidas se limpia al leerlo.
+                merges = lists(json.optJSONArray("merges"), 2).unique(),
                 splits = lists(json.optJSONArray("splits"), 2).map { ordered(it[0], it[1]) }.toSet()
             )
         }

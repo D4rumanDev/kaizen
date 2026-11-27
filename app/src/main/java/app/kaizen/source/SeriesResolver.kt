@@ -7,11 +7,13 @@ object SeriesResolver {
     /**
      * Agrupa las fichas de todas las fuentes en series. Reglas, en orden:
      *  1. dentro de una misma fuente, «x» y «x-latino» son la misma serie ([SeriesMatch.slugBase]), con años compatibles;
-     *  2. mismo anime de AniList ([anilistOf], el enlace aplicado de cada ficha) en otra fuente, salvo que el usuario las haya separado
-     *     o que sus años de estreno no quepan juntos ([LinkEvidence.compatible]): es la única regla automática entre fuentes;
+     *  2. mismo anime de AniList ([anilistOf], el enlace aplicado de cada ficha), salvo que el usuario las haya separado o que sus
+     *     años de estreno no quepan juntos ([LinkEvidence.compatible]): es la única regla automática entre fuentes. Dentro de una
+     *     misma fuente también une («air» y «air-tv» son la misma serie en animeflv), pero solo si los slugs dicen la misma temporada
+     *     y el mismo formato ([JoinRules.sameShape]): «x» y «x-ova» o «x» y «x-2» siguen siendo fichas distintas aunque un enlace las junte;
      *  3. mismo id de serie ([idOf]): lo que ya se unió antes y las uniones del usuario ([rules]) siguen unidos.
      * No se une por título ni por el mismo slug entre fuentes: dos fichas sin enlace con AniList en común quedan como series distintas
-     * (se pueden unir a mano en «Repetidas»). Dos fichas de la misma fuente solo se unen por la regla 3 o por el sufijo «-latino».
+     * (se pueden unir a mano en «Repetidas»). Dos fichas de la misma fuente sin AniList en común solo se unen por la regla 3 o por el sufijo «-latino».
      * Devuelve las fichas de cada serie con su fuente.
      */
     fun resolveSeries(
@@ -31,7 +33,7 @@ object SeriesResolver {
             val sources = members.map { it.first.id }.toSet()
             val years = members.map { it.second.year }
             // Dos fichas con el mismo anime de AniList pero años de estreno que no caben juntos no son la misma serie (una temporada o un remake).
-            fun fits(index: Int) = keys[index].none { a -> memberKeys.any { b -> rules.isSplit(a, b) } } && groups[index].none { it.first.id in sources } &&
+            fun fits(index: Int) = keys[index].none { a -> memberKeys.any { b -> rules.isSplit(a, b) } } && JoinRules.sameShapePerSource(groups[index], members) &&
                 LinkEvidence.compatible(groups[index].map { it.second.year } + years)
             val target = anilists.firstNotNullOfOrNull { id -> byAnilist[id].orEmpty().firstOrNull(::fits) }
             val index = if (target != null) {

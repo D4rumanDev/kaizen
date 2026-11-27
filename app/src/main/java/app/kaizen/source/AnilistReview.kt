@@ -221,21 +221,24 @@ internal object AnilistReview {
             PendingSeries(work.fichas, anilistId, best.nivel, best.puntuacion, work.priority)
         }.sortedWith(compareByDescending<PendingSeries> { it.priority }.thenByDescending { it.score })
 
-    /** Desde este parecido, un candidato que el usuario ya confirmó para otra serie se da por bueno sin volver a preguntar. */
-    // Como «probable» del matcher: con otra temporada el parecido no pasa de 0,75, así que esas siguen preguntándose.
-    private const val CONFIRMED_FROM = 0.85
-
     /**
      * Las series sin enlace cuyo candidato es un anime que ya está enlazado ([applied], por decisión del usuario o del emparejado): es el
      * mismo anime en otra ficha, así que se enlazan con él (origen auto, nivel «mismo-id»). Devuelve las filas a guardar; no toca lo del usuario.
+     *
+     * Una serie que ya tiene alguna ficha enlazada no se adopta entera: solo se completan sus fichas por revisar cuyo candidato es uno de los
+     * animes que enlazan sus hermanas ([JoinRules.completions]).
+     *
+     * [acceptable] juzga la fila tal como se guardaría: si el comprobador de enlaces la quitaría después (una película enlazada a una serie de TV,
+     * un anime que no se parece a la ficha), no se adopta, para no enlazar y desenlazar en cada arranque.
      */
-    fun adoptions(series: Collection<SeriesWork>, row: (String, String) -> AnimeFuente?, applied: Set<Long>, at: Long): List<AnimeFuente> =
+    fun adoptions(series: Collection<SeriesWork>, row: (String, String) -> AnimeFuente?, applied: Set<Long>, at: Long, acceptable: (AnimeFuente) -> Boolean = { true }): List<AnimeFuente> =
         series.flatMap { work ->
             val rows = rowsOf(work, row)
-            if (rows.any { it.estado == AnimeFuente.APLICADO }) return@flatMap emptyList()
+            val inSeries = rows.filter { it.estado == AnimeFuente.APLICADO }.mapNotNull { it.anilistId }.toSet()
+            if (inSeries.isNotEmpty()) return@flatMap JoinRules.completions(work, row, inSeries, at, acceptable)
             // El mejor candidato de la serie, como en [pending]: solo se adopta si ese ya está enlazado y es lo bastante parecido.
             val best = rows.filter { it.estado == AnimeFuente.PENDIENTE && it.anilistId != null }.maxByOrNull { it.puntuacion }
-                ?.takeIf { it.anilistId in applied && it.puntuacion >= CONFIRMED_FROM } ?: return@flatMap emptyList()
+                ?.takeIf { it.anilistId in applied && it.puntuacion >= JoinRules.CONFIRMED_FROM } ?: return@flatMap emptyList()
             notDecidedByUser(work.fichas, row).map { (f, s) -> AnimeFuente(f, s, best.anilistId, AnimeFuente.APLICADO, AnimeFuente.AUTO, "mismo-id", best.puntuacion, at) }
         }
 

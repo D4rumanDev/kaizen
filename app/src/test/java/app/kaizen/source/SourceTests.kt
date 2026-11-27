@@ -1127,6 +1127,32 @@ class AnilistReviewTest {
     }
 
     @Test
+    fun `una ficha por revisar de una serie con hermanas enlazadas se completa si su candidato es el anime de una hermana`() {
+        val r = listOf(
+            row("a", "air", 7, AnimeFuente.APLICADO, 1.0),
+            row("b", "air", 7, AnimeFuente.APLICADO, 1.0),
+            row("c", "air-tv", 7, AnimeFuente.PENDIENTE, 1.03),   // candidato = el de las hermanas: se completa
+            row("d", "air-ova", 8, AnimeFuente.PENDIENTE, 1.03),  // otro anime que ninguna hermana tiene: sigue por revisar
+            row("e", "air-2", 7, AnimeFuente.PENDIENTE, 0.7)      // parecido bajo: sigue por revisar
+        ).associateBy { it.fuente to it.slug }
+        val work = listOf(SeriesWork(1, r.keys.toList(), 0))
+        val adopted = AnilistReview.adoptions(work, { f, s -> r[f to s] }, setOf(7L, 8L), 5L)
+        assertEquals(listOf("c" to "air-tv"), adopted.map { it.fuente to it.slug })
+        assertEquals(7L, adopted.single().anilistId)
+        assertEquals("mismo-id", adopted.single().nivel)
+        assertEquals(AnimeFuente.AUTO, adopted.single().origen)
+        assertEquals(AnimeFuente.APLICADO, adopted.single().estado)
+    }
+
+    @Test
+    fun `completar una serie no toca lo del usuario ni lo que el comprobador de enlaces quitaria`() {
+        val userRow = row("c", "air-tv", 7, AnimeFuente.PENDIENTE, 1.03).copy(origen = AnimeFuente.USUARIO)
+        val r = listOf(row("a", "air", 7, AnimeFuente.APLICADO, 1.0), userRow, row("d", "air-movie", 7, AnimeFuente.PENDIENTE, 1.03)).associateBy { it.fuente to it.slug }
+        val work = listOf(SeriesWork(1, r.keys.toList(), 0))
+        assertEquals(emptyList<AnimeFuente>(), AnilistReview.adoptions(work, { f, s -> r[f to s] }, setOf(7L), 5L) { it.slug != "air-movie" })
+    }
+
+    @Test
     fun `no se adopta con otra temporada ni si el mejor candidato de la serie es otro`() {
         val r = listOf(
             row("a", "foo-2", 1, AnimeFuente.PENDIENTE, 0.75),                                                    // otra temporada: 0,75 < 0,85
@@ -6253,6 +6279,51 @@ class SeriesMatchingTest {
         assertFalse(d.isNew("tokyo-ghoul-c", "Tokyo Ghoul", "animeflv", year = 2010))
     }
 
+    // ---- JoinRules.safeGroups: lo que una copia o una sincronización puede unir ----
+
+    private val shana = listOf("animeflv" to "shakugan-no-shana", "jkanime" to "shakugan-no-shana")
+    private val shingeki = listOf("animeflv" to "shingeki-no-kyojin", "jkanime" to "shingeki-no-kyojin")
+    private val ids = mapOf(shana[0] to 1L, shana[1] to 1L, shingeki[0] to 2L, shingeki[1] to 2L)
+
+    private fun guard(groups: List<List<Pair<String, String>>>, split: Set<Pair<Long, Long>> = emptySet(), anilist: Map<Pair<String, String>, Long> = emptyMap()) =
+        JoinRules.safeGroups(groups, { s, l -> ids[s to l] }, { a, b -> (a.toLong() to b.toLong()) in split || (b.toLong() to a.toLong()) in split }) { s, l -> anilist[s to l] }
+
+    @Test
+    fun joinGuardDropsAGroupThatJoinsTwoSeriesTheUserSeparated() {
+        assertEquals(emptyList<List<Pair<String, String>>>(), guard(listOf(shana + shingeki), split = setOf(1L to 2L)))
+        // Sin separación declarada, el grupo pasa.
+        assertEquals(listOf(shana + shingeki), guard(listOf(shana + shingeki)))
+    }
+
+    @Test
+    fun joinGuardDropsAGroupWithFichasLinkedToDifferentAnilistAnimes() {
+        val links = mapOf(shana[0] to 355L, shingeki[0] to 16498L)
+        assertEquals(emptyList<List<Pair<String, String>>>(), guard(listOf(shana + shingeki), anilist = links))
+    }
+
+    @Test
+    fun joinGuardKeepsGroupsWithTheSameOrNoAnilistLinkAndOnlyDropsTheBadOne() {
+        val links = mapOf(shana[0] to 355L, shana[1] to 355L, shingeki[0] to 16498L)
+        // Misma serie en dos fuentes con el mismo enlace, y una ficha sin enlace aún: se unen. El grupo mixto cae.
+        assertEquals(listOf(shana, shingeki), guard(listOf(shana, shingeki, shana + shingeki), anilist = links))
+        // Una ficha sin id en el libro no choca con ninguna separación.
+        assertEquals(listOf(listOf("animeflv" to "nueva", "jkanime" to "nueva")), guard(listOf(listOf("animeflv" to "nueva", "jkanime" to "nueva")), split = setOf(1L to 2L)))
+    }
+
+    @Test
+    fun catalogListingKeepsOneCardPerSeriesEvenWithTwoEntries() {
+        // Dos entradas del catálogo para la misma temporada (una sin año): solo sale la primera, como en la lista de Mejores.
+        val keep = Catalog.newSeriesFilter(SeriesDedupe(TitleRules.EMPTY) { _, _ -> null })
+        fun card(slug: String, name: String, source: String, year: Int?) =
+            SeriesSummary(aid = 1, name = name, slug = slug, category = 1, source = source, score = 4.3, votes = 10, year = year)
+        assertTrue(keep(card("shingeki-no-kyojin-season-3", "Shingeki no Kyojin Season 3", "jkanime", 2018)))
+        assertFalse(keep(card("shingeki-no-kyojin-season-3", "Shingeki no Kyojin Season 3", "animeflv", null)))
+        // Otra temporada distinta no se pierde.
+        assertTrue(keep(card("shingeki-no-kyojin-season-2", "Shingeki no Kyojin Season 2", "jkanime", 2017)))
+        // Cada lista empieza de cero: un filtro nuevo vuelve a dejar pasar la primera.
+        assertTrue(Catalog.newSeriesFilter(SeriesDedupe(TitleRules.EMPTY) { _, _ -> null })(card("shingeki-no-kyojin-season-3", "Shingeki no Kyojin Season 3", "jkanime", 2018)))
+    }
+
     @Test
     fun dedupeSameSlugWithDifferentKnownYearsIsNotDuplicate() {
         val d = SeriesDedupe()
@@ -6372,12 +6443,47 @@ class SeriesResolverTest {
     }
 
     @Test
-    fun `dos fichas de la misma fuente nunca se unen`() {
+    fun `dos fichas de la misma fuente sin anime de AniList en comun no se unen`() {
         val groups = resolve(
             jk to summary("Serie X", "serie-x", "jkanime"),
             jk to summary("Serie X", "serie-x-movie", "jkanime")
         )
         assertEquals(2, groups.size)
+    }
+
+    private fun sameAnilist(vararg items: Pair<AnimeSource, SeriesSummary>, anilist: Long = 7L, rules: TitleRules = TitleRules.EMPTY) =
+        SeriesResolver.resolveSeries(items.toList(), rules, { _, _ -> anilist }, { _, _ -> null })
+
+    @Test
+    fun `dos fichas de una misma fuente con el mismo anime de AniList y la misma forma se unen`() {
+        val groups = sameAnilist(jk to summary("Air", "air", "jkanime"), jk to summary("Air TV", "air-tv", "jkanime"), ag to summary("Air", "air", "animegratis"))
+        assertEquals(1, groups.size)
+        assertEquals(3, groups.single().size)
+    }
+
+    @Test
+    fun `la misma fuente con el mismo anime pero otro formato o temporada no se une`() {
+        assertEquals(2, sameAnilist(jk to summary("Baki", "grappler-baki", "jkanime"), jk to summary("Baki OVA", "grappler-baki-ova", "jkanime")).size)
+        assertEquals(2, sameAnilist(jk to summary("Retsuko", "aggressive-retsuko", "jkanime"), jk to summary("Retsuko 3", "aggressive-retsuko-3", "jkanime")).size)
+    }
+
+    @Test
+    fun `la misma fuente con el mismo anime no se une si los años no caben o el usuario las separo`() {
+        assertEquals(2, sameAnilist(jk to summary("Air", "air", "jkanime", year = 2005), jk to summary("Air TV", "air-tv", "jkanime", year = 2015)).size)
+        val ids = mapOf("jkanime" to "air" to 1L, "jkanime" to "air-tv" to 2L)
+        val groups = SeriesResolver.resolveSeries(
+            listOf(jk to summary("Air", "air", "jkanime"), jk to summary("Air TV", "air-tv", "jkanime")),
+            TitleRules.EMPTY.withSplit("1", "2"), { _, _ -> 7L }, { s, slug -> ids[s to slug] }
+        )
+        assertEquals(2, groups.size)
+    }
+
+    @Test
+    fun `JoinRules sameShape distingue formato y temporada del slug`() {
+        assertTrue(JoinRules.sameShape("air", "air-tv"))
+        assertTrue(JoinRules.sameShape("psycho-pass-movie", "psycho-pass-movie-1"))
+        assertFalse(JoinRules.sameShape("x", "x-especiales"))
+        assertFalse(JoinRules.sameShape("x", "x-2nd-season"))
     }
 
     @Test
@@ -7056,6 +7162,29 @@ class TitleRulesTest {
         val joined = mine.fillFrom(TitleRules.EMPTY.withSplit("1", "2").withSplit("1", "3"))
         assertEquals(false, joined.isSplit("1", "2"))
         assertTrue(joined.isSplit("1", "3"))
+    }
+
+    @Test
+    fun fillFromTheSameCopyTwiceDoesNotRepeatItsMerges() {
+        // Cada importación o sincronización vuelve a traer las mismas uniones: no deben acumularse (el recuento subía 150 cada vez).
+        val copy = TitleRules.EMPTY.withMerge("11", "12").withMerge("13", "14")
+        val once = TitleRules.EMPTY.fillFrom(copy)
+        val thrice = once.fillFrom(copy).fillFrom(copy)
+        assertEquals(2, once.mergeCount())
+        assertEquals(2, thrice.mergeCount())
+        // Un grupo con las mismas claves en otro orden es la misma unión.
+        assertEquals(2, thrice.fillFrom(TitleRules.EMPTY.withMerge("12", "11")).mergeCount())
+        // Una unión distinta sí se suma.
+        assertEquals(3, thrice.fillFrom(TitleRules.EMPTY.withMerge("15", "16")).mergeCount())
+    }
+
+    @Test
+    fun parseCleansMergesRepeatedInAnInflatedFile() {
+        val inflated = """{"version":2,"merges":[["11","12"],["11","12"],["12","11"],["13","14"],["11","12"]]}"""
+        val rules = TitleRules.parse(inflated)
+        assertEquals(2, rules.mergeCount())
+        assertEquals(rules.canonical("11"), rules.canonical("12"))
+        assertEquals(rules.canonical("13"), rules.canonical("14"))
     }
 
     @Test
