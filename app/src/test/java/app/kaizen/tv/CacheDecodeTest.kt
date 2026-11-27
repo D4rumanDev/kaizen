@@ -13,26 +13,26 @@ class CacheDecodeTest {
 
     @Test fun `mejores en emision lee lo guardado y valido`() {
         val json = """{"at":1,"sources":["animeav1"],"items":[$item]}"""
-        assertNotNull(BestAiringCache.decode(json, listOf("animeav1")))
+        assertNotNull(BestCache.decode(json, listOf("animeav1")))
     }
 
     @Test fun `mejores en emision descarta un json sin campos o vacio sin lanzar`() {
-        assertNull(BestAiringCache.decode("{}", listOf("animeav1")))
-        assertNull(BestAiringCache.decode("""{"at":1,"sources":["animeav1"]}""", listOf("animeav1")))
-        assertNull(BestAiringCache.decode("""{"at":1,"sources":["animeav1"],"items":[]}""", listOf("animeav1")))
-        assertNull(BestAiringCache.decode(null, listOf("animeav1")))
+        assertNull(BestCache.decode("{}", listOf("animeav1")))
+        assertNull(BestCache.decode("""{"at":1,"sources":["animeav1"]}""", listOf("animeav1")))
+        assertNull(BestCache.decode("""{"at":1,"sources":["animeav1"],"items":[]}""", listOf("animeav1")))
+        assertNull(BestCache.decode(null, listOf("animeav1")))
     }
 
     @Test fun `mejores en emision no vale si cambiaron las fuentes activas`() {
         val json = """{"at":1,"sources":["animeav1"],"items":[$item]}"""
-        assertNull(BestAiringCache.decode(json, listOf("animeav1", "jkanime")))
+        assertNull(BestCache.decode(json, listOf("animeav1", "jkanime")))
         // El orden de las fuentes no importa.
         val two = """{"at":1,"sources":["animeav1","jkanime"],"items":[$item]}"""
-        assertNotNull(BestAiringCache.decode(two, listOf("jkanime", "animeav1")))
+        assertNotNull(BestCache.decode(two, listOf("jkanime", "animeav1")))
     }
 
     @Test fun `un json que no se puede leer lanza el error de gson para que load lo recoja`() {
-        assertThrows(RuntimeException::class.java) { BestAiringCache.decode("esto no es json", listOf("animeav1")) }
+        assertThrows(RuntimeException::class.java) { BestCache.decode("esto no es json", listOf("animeav1")) }
     }
 
     @Test fun `recomendados descarta lo guardado sin tanda o sin recientes`() {

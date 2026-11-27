@@ -2,6 +2,8 @@ package app.kaizen.tv.ui
 
 import app.kaizen.commons.KaizenProgress
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CardWatchTest {
@@ -25,5 +27,18 @@ class CardWatchTest {
     @Test
     fun `con progreso a medias y sin visto tambien es seguir viendo`() {
         assertEquals(CardWatch.RESUMING, cardWatchOf(seen = false, progress = midway))
+    }
+
+    @Test
+    fun `una tarjeta sin marca con la base diciendo visto esta desfasada`() {
+        assertTrue(isStaleCard(CardWatch.NONE, ready = true, seenInDb = true))
+    }
+
+    @Test
+    fun `no esta desfasada si la marca existe, si la base no lo tiene visto o si aun no esta todo cargado`() {
+        assertFalse(isStaleCard(CardWatch.SEEN, ready = true, seenInDb = true))
+        assertFalse(isStaleCard(CardWatch.RESUMING, ready = true, seenInDb = true))
+        assertFalse(isStaleCard(CardWatch.NONE, ready = true, seenInDb = false))
+        assertFalse(isStaleCard(CardWatch.NONE, ready = false, seenInDb = true))
     }
 }

@@ -14,25 +14,29 @@ class HomeChannelsSyncTest {
     private val rows = listOf("animeav1|1|Serie A|Episodio 3|https://x/a.jpg|https://x/a", "animeav1|2|Serie B|Episodio 7|https://x/b.jpg|https://x/b")
 
     @Test
-    fun `la firma cambia con un capitulo nuevo, otro orden, otra miniatura u otro canal`() {
-        val base = HomeChannels.recentsSignature(5, rows)
-        assertEquals(base, HomeChannels.recentsSignature(5, rows.toList()))
-        assertTrue(base != HomeChannels.recentsSignature(5, rows.reversed()))
-        assertTrue(base != HomeChannels.recentsSignature(5, rows + "animeav1|3|Serie C|Episodio 1|https://x/c.jpg|https://x/c"))
-        assertTrue(base != HomeChannels.recentsSignature(5, listOf(rows[0].replace("a.jpg", "a2.jpg"), rows[1])))
-        assertTrue(base != HomeChannels.recentsSignature(6, rows))
+    fun `la firma cambia con un capitulo nuevo, otro orden, otra miniatura, otro canal o una miniatura menos por bajar`() {
+        val base = HomeChannels.recentsSignature(5, rows, emptyList())
+        assertEquals(base, HomeChannels.recentsSignature(5, rows.toList(), emptyList()))
+        assertTrue(base != HomeChannels.recentsSignature(5, rows.reversed(), emptyList()))
+        assertTrue(base != HomeChannels.recentsSignature(5, rows + "animeav1|3|Serie C|Episodio 1|https://x/c.jpg|https://x/c", emptyList()))
+        assertTrue(base != HomeChannels.recentsSignature(5, listOf(rows[0].replace("a.jpg", "a2.jpg"), rows[1]), emptyList()))
+        assertTrue(base != HomeChannels.recentsSignature(6, rows, emptyList()))
+        // Con una miniatura por bajar los programas llevaban su dirección web: al llegar, la firma es otra y se rehacen.
+        assertTrue(base != HomeChannels.recentsSignature(5, rows, listOf("https://x/a.jpg")))
+        // Y si llega una y falta otra, el contador sería el mismo pero no la firma.
+        assertTrue(HomeChannels.recentsSignature(5, rows, listOf("https://x/a.jpg")) != HomeChannels.recentsSignature(5, rows, listOf("https://x/b.jpg")))
+        assertEquals(HomeChannels.recentsSignature(5, rows, listOf("https://x/a.jpg", "https://x/b.jpg")), HomeChannels.recentsSignature(5, rows, listOf("https://x/b.jpg", "https://x/a.jpg")))
     }
 
     @Test
-    fun `solo se omite si todo coincide y el canal conserva sus programas`() {
-        // Control bueno: todo igual, nada por bajar y los 2 programas siguen en el canal.
-        assertTrue(HomeChannels.canSkip("firma", "firma", missingArt = 0, existingPrograms = 2, wanted = 2))
+    fun `solo se omite si la firma coincide y el canal conserva sus programas`() {
+        // Control bueno: todo igual y los 2 programas siguen en el canal.
+        assertTrue(HomeChannels.canSkip("firma", "firma", existingPrograms = 2, wanted = 2))
         // Controles malos: cada condición por separado obliga a rehacer.
-        assertTrue(!HomeChannels.canSkip(null, "firma", 0, 2, 2))
-        assertTrue(!HomeChannels.canSkip("otra", "firma", 0, 2, 2))
-        assertTrue(!HomeChannels.canSkip("firma", "firma", 1, 2, 2))
-        assertTrue(!HomeChannels.canSkip("firma", "firma", 0, 1, 2))
-        assertTrue(!HomeChannels.canSkip("firma", "firma", 0, -1, 2))
+        assertTrue(!HomeChannels.canSkip(null, "firma", 2, 2))
+        assertTrue(!HomeChannels.canSkip("otra", "firma", 2, 2))
+        assertTrue(!HomeChannels.canSkip("firma", "firma", 1, 2))
+        assertTrue(!HomeChannels.canSkip("firma", "firma", -1, 2))
     }
 }
 

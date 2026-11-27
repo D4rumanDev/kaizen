@@ -127,7 +127,17 @@ object CoverPipeline {
     /** El trabajo entero, en un solo paso: descarga, reduce, convierte y escribe (con un fichero temporal para no dejar nada a medias). */
     private fun download(url: String, tier: CoverTier): Outcome {
         val bytes = fetch(url)
-        val webp = encode(bytes)
+        return Outcome.Ready(store(url, tier, encode(bytes), "${bytes.size / 1024} KB"))
+    }
+
+    /**
+     * Guarda en WebP una imagen que ya está en el disco (la de la caché de imágenes de Coil): así no se vuelve a bajar y las filas del inicio la encuentran
+     * por el camino barato (un fichero) en vez de abrir la otra caché. null si no se pudo convertir o guardar.
+     */
+    fun adopt(url: String, source: File, tier: CoverTier = CoverTier.HOT): File? =
+        runCatching { store(url, tier, encode(source.readBytes()), "${source.length() / 1024} KB de la caché de imágenes") }.getOrNull()
+
+    private fun store(url: String, tier: CoverTier, webp: ByteArray, origin: String): File {
         val target = File(dir(tier), nameOf(url)).also { it.parentFile?.mkdirs() }
         val tmp = File(target.parentFile, target.name + ".tmp")
         try {
@@ -139,8 +149,8 @@ object CoverPipeline {
         }
         // Cada tantas escrituras se mira el tope de las dos carpetas (la otra también crece al subir series de nivel).
         if (writes.incrementAndGet() % TRIM_EVERY == 0) { trim(CoverTier.HOT); trim(CoverTier.WARM) }
-        DebugLog.detail("Portadas", "Guardada (${tier.name.lowercase()}): ${bytes.size / 1024} KB → ${webp.size / 1024} KB en WebP")
-        return Outcome.Ready(target)
+        DebugLog.detail("Portadas", "Guardada (${tier.name.lowercase()}): $origin → ${webp.size / 1024} KB en WebP")
+        return target
     }
 
     private fun fetch(url: String): ByteArray {

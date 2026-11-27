@@ -3,6 +3,7 @@ package app.kaizen.tv.ui
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.kaizen.pojos.av1.Record
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -15,16 +16,15 @@ internal enum class SeenFilter(val label: String) { ALL("Todos"), SEEN("Vistos")
 
 /**
  * Lo visto, en memoria, con el mismo criterio que `RecordDao.chapterIsSeen` (el ojo de la tarjeta): el mismo capítulo (eid ≠ 0) o el
- * mismo número de la misma serie (mismo aid o mismo id de serie ≠ 0). «Visto» es lo acabado, como el check verde: un capítulo empezado y sin acabar
+ * mismo número de la misma serie (mismo id de serie ≠ 0). El aid no cuenta: es de la fuente y se repite entre series distintas (5 de 394 en la copia del 27-nov). «Visto» es lo acabado, como el check verde: un capítulo empezado y sin acabar
  * ([resuming] dice si lo está, por id de serie, número y eid) lleva el triángulo azul y cuenta como no visto, igual que uno sin marca.
  */
 internal class SeenIndex(records: List<Record>, private val resuming: (seriesId: Long, number: Double, eid: Int) -> Boolean = { _, _, _ -> false }) {
     private val eids = records.mapTo(HashSet()) { it.eid }
-    private val byAid = records.mapTo(HashSet()) { it.aid to it.number }
     private val bySeries = records.mapNotNull { r -> r.seriesId.takeIf { it != 0L }?.let { it to r.number } }.toHashSet()
 
     fun isSeen(eid: Int, aid: Int, seriesId: Long, number: Double): Boolean =
-        ((eid != 0 && eid in eids) || (aid to number) in byAid || (seriesId != 0L && (seriesId to number) in bySeries)) && !resuming(seriesId, number, eid)
+        ((eid != 0 && eid in eids) || (seriesId != 0L && (seriesId to number) in bySeries)) && !resuming(seriesId, number, eid)
 }
 
 /**
@@ -73,7 +73,44 @@ internal fun rememberChapterWatch(source: String, slug: String, number: Double, 
     val seen = rememberSeen(source, slug, number)
     return remember(source, slug, number, eid, ledger, changes, seen) {
         val started = app.kaizen.commons.KaizenProgress.startedOf(app.kaizen.commons.KaizenProgress.Key(app.kaizen.source.seriesIdOf(source, slug), number), eid)
-        ChapterWatch(cardWatchOf(seen, started), started)
+        val watch = ChapterWatch(cardWatchOf(seen, started), started)
+        StaleCardCheck.watch(source, slug, number, watch.state)
+        watch
+    }
+}
+
+/** ¿Una tarjeta está desfasada? Pinta «sin marca» ([state] NONE) con todo cargado ([ready]) y, sin embargo, la base tiene ese capítulo visto ([seenInDb]). */
+internal fun isStaleCard(state: CardWatch, ready: Boolean, seenInDb: Boolean): Boolean = ready && state == CardWatch.NONE && seenInDb
+
+/**
+ * TEMPORAL (27-nov-2026): detector de tarjetas desfasadas para cualquier serie. Si una tarjeta sale «sin marca», pregunta en segundo plano a la base (la misma consulta que
+ * `chapterIsSeen`) y, si dice que está visto, lo anota con los registros de esa serie y su ficha en el libro, para entender por qué. Como mucho una vez por minuto y capítulo,
+ * y solo con los vistos y el libro de series ya cargados. Quitar cuando pase una semana sin recaídas.
+ */
+private object StaleCardCheck {
+    private val EVERY = 60.seconds
+    private const val MAX_KEYS = 500
+    private val last = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun watch(source: String, slug: String, number: Double, state: CardWatch) {
+        if (state != CardWatch.NONE) return
+        val seenSet = SeenChapters.all.value
+        val ready = seenSet != null && app.kaizen.source.SeriesLedger.version.value > 0
+        if (!ready) return
+        val key = "$source|$slug|$number"
+        val now = System.currentTimeMillis()
+        if (last.size > MAX_KEYS) last.clear()
+        val before = last[key]
+        if (before != null && now - before < EVERY.inWholeMilliseconds) return
+        last[key] = now
+        kotlinx.coroutines.CoroutineScope(app.kaizen.commons.AppScope.coroutineContext + kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching {
+                if (!isStaleCard(state, ready, app.kaizen.domain.Library.chapterSeen(source, slug, number))) return@runCatching
+                val id = app.kaizen.source.seriesIdOf(source, slug)
+                val mine = app.kaizen.domain.Library.historyNow().filter { it.slug == slug }.joinToString { "cap=${it.number} eid=${it.eid} serie=${it.seriesId}" }
+                app.kaizen.commons.DebugLog.info("Diagnóstico", "Tarjeta desfasada: $source/$slug cap=$number sin marca, pero la base lo tiene visto. Id de serie en memoria=$id; el conjunto de vistos lo contiene=${seenSet?.contains(id to number)}; versión del libro=${app.kaizen.source.SeriesLedger.version.value}; registros de la ficha: $mine")
+            }
+        }
     }
 }
 

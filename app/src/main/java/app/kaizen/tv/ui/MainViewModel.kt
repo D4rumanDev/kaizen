@@ -18,7 +18,9 @@ import app.kaizen.tv.TVRepository
 import app.kaizen.tv.LoadLimits
 import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.tv.anime.ContinueItem
+import app.kaizen.source.BestTop
 import app.kaizen.tv.ui.MainSections.BEST
+import app.kaizen.tv.ui.MainSections.BESTGLOBAL
 import app.kaizen.tv.ui.MainSections.FAVORITES
 import app.kaizen.tv.ui.MainSections.CONTINUE
 import app.kaizen.tv.ui.MainSections.LAST_SEEN
@@ -58,6 +60,16 @@ class MainViewModel : ViewModel() {
     private val staffRefresh = kotlinx.coroutines.flow.MutableStateFlow(0)
     private val retryStaff = RetryCard(app.kaizen.commons.appString(app.kaizen.R.string.ui_tarda_mas_de_lo_normal) + " " + app.kaizen.commons.appString(app.kaizen.R.string.ui_reintentar)) { staffRefresh.value += 1 }
 
+    // «Mejores»: la tarjeta «Reintentar» (sin lista ni guardado) pide otra vez la lista que toque.
+    private val bestRefresh = BestTop.Kind.entries.associateWith { kotlinx.coroutines.flow.MutableStateFlow(0) }
+    private val retryBest = BestTop.Kind.entries.associateWith { kind -> RetryCard("No se pudo cargar la lista. Reintentar") { bestRefresh.getValue(kind).value += 1 } }
+
+    /** La lista «Mejores» de [kind] (guardada una semana por [TVRepository.best]); se rehace al cambiar las fuentes activas o al pulsar «Reintentar». */
+    private fun best(kind: BestTop.Kind): StateFlow<List<Any>> = bestRefresh.getValue(kind).combine(enabled) { _, _ -> }.transformLatest {
+        emit(listOf<Any>(LoadingCard))
+        emit(try { TVRepository.best(kind) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { logError(e); null } ?: listOf(retryBest.getValue(kind)))
+    }.catch { logError(it); emit(listOf(retryBest.getValue(kind))) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard))
+
     private val sections: Map<Int, StateFlow<List<Any>>> = mapOf(
         // La web solo da 20 recientes; se suman a los guardados (RecentsArchive).
         // Sin recientes y con la última recarga fallida: tarjeta para reintentar.
@@ -92,11 +104,8 @@ class MainViewModel : ViewModel() {
             emit(withTimeoutOrNull(LoadLimits.DATA) { Recommendations.forHome() } ?: listOf(retryStaff))
         }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf<Any>(LoadingCard)),
 
-        // Guardado una semana (BestAiringCache): abrir la sección no pide nada a las webs mientras valga.
-        BEST to enabled.mapLatest { _ ->
-            // El fallo se recoge aquí y no en el `.catch` de abajo: ese termina el flujo y la lista no se rehace al cambiar las fuentes activas.
-            try { TVRepository.bestAiring() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { logError(e); emptyList() }
-        }.catch { logError(it); emit(emptyList()) }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.Lazily, listOf(LoadingCard)),
+        BEST to best(BestTop.Kind.AIRING),
+        BESTGLOBAL to best(BestTop.Kind.ALWAYS),
     )
 
     init {

@@ -14,7 +14,19 @@ internal interface AnilistApi {
 
     /** El anime de AniList que corresponde a cada id de MyAnimeList pedido (`Media(idMal)`); los que AniList no conoce no aparecen. */
     suspend fun byMal(ids: List<Long>): Map<Long, AnilistMatcher.Candidate> = emptyMap()
+
+    /**
+     * Los [count] animes mejor puntuados del ranking público (TV, película, OVA y ONA, sin adultos) con popularidad mayor de [minPopularity], de mayor a menor nota; solo los que
+     * se están emitiendo si [airing].
+     */
+    suspend fun top(count: Int, minPopularity: Int, airing: Boolean = false): AnilistTops = AnilistTops(emptyList(), true)
 }
+
+/** El ranking pedido y si llegó entero ([complete]: se alcanzó lo pedido o AniList no tiene más; false si una página no dio datos y la lista quedó corta). */
+internal class AnilistTops(val items: List<AnilistTop>, val complete: Boolean)
+
+/** Un anime del ranking público de AniList: [score] de 0 a 100. */
+internal class AnilistTop(val id: Long, val title: String, val score: Int?, val year: Int?)
 
 /** La ficha tal como llegó ([json]) y lo que se deriva de ella para la tabla. */
 internal class AnilistFichaRaw(
@@ -79,6 +91,26 @@ internal class AnilistClient(private val post: suspend (String) -> String) : Ani
         }.toMap()
     }
 
+    override suspend fun top(count: Int, minPopularity: Int, airing: Boolean): AnilistTops {
+        val out = ArrayList<AnilistTop>()
+        val status = if (airing) ", status: RELEASING" else ""
+        var page = 1
+        while (out.size < count) {
+            val variables = JsonObject().also { it.addProperty("page", page); it.addProperty("pop", minPopularity) }
+            val query = "query (\$page: Int, \$pop: Int) { Page(page: \$page, perPage: $TOP_PAGE) { media(type: ANIME, isAdult: false, sort: SCORE_DESC, popularity_greater: \$pop, format_in: [TV, MOVIE, OVA, ONA]$status) { id title { romaji } averageScore seasonYear } } }"
+            // Sin datos (AniList rechazó la consulta) la lista queda corta: quien la pide decide si vale; una caída lanza AnilistUnavailable.
+            val media = request(query, variables)?.get("Page").asObjectOrNull()?.get("media")?.takeIf { it.isJsonArray }?.asJsonArray ?: return AnilistTops(out.distinctBy { it.id }.take(count), complete = false)
+            if (media.size() == 0) break
+            media.mapNotNullTo(out) { element ->
+                val m = element.asObjectOrNull() ?: return@mapNotNullTo null
+                val id = m.get("id")?.takeIf { it.isJsonPrimitive }?.asLong ?: return@mapNotNullTo null
+                AnilistTop(id, m.get("title").asObjectOrNull()?.string("romaji").orEmpty(), m.get("averageScore")?.takeIf { it.isJsonPrimitive }?.asInt, m.get("seasonYear")?.takeIf { it.isJsonPrimitive }?.asInt)
+            }
+            page++
+        }
+        return AnilistTops(out.distinctBy { it.id }.take(count), complete = true)
+    }
+
     /** El tráiler de un anime (sitio e id del vídeo, como los da AniList), o null si no tiene. No se guarda: se pide al abrir la ficha. */
     suspend fun trailer(id: Long): Pair<String?, String?>? {
         val variables = JsonObject().also { it.addProperty("id", id) }
@@ -123,6 +155,7 @@ internal class AnilistClient(private val post: suspend (String) -> String) : Ani
         /** Versión de la consulta de ficha: si se amplía, se sube y se vuelven a pedir las fichas ya guardadas. */
         const val FICHA_VERSION = 1
         private const val PER_SEARCH = 8
+        private const val TOP_PAGE = 50
         const val SEARCH_FIELDS = "id idMal format episodes title { romaji english native } synonyms seasonYear startDate { year }"
         const val FICHA_FIELDS = "id idMal title { romaji english native } synonyms format status season seasonYear episodes duration " +
             "startDate { year month day } endDate { year month day } genres description(asHtml: false) averageScore popularity isAdult countryOfOrigin " +

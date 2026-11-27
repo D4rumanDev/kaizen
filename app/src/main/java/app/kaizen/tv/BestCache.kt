@@ -12,10 +12,10 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * «Mejores en emisión» guardado: calcularlo pide a cada web su lista de emisión y las ordena por la nota de AniList, y eso en una tele lenta tardaba en salir cada vez
- * que se abría la sección. Se guarda el resultado y se rehace como mucho una vez a la semana (o con «Actualizar»). Si cambian las fuentes activas, el guardado no vale.
+ * «Mejores» guardado («en emisión» y «de siempre», cada una con su clave): calcularlo pide el ranking a AniList y lo resuelve a series, y eso en una tele lenta tardaba en salir cada vez
+ * que se abría la sección. Se guarda el resultado y se rehace como mucho una vez a la semana. Si cambian las fuentes activas, el guardado no vale.
  */
-internal object BestAiringCache {
+internal object BestCache {
     /** Cuánto vale lo guardado antes de volver a pedirlo a las webs. */
     val MAX_AGE: Duration = 7.days
 
@@ -27,17 +27,16 @@ internal object BestAiringCache {
         @SerializedName("items") val items: List<SeriesSummary>
     )
 
-    private const val KEY = "best"
     private val gson = Gson()
     private val prefs get() = KaizenStore.prefs("kaizen_best_airing")
 
     /** Lo guardado para estas fuentes (cualquiera que sea su edad), o null si no hay o es de otro conjunto de fuentes. */
-    @Synchronized fun load(sources: List<String>): Stored? = try {
-        decode(prefs.getString(KEY, null), sources)
+    @Synchronized fun load(sources: List<String>, key: String): Stored? = try {
+        decode(prefs.getString(key, null), sources)
     } catch (e: Exception) {
         // JSON ilegible o de otra versión (Gson deja a null lo que falta aunque Kotlin lo declare no nulo): se descarta y se rehace; no debe tumbar la sección.
         logError(e)
-        prefs.edit { remove(KEY) }
+        prefs.edit { remove(key) }
         null
     }
 
@@ -52,8 +51,8 @@ internal object BestAiringCache {
         return stored
     }
 
-    @Synchronized fun save(sources: List<String>, items: List<SeriesSummary>, now: Long = System.currentTimeMillis()) {
-        prefs.edit { putString(KEY, gson.toJson(Stored(now, sources.sorted(), items))) }
+    @Synchronized fun save(sources: List<String>, items: List<SeriesSummary>, key: String, now: Long = System.currentTimeMillis()) {
+        prefs.edit { putString(key, gson.toJson(Stored(now, sources.sorted(), items))) }
     }
 
     /** Si lo guardado el [at] aún vale en [now]. Un reloj retrasado (guardado «en el futuro») no vale: se rehace. */

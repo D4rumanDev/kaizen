@@ -55,7 +55,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import app.kaizen.R
@@ -66,8 +65,6 @@ import app.kaizen.pojos.av1.Recommended
 import app.kaizen.pojos.av1.Record
 import app.kaizen.domain.SeriesStatuses
 import app.kaizen.pojos.av1.SeriesSummary
-import app.kaizen.source.SearchQuery
-import app.kaizen.source.SortBy
 import app.kaizen.retrofit.Repository
 import app.kaizen.tv.TVRepository
 import app.kaizen.tv.anime.ContinueItem
@@ -422,15 +419,7 @@ private fun BestPage(model: MainViewModel, actions: CardActions) {
             }
         }
     }
-    if (global) BestGlobalPage(actions, toggle) else SectionGridPage(MainSections.BEST, model, actions, toggle)
-}
-
-/** «Mejores de siempre»: el catálogo interno ordenado por puntuación. */
-@Composable
-private fun BestGlobalPage(actions: CardActions, header: LazyGridScope.() -> Unit) {
-    val items = remember { TVRepository.paged(SearchQuery(sort = SortBy.RATING)) }.collectAsLazyPagingItems()
-    // El catálogo no se recorre desde aquí: se gestiona en Configuración › Biblioteca; esta sección solo lo lee.
-    PagedGrid(items, actions, onOpen = { actions.open(it) }, header = header)
+    SectionGridPage(if (global) MainSections.BESTGLOBAL else MainSections.BEST, model, actions, toggle)
 }
 
 /**

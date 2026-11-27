@@ -34,6 +34,9 @@ import kotlin.time.Duration.Companion.seconds
 object HomeChannels {
     private const val MAX_ROWS = 20
 
+    /** Capítulos que enseña el canal «Capítulos recientes» del inicio (el launcher solo deja ver unos pocos a la vez; la lista de la app sigue siendo más larga). */
+    private const val RECENTS_ROWS = 10
+
     /** Una sincronización de filas a la vez (sustituye a @Synchronized, que no admite esperar imágenes sin bloquear el hilo). */
     private val lock = Mutex()
 
@@ -66,7 +69,8 @@ object HomeChannels {
         val existing = existingWatchNext(context)
         val wantedIds = wanted.map { it.first.eid.toString() }.toSet()
         // Primero se publica qué imágenes se pueden servir; después se dan al launcher como content:// (ver ChannelArt).
-        val art = ChannelArt.publish(context, "continue", wanted.map { episodeImage(it.first) })
+        // Aquí no hay fila que escribir antes: se bajan las miniaturas que falten y después se publican, como siempre.
+        val art = ChannelArt.fetchMissing(ChannelArt.publish(context, "continue", wanted.map { episodeImage(it.first) }))
         existing.filterKeys { it !in wantedIds }.values.forEach { context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
         wanted.forEach { (record, progress) ->
             val program = WatchNextProgram.Builder()
@@ -106,34 +110,41 @@ object HomeChannels {
             prefs.edit().putLong(KEY_CHANNEL, channelId).putInt(KEY_LOGO, LOGO_VERSION).apply()
         }
         val channelDone = System.nanoTime()
-        val recents = RecentsArchive.merge(Library.recentsNow()).take(MAX_ROWS)
+        val recents = RecentsArchive.merge(Library.recentsNow()).take(RECENTS_ROWS)
         val dataDone = System.nanoTime()
         val art = ChannelArt.publish(context, "recents", recents.map { it.episodeImageUrl })
         val imagesDone = System.nanoTime()
-        val signature = recentsSignature(channelId, recents.map { "${it.source}|${it.eid}|${it.name}|${it.chapter}|${it.episodeImageUrl}|${it.animeUrl}" })
-        val existing = programCount(context, channelId)
-        val outcome = if (canSkip(prefs.getString(KEY_SIGNATURE, null), signature, art.missing, existing, recents.size)) "sin cambios" else {
-            rewritePrograms(context, helper, prefs, channelId, recents, art)
+        val rows = recents.map { "${it.source}|${it.eid}|${it.name}|${it.chapter}|${it.episodeImageUrl}|${it.animeUrl}" }
+        // Deja la fila al día (o no la toca si ya lo está) con las miniaturas que hay ahora; lo que falte lleva su dirección web.
+        fun refresh(thumbnails: ChannelArt.Published): String {
+            val signature = recentsSignature(channelId, rows, thumbnails.toFetch)
+            if (canSkip(prefs.getString(KEY_SIGNATURE, null), signature, programCount(context, channelId), recents.size)) return "sin cambios"
+            rewritePrograms(context, helper, prefs, channelId, recents, thumbnails)
             prefs.edit().putString(KEY_SIGNATURE, signature).apply()
-            "rehechos"
+            return "rehechos"
         }
+        var outcome = refresh(art)
+        val programsDone = System.nanoTime()
+        // Las que falten se bajan después de dejar la fila escrita: una web que no contesta no la retrasa. Si llega alguna, se rehace con ella.
+        val fetched = ChannelArt.fetchMissing(art)
+        if (fetched !== art) outcome += " y de nuevo con las descargadas: ${refresh(fetched)}"
         val done = System.nanoTime()
         fun ms(from: Long, to: Long) = (to - from) / 1_000_000
-        DebugLog.info("Medición", "Fila de recientes: ${recents.size} capítulos, $outcome (canal ${ms(started, channelDone)} ms, datos ${ms(channelDone, dataDone)} ms, miniaturas ${ms(dataDone, imagesDone)} ms con ${art.missing} por bajar, programas ${ms(imagesDone, done)} ms)")
+        DebugLog.info("Medición", "Fila de recientes: ${recents.size} capítulos, $outcome (canal ${ms(started, channelDone)} ms, datos ${ms(channelDone, dataDone)} ms, miniaturas ${ms(dataDone, imagesDone)} ms [${art.detail}], programas ${ms(imagesDone, programsDone)} ms, descargas de ${art.toFetch.size} en ${ms(programsDone, done)} ms)")
     }
 
-    /** Qué hay en la fila: una línea por capítulo (con lo que lo distingue: textos, miniatura, enlace), en su orden, más el canal y la versión del logotipo. Igual firma = nada que rehacer. */
-    internal fun recentsSignature(channelId: Long, rows: List<String>): String {
-        val text = rows.joinToString("\n", prefix = "$channelId|$LOGO_VERSION\n")
+    /** Qué hay en la fila: una línea por capítulo (con lo que lo distingue: textos, miniatura, enlace), en su orden, más el canal, la versión del logotipo y cuáles miniaturas aún faltan (las que llevan su dirección web). Igual firma = nada que rehacer. */
+    internal fun recentsSignature(channelId: Long, rows: List<String>, missingThumbnails: Collection<String>): String {
+        val text = rows.joinToString("\n", prefix = "$channelId|$LOGO_VERSION|${missingThumbnails.sorted().joinToString(",")}\n")
         return java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
     /**
-     * La fila ya está bien: misma firma que la de la última vez, ninguna miniatura por bajar (si faltaba alguna, los programas llevaban su dirección web) y el canal
-     * conserva todos sus programas (el sistema puede haberlos quitado: entonces el recuento no coincide y se rehacen).
+     * La fila ya está bien: misma firma que la de la última vez (con las mismas miniaturas por bajar: si ahora falta alguna menos, los programas llevaban su dirección web y
+     * hay que rehacerlos) y el canal conserva todos sus programas (el sistema puede haberlos quitado: entonces el recuento no coincide y se rehacen).
      */
-    internal fun canSkip(storedSignature: String?, signature: String, missingArt: Int, existingPrograms: Int, wanted: Int): Boolean =
-        storedSignature == signature && missingArt == 0 && existingPrograms == wanted
+    internal fun canSkip(storedSignature: String?, signature: String, existingPrograms: Int, wanted: Int): Boolean =
+        storedSignature == signature && existingPrograms == wanted
 
     /** Cuántos programas tiene ahora el canal; -1 si el proveedor no contesta (así nunca coincide y se rehace). */
     private fun programCount(context: Context, channelId: Long): Int = runCatching {

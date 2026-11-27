@@ -154,9 +154,14 @@ class SeenIndexTest {
     }
 
     @Test
-    fun `el mismo numero de la misma serie en otra fuente cuenta como visto por aid o por id de serie`() {
-        assertTrue(index.isSeen(eid = 50, aid = 10, seriesId = 0L, number = 3.0))
+    fun `el mismo numero de la misma serie en otra fuente cuenta como visto por id de serie`() {
         assertTrue(index.isSeen(eid = 50, aid = 77, seriesId = 5L, number = 4.0))
+    }
+
+    @Test
+    fun `un aid repetido en otra serie no cuenta como visto`() {
+        assertFalse(index.isSeen(eid = 50, aid = 10, seriesId = 0L, number = 3.0))
+        assertFalse(index.isSeen(eid = 50, aid = 11, seriesId = 6L, number = 4.0))
     }
 
     @Test

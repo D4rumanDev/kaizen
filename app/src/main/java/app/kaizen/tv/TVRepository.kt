@@ -5,6 +5,7 @@ import app.kaizen.pojos.av1.Series
 import app.kaizen.pojos.av1.AiringSeries
 import app.kaizen.pojos.av1.SeriesSummary
 import app.kaizen.source.AnimeSources
+import app.kaizen.source.BestTop
 import app.kaizen.source.Catalog
 import app.kaizen.source.SearchEngine
 import app.kaizen.source.SearchQuery
@@ -16,19 +17,26 @@ import kotlinx.coroutines.withTimeoutOrNull
 object TVRepository {
 
     /**
-     * «Mejores en emisión»: primera página, en emisión y por puntuación, de las fuentes activas. Sale de lo guardado si tiene menos de [BestAiringCache.MAX_AGE]
-     * ; si no hay red o las webs no dan nada, se enseña lo guardado aunque sea viejo.
+     * «Mejores» ([kind]: en emisión o de siempre): el top público de AniList resuelto a una serie por anime ([BestTop]). Guardado una semana por lista; si AniList no responde o tarda
+     * más de [LoadLimits.DATA] se enseña lo guardado aunque sea viejo, y null si no hay nada que enseñar (la sección ofrece reintentar).
      */
-    suspend fun bestAiring(): List<SeriesSummary> {
+    internal suspend fun best(kind: BestTop.Kind): List<SeriesSummary>? {
         val sources = AnimeSources.enabled.map { it.id }
-        val stored = BestAiringCache.load(sources)
-        if (stored != null && BestAiringCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
-        // Tope de tiempo: una web colgada no debe dejar la sección en «cargando»; pasado el tope cuenta como lista incompleta (sale lo guardado, si lo hay).
-        val (fresh, complete) = withTimeoutOrNull(LoadLimits.DATA) { SearchEngine.firstChecked(SearchQuery(airing = true, sort = SortBy.RATING)) } ?: (emptyList<SeriesSummary>() to false)
-        // Una lista parcial (una web falló) o sin las notas de AniList todavía (catálogo sin listo) no se guarda una semana: se enseña, pero lo bueno guardado no se pisa.
-        if (fresh.isEmpty() || !complete || !Catalog.isReady()) return stored?.items ?: fresh
-        BestAiringCache.save(sources, fresh)
-        return fresh
+        val key = "best-" + kind.name.lowercase()
+        val stored = BestCache.load(sources, key)
+        if (stored != null && BestCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
+        val fresh = try {
+            withTimeoutOrNull(LoadLimits.DATA) { BestTop.fromAnilist(kind, sources) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: app.kaizen.source.AnilistUnavailable) {
+            null
+        }
+        if (fresh == null || fresh.cards.isEmpty()) return stored?.items
+        // Un ranking cortado se enseña, pero lo bueno guardado no se pisa una semana con él.
+        if (!fresh.complete) return stored?.items ?: fresh.cards
+        BestCache.save(sources, fresh.cards, key)
+        return fresh.cards
     }
 
     /** Lista paginada de cualquier consulta (directorio, «Mejores en general»). */

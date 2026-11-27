@@ -48,13 +48,43 @@ object ChannelArt {
 
     private fun published(): Set<String> = runCatching { KaizenStore.prefs(PREFS).all.values.flatMap { (it as? Set<*>).orEmpty().filterIsInstance<String>() }.toSet() }.getOrDefault(emptySet())
 
-    /** La imagen guardada de [url] (copia abierta al leer); null si no está o no se puede servir. [servable] es lo publicado (se lee una vez y se pasa si se piden varias). */
-    internal fun cachedFile(context: Context, url: String, servable: Set<String> = published()): File? {
+    /** Solo la copia WebP de [url] (un fichero: no toca la caché de imágenes, que con el arranque en frío tarda mucho en abrirse); null si no está o no se puede servir. */
+    private fun cachedWebp(url: String, servable: Set<String>, stats: Lookup?): File? {
         if (!isServable(url, servable)) return null
-        // El launcher puede pedir una imagen antes de que la app arranque (App.context aún sin asignar): entonces no hay copia WebP que mirar y se sigue por Coil, que espera a la app.
-        runCatching { app.kaizen.commons.CoverPipeline.cached(url) }.getOrNull()?.let { return it }
-        val cache = app.kaizen.App.awaitImageLoader(context).diskCache ?: return null
-        return cache.openSnapshot(url)?.use { snapshot -> snapshot.data.toFile().takeIf { it.isFile && it.length() > 0 } }
+        val start = System.nanoTime()
+        val webp = runCatching { app.kaizen.commons.CoverPipeline.cached(url) }.getOrNull()
+        stats?.webpNs = stats.webpNs + (System.nanoTime() - start)
+        if (webp != null) stats?.viaWebp++
+        return webp
+    }
+
+    /** La imagen guardada de [url] (copia abierta al leer); null si no está o no se puede servir. [servable] es lo publicado (se lee una vez y se pasa si se piden varias). */
+    internal fun cachedFile(context: Context, url: String, servable: Set<String> = published(), stats: Lookup? = null): File? =
+        cachedWebp(url, servable, stats) ?: coilFile(context, url, servable, stats)
+
+    /** La copia en la caché de imágenes de Coil. El launcher puede pedirla antes de que la app arranque (App.context aún sin asignar): Coil espera a la app. */
+    private fun coilFile(context: Context, url: String, servable: Set<String>, stats: Lookup?): File? {
+        if (!isServable(url, servable)) return null
+        val loaderStart = System.nanoTime()
+        val cache = app.kaizen.App.awaitImageLoader(context).diskCache
+        val snapshotStart = System.nanoTime()
+        stats?.loaderNs = stats.loaderNs + (snapshotStart - loaderStart)
+        val file = cache?.openSnapshot(url)?.use { snapshot -> snapshot.data.toFile().takeIf { it.isFile && it.length() > 0 } }
+        stats?.snapshotNs = stats.snapshotNs + (System.nanoTime() - snapshotStart)
+        if (file != null) stats?.viaCoil++ else stats?.notFound++
+        return file
+    }
+
+    /** Cuánto cuesta mirar las miniaturas y por qué camino se resolvió cada una (solo para medir: «Medición» del registro). */
+    internal class Lookup {
+        var viaWebp = 0
+        var viaCoil = 0
+        var notFound = 0
+        var webpNs = 0L
+        var loaderNs = 0L
+        var snapshotNs = 0L
+        private fun ms(ns: Long) = ns / 1_000_000
+        fun describe() = "WebP $viaWebp en ${ms(webpNs)} ms, caché de imágenes $viaCoil (cargador ${ms(loaderNs)} ms, lectura ${ms(snapshotNs)} ms), sin guardar $notFound"
     }
 
     /**
@@ -77,32 +107,43 @@ object ChannelArt {
         urls.asSequence().filter { it.startsWith("https://") }.distinct().filterNot(isCached).toList()
 
     /**
-     * Publica qué imágenes de la fila [kind] se pueden servir (sustituye lo anterior de esa fila) y, con conexión, baja a la vez las que
-     * faltan, cada una con su propio tiempo máximo ([FETCH_TIMEOUT]). Antes se bajaban una a una bloqueando el hilo: con 20 filas, hasta
-     * minutos en una web lenta, con el cerrojo de la sincronización cogido. Un fallo de una imagen no corta las demás.
+     * Publica qué imágenes de la fila [kind] se pueden servir (sustituye lo anterior de esa fila) y mira cuáles hay, sin bajar nada: primero la copia WebP (un
+     * fichero) y, para lo que solo esté en la caché de imágenes de Coil, la pasa a WebP una vez ([app.kaizen.commons.CoverPipeline.adopt]); así la siguiente vez
+     * es también un fichero (con la caché de Coil fría, abrirla costó 9 s por miniatura en la BRAVIA). Lo que no esté en ningún sitio queda en [Published.toFetch]
+     * para [fetchMissing], que se hace después de escribir la fila.
      */
     suspend fun publish(context: Context, kind: String, urls: Collection<String>): Published {
         register(kind, urls)
-        // Lo publicado se lee una vez y cada imagen se mira en el disco una vez (antes, otra más al dárselas al launcher).
         val servable = published()
-        val available = urls.filterTo(HashSet()) { cachedFile(context, it, servable) != null }
-        // «Faltan» cuenta también sin conexión (no se pueden bajar, pero la fila no está al día mientras falten): así no se omite el rehacerla.
-        val todo = missing(urls) { it in available }
-        if (NetworkState.isOffline) return Published(todo.size, available)
-        if (todo.isNotEmpty()) {
-            coroutineScope {
-                todo.map { url ->
-                    // Las filas del launcher son lo que más se mira: caché superior, y por el mismo camino único que las tarjetas.
-                    async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.commons.CoverPipeline.obtain(url, app.kaizen.commons.CoverTier.HOT) } } }
-                }.awaitAll()
-            }
-            todo.filterTo(available) { cachedFile(context, it, servable) != null }
+        val stats = Lookup()
+        val available = urls.filterTo(HashSet()) { cachedWebp(it, servable, stats) != null }
+        for (url in missing(urls) { it in available }) {
+            val file = coilFile(context, url, servable, stats) ?: continue
+            app.kaizen.commons.CoverPipeline.adopt(url, file)
+            available += url
         }
-        return Published(todo.size, available)
+        return Published(missing(urls) { it in available }, available, stats.describe())
     }
 
-    /** Lo que dejó [publish]: cuántas miniaturas faltaban (y se pidieron) y cuáles hay guardadas, para dárselas al launcher sin volver a mirar el disco. */
-    class Published(val missing: Int, private val available: Set<String>) {
+    /**
+     * Baja a la vez las miniaturas de [published] que faltan, cada una con su propio tiempo máximo ([FETCH_TIMEOUT]); un fallo no corta las demás. Sin conexión no hace
+     * nada. Devuelve [published] mismo si no llegó ninguna. Antes se bajaban una a una bloqueando el hilo: con 20 filas, hasta minutos en una web lenta.
+     */
+    suspend fun fetchMissing(published: Published): Published {
+        if (published.toFetch.isEmpty() || NetworkState.isOffline) return published
+        coroutineScope {
+            published.toFetch.map { url ->
+                // Las filas del launcher son lo que más se mira: caché superior, y por el mismo camino único que las tarjetas.
+                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.commons.CoverPipeline.obtain(url, app.kaizen.commons.CoverTier.HOT) } } }
+            }.awaitAll()
+        }
+        val arrived = published.toFetch.filter { runCatching { app.kaizen.commons.CoverPipeline.cached(it) }.getOrNull() != null }
+        if (arrived.isEmpty()) return published
+        return Published(published.toFetch - arrived.toSet(), published.available + arrived, published.detail)
+    }
+
+    /** Lo que dejó [publish]: las miniaturas que aún faltan y cuáles hay guardadas, para dárselas al launcher sin volver a mirar el disco. */
+    class Published(val toFetch: List<String>, internal val available: Set<String>, val detail: String = "") {
         fun forLauncher(context: Context, url: String): String = launcherUrl(context, url) { url in available }
     }
 }
