@@ -4,7 +4,10 @@ package app.kaizen.tv
 
 import android.content.Context
 import android.net.Uri
+import app.kaizen.App
 import app.kaizen.commons.AppErrors
+import app.kaizen.commons.CoverPipeline
+import app.kaizen.commons.CoverTier
 import app.kaizen.commons.KaizenStore
 import app.kaizen.commons.NetworkState
 import app.kaizen.commons.runCatchingCoop
@@ -52,7 +55,7 @@ object ChannelArt {
     private fun cachedWebp(url: String, servable: Set<String>, stats: Lookup?): File? {
         if (!isServable(url, servable)) return null
         val start = System.nanoTime()
-        val webp = runCatching { app.kaizen.commons.CoverPipeline.cached(url) }.getOrNull()
+        val webp = runCatching { CoverPipeline.cached(url) }.getOrNull()
         stats?.webpNs = stats.webpNs + (System.nanoTime() - start)
         if (webp != null) stats?.viaWebp++
         return webp
@@ -66,7 +69,7 @@ object ChannelArt {
     private fun coilFile(context: Context, url: String, servable: Set<String>, stats: Lookup?): File? {
         if (!isServable(url, servable)) return null
         val loaderStart = System.nanoTime()
-        val cache = app.kaizen.App.awaitImageLoader(context).diskCache
+        val cache = App.awaitImageLoader(context).diskCache
         val snapshotStart = System.nanoTime()
         stats?.loaderNs = stats.loaderNs + (snapshotStart - loaderStart)
         val file = cache?.openSnapshot(url)?.use { snapshot -> snapshot.data.toFile().takeIf { it.isFile && it.length() > 0 } }
@@ -108,7 +111,7 @@ object ChannelArt {
 
     /**
      * Publica qué imágenes de la fila [kind] se pueden servir (sustituye lo anterior de esa fila) y mira cuáles hay, sin bajar nada: primero la copia WebP (un
-     * fichero) y, para lo que solo esté en la caché de imágenes de Coil, la pasa a WebP una vez ([app.kaizen.commons.CoverPipeline.adopt]); así la siguiente vez
+     * fichero) y, para lo que solo esté en la caché de imágenes de Coil, la pasa a WebP una vez ([CoverPipeline.adopt]); así la siguiente vez
      * es también un fichero (con la caché de Coil fría, abrirla costó 9 s por miniatura en la BRAVIA). Lo que no esté en ningún sitio queda en [Published.toFetch]
      * para [fetchMissing], que se hace después de escribir la fila.
      */
@@ -119,7 +122,7 @@ object ChannelArt {
         val available = urls.filterTo(HashSet()) { cachedWebp(it, servable, stats) != null }
         for (url in missing(urls) { it in available }) {
             val file = coilFile(context, url, servable, stats) ?: continue
-            app.kaizen.commons.CoverPipeline.adopt(url, file)
+            CoverPipeline.adopt(url, file)
             available += url
         }
         return Published(missing(urls) { it in available }, available, stats.describe())
@@ -134,10 +137,10 @@ object ChannelArt {
         coroutineScope {
             published.toFetch.map { url ->
                 // Las filas del launcher son lo que más se mira: caché superior, y por el mismo camino único que las tarjetas.
-                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { app.kaizen.commons.CoverPipeline.obtain(url, app.kaizen.commons.CoverTier.HOT) } } }
+                async { runCatchingCoop { withTimeoutOrNull(FETCH_TIMEOUT) { CoverPipeline.obtain(url, CoverTier.HOT) } } }
             }.awaitAll()
         }
-        val arrived = published.toFetch.filter { runCatching { app.kaizen.commons.CoverPipeline.cached(it) }.getOrNull() != null }
+        val arrived = published.toFetch.filter { runCatching { CoverPipeline.cached(it) }.getOrNull() != null }
         if (arrived.isEmpty()) return published
         return Published(published.toFetch - arrived.toSet(), published.available + arrived, published.detail)
     }

@@ -27,7 +27,7 @@ internal object BestTop {
         val used = HashSet<Long>()
         return top.mapNotNull { anime ->
             val usable = linksOf[anime.id].orEmpty().filter { it.first in enabled }.distinct().groupBy(seriesOf).filterKeys { it != 0L }
-            val series = usable.entries.filter { it.key !in used }.sortedWith(compareByDescending<Map.Entry<Long, List<Pair<String, String>>>> { it.value.size }.thenBy { it.key }).firstOrNull() ?: return@mapNotNull null
+            val series = usable.entries.filter { it.key !in used }.minWithOrNull(compareByDescending<Map.Entry<Long, List<Pair<String, String>>>> { it.value.size }.thenBy { it.key }) ?: return@mapNotNull null
             val ficha = series.value.minWith(compareBy<Pair<String, String>>({ enabled.indexOf(it.first) }, { it.second.endsWith("-latino") }, { it.second }))
             used += series.key
             Pick(anime, series.key, ficha.first, ficha.second)

@@ -2,6 +2,8 @@ package app.kaizen.tv
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.tvprovider.media.tv.PreviewChannel
@@ -16,11 +18,13 @@ import app.kaizen.commons.RecentsArchive
 import app.kaizen.commons.roundedString
 import app.kaizen.commons.logError
 import app.kaizen.commons.DebugLog
+import app.kaizen.commons.KaizenStore
 import app.kaizen.domain.Library
 import app.kaizen.pojos.av1.RecentEpisode
 import app.kaizen.pojos.av1.Record
 import app.kaizen.source.AnimeSources
 import app.kaizen.source.seriesKeyOf
+import app.kaizen.tv.ui.TVMain
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.sync.Mutex
@@ -57,7 +61,7 @@ object HomeChannels {
 
     /** Abre la ficha de la serie desde fuera de la app: [TVMain] atiende `kaizen://tv/series` (la ficha no está exportada). */
     internal fun seriesIntent(context: Context, url: String): Intent =
-        Intent(Intent.ACTION_VIEW, Uri.Builder().scheme("kaizen").authority("tv").path("/series").appendQueryParameter("url", url).build(), context, app.kaizen.tv.ui.TVMain::class.java)
+        Intent(Intent.ACTION_VIEW, Uri.Builder().scheme("kaizen").authority("tv").path("/series").appendQueryParameter("url", url).build(), context, TVMain::class.java)
             .addFlags(OPEN_FLAGS)
 
     /** Vuelca «Seguir viendo» a Watch Next; lo que ya no está en curso se quita. Hilo de fondo. */
@@ -98,7 +102,7 @@ object HomeChannels {
     suspend fun syncRecents(context: Context) = lock.withLock {
         val started = System.nanoTime()
         val helper = PreviewChannelHelper(context)
-        val prefs = app.kaizen.commons.KaizenStore.prefs(PREFS)
+        val prefs = KaizenStore.prefs(PREFS)
         var channelId = prefs.getLong(KEY_CHANNEL, -1L)
         // Con otra versión del logotipo se actualiza el canal ya creado (borrarlo y recrearlo perdería su visibilidad en inicio).
         if (channelId >= 0 && prefs.getInt(KEY_LOGO, 0) != LOGO_VERSION && helper.getPreviewChannel(channelId) != null) {
@@ -152,7 +156,7 @@ object HomeChannels {
     }.getOrNull() ?: -1
 
     /** Quita los programas del canal y publica los de [recents] en una sola operación al proveedor (antes, 20 llamadas seguidas); si no los acepta todos, vuelve al camino de uno en uno. */
-    private fun rewritePrograms(context: Context, helper: PreviewChannelHelper, prefs: android.content.SharedPreferences, channelId: Long, recents: List<RecentEpisode>, art: ChannelArt.Published) {
+    private fun rewritePrograms(context: Context, helper: PreviewChannelHelper, prefs: SharedPreferences, channelId: Long, recents: List<RecentEpisode>, art: ChannelArt.Published) {
         context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(channelId), null, null)
         val programs = recents.map { recent ->
             PreviewProgram.Builder()
@@ -183,7 +187,7 @@ object HomeChannels {
 
     private fun channelBuilder(context: Context) = PreviewChannel.Builder()
         .setDisplayName(context.getString(R.string.ui_capitulos_recientes))
-        .setAppLinkIntent(Intent(context, app.kaizen.tv.ui.TVMain::class.java).addFlags(OPEN_FLAGS))
+        .setAppLinkIntent(Intent(context, TVMain::class.java).addFlags(OPEN_FLAGS))
         // El proveedor de TV rechaza un canal sin logotipo.
         .setLogo(logo(context))
 
@@ -205,9 +209,9 @@ object HomeChannels {
     @OptIn(FlowPreview::class)
     suspend fun keepInSync(context: Context) {
         // Sin TvProvider (dispositivo sin Leanback) no hay filas que mantener.
-        if (!context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) return
         // Los recientes los renueva RecentsWork; aquí solo una vez al arrancar.
-        runCatchingCoop { app.kaizen.commons.DebugLog.timed("Arranque", "Filas de la pantalla de inicio de Android TV actualizadas") { syncRecents(context) } }.onFailure(::logError)
+        runCatchingCoop { DebugLog.timed("Arranque", "Filas de la pantalla de inicio de Android TV actualizadas") { syncRecents(context) } }.onFailure(::logError)
         KaizenProgress.changes.debounce(2.seconds).collect {
             runCatchingCoop { syncWatchNext(context) }.onFailure(::logError)
         }
