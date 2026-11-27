@@ -274,12 +274,16 @@ class AdbControlReceiver : BroadcastReceiver() {
         val name = intent.getStringExtra("file").orEmpty()
         val file = backupFile(name)
         if (file == null || file.length() > MAX_FILE_BYTES) return fail("Fichero no válido: $name")
-        val groups = JSONObject(file.readText()).getJSONArray("groups")
-        if (groups.length() > MAX_GROUPS) return fail("Demasiados grupos: ${groups.length()}")
-        // Se lee y se valida todo el fichero antes de tocar nada: una entrada mal formada no deja el trabajo a medias.
-        val parsed = (0 until groups.length()).map { g ->
-            val members = groups.getJSONArray(g)
-            (0 until members.length()).map { members.getJSONArray(it).let { f -> f.getString(0) to f.getString(1) } }
+        // Se lee y se valida todo el fichero antes de tocar nada: una entrada mal formada no deja el trabajo a medias ni tira la app.
+        val parsed = try {
+            val groups = JSONObject(file.readText()).getJSONArray("groups")
+            if (groups.length() > MAX_GROUPS) return fail("Demasiados grupos: ${groups.length()}")
+            (0 until groups.length()).map { g ->
+                val members = groups.getJSONArray(g)
+                (0 until members.length()).map { members.getJSONArray(it).let { f -> f.getString(0) to f.getString(1) } }
+            }
+        } catch (e: org.json.JSONException) {
+            return fail("Fichero mal formado: $name")
         }
         val oversized = parsed.count { it.size > MAX_GROUP_SIZE }
         val moved = parsed.count { it.size <= MAX_GROUP_SIZE && SeriesLedger.detachGroup(it) != null }

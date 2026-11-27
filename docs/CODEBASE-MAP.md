@@ -91,8 +91,9 @@ Fuentes empaquetadas con firma ECDSA:
 ## 5. Herramientas del Proyecto (`tools/`)
 
 Ver la guía exhaustiva en [tools/README.md](../tools/README.md):
-- **`tv.js`**: Operaciones completas en el tvbox (`deploy`, `open`, `logs`, `logcat`, `awake`, `health`, `backup`, `status`, `export-fichas`, `fill-fichas`, `ficha`, `series`, `settings`, `setting`, `sources`, `anilist-auto`, `store`, `calls`, `warp`, `errors`, `bypass`, `laliga`, etc.).
+- **`tv.js`**: Operaciones en las teles por ADB (instalar, abrir, registros, copias de seguridad, salud, ajustes). La lista de órdenes está en el README de herramientas.
 - **`ship.js`**: Publicación controlada en 2 fases (`check`, `publish`, `docs`, `push`) con verificación obligatoria de secretos, pruebas y compilación.
+- **`release.js`**: Publicación completa en dos órdenes (`prepare`, `ship`): comprobar, commit y push, release de GitHub e instalación; la auditoría independiente sigue siendo manual.
 - **`bench.js`**: Banco de pruebas de arranque en frío y consumo de CPU en la TV.
 - **`make-catalog-seed.py` / `make-links-seed.py`**: Generación y firma de semillas portables del catálogo y de enlaces con AniList.
 - **`sign-sources.sh`**: Firma ECDSA P-256 del manifiesto de fuentes.

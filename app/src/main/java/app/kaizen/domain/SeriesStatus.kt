@@ -144,6 +144,13 @@ object SeriesStatuses {
         else -> null
     }
 
+    /**
+     * Si la ficha debe pasar sola a «Completada»: serie finalizada, con capítulos y todos vistos, **y sin ninguno a medias**. El capítulo cuenta como visto al empezar a reproducirlo,
+     * así que una película (o el último capítulo) a medias ya es «todo visto»: sin esta condición quedaba «Completada» a los segundos de empezarla.
+     */
+    fun shouldAutoComplete(allSeen: Boolean, airing: Boolean, hasEpisodes: Boolean, watchInProgress: Boolean): Boolean =
+        allSeen && !airing && hasEpisodes && !watchInProgress
+
     /** Al desmarcar un capítulo de una serie «Completada»: ya no está entera vista, vuelve a «Viendo». */
     @Synchronized
     fun autoReopen(name: String, source: String, slug: String, aid: Int) {

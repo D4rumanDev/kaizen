@@ -24,7 +24,7 @@ object TVRepository {
      */
     internal suspend fun best(kind: BestTop.Kind): List<SeriesSummary>? {
         val sources = AnimeSources.enabled.map { it.id }
-        val key = "best-" + kind.name.lowercase()
+        val key = BestCache.keyFor(kind)
         val stored = BestCache.load(sources, key)
         if (stored != null && BestCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
         val fresh = try {

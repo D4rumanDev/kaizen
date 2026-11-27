@@ -179,3 +179,22 @@ class OnlyActiveTest {
         assertTrue(only(listOf(original), setOf("animeav1", "jkanime")).single() === original)
     }
 }
+
+/** Una serie con un capítulo a medias no se completa sola: el capítulo cuenta como visto al empezar, pero la película aún se está viendo. */
+class ShouldAutoCompleteTest {
+    private val complete = SeriesStatuses::shouldAutoComplete
+
+    @Test fun `finalizada con todo visto y nada a medias se completa`() {
+        assertTrue(complete(true, false, true, false))
+    }
+
+    @Test fun `una pelicula a medias no se completa`() {
+        assertFalse(complete(true, false, true, true))
+    }
+
+    @Test fun `en emision sin capitulos o sin todo visto no se completa`() {
+        assertFalse(complete(true, true, true, false))
+        assertFalse(complete(true, false, false, false))
+        assertFalse(complete(false, false, true, false))
+    }
+}

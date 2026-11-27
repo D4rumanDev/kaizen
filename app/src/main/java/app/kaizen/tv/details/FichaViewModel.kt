@@ -8,7 +8,9 @@ import app.kaizen.commons.runCatchingCoop
 import app.kaizen.tv.LoadLimits
 import kotlinx.coroutines.withTimeoutOrNull
 import app.kaizen.domain.WatchState
+import app.kaizen.commons.KaizenProgress
 import app.kaizen.domain.SeriesStatuses
+import app.kaizen.source.seriesIdOf
 import app.kaizen.pojos.av1.Chapter
 import app.kaizen.pojos.av1.RELATION_PREQUEL
 import app.kaizen.pojos.av1.RELATION_SEQUEL
@@ -150,7 +152,10 @@ class FichaViewModel(private val url: String) : ViewModel() {
                 val latest = _state.value as? State.Ready ?: return@withLock
                 // Serie finalizada (sin día de emisión ni en el calendario) y con todo visto: «Completada» (ver SeriesStatuses.autoCompleted).
                 with(latest.series) {
-                    if (watch.allSeen && !airing && latest.episodes.isNotEmpty()) SeriesStatuses.autoCompleted(name, source, slug, aid)
+                    // Un capítulo a medias (reproducción en curso de esta serie) aún no la completa: se completa al terminarlo.
+                    val seriesId = seriesIdOf(source, slug)
+                    val inProgress = KaizenProgress.inProgress().keys.any { it.seriesId == seriesId }
+                    if (SeriesStatuses.shouldAutoComplete(watch.allSeen, airing, latest.episodes.isNotEmpty(), inProgress)) SeriesStatuses.autoCompleted(name, source, slug, aid)
                 }
                 _state.value = State.Ready(latest.series, latest.episodes, latest.similar, watch, latest.version + 1, latest.anilist)
             }

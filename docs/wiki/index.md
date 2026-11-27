@@ -6,7 +6,7 @@ tags:
   - memory
   - android-tv
   - kaizen
-updated: 2026-11-19
+updated: 2026-11-27
 ---
 
 # Base de conocimiento de Kaizen (`docs/wiki`)
@@ -53,6 +53,7 @@ Ver el manual completo en [Herramientas de Kaizen (`tools/README.md`)](../../too
 
 - **[tv.js](../../tools/README.md#1-control-y-despliegue-en-android-tv-tvjs)**: Control directo del tvbox por ADB (instalación segura con `-r -f`, arranque, recolección de `debug.jsonl` y logcat con `logs`, modo `awake`, informes `health`, copias `backup` y consultas por ADB).
 - **[ship.js](../../tools/README.md#2-publicación-y-auditoría-de-código-shipjs)**: Ciclo formal de publicación (`check` para seguridad y pruebas, `publish` verificado contra SHA auditado, `docs` para cierre de documentación).
+- **[release.js](../../tools/README.md#releasejs)**: Publicación completa en dos órdenes: comprobar, commit y push, release de GitHub e instalación en las teles (la auditoría la hace otra instancia).
 - **[bench.js](../../tools/README.md#3-medición-de-rendimiento-y-arranque-benchjs)**: Medición científica y repetible de tiempos de arranque en frío y consumo de CPU en la TV.
 - **[make-catalog-seed.py](../../tools/README.md#make-catalog-seedpy) / [make-links-seed.py](../../tools/README.md#make-links-seedpy)**: Generación y firma ECDSA P-256 de semillas portables del catálogo unificado y de enlaces con AniList.
 - **[sign-sources.sh](../../tools/README.md#sign-sourcessh)**: Firma criptográfica del manifiesto `index.json` de fuentes.

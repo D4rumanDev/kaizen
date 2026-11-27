@@ -11,7 +11,7 @@ import kotlin.time.Duration.Companion.days
 
 /**
  * **Catálogo unificado descargable**, para que una instalación limpia no recorra las fuentes (cientos de peticiones) para tener el catálogo. Se publica junto a las fuentes por
- * fichero: `catalogo-unificado.json.gz` y su firma `catalogo-unificado.sig` en el repositorio `kaizen-sources`, con la misma clave ([SpecSources.PUBLIC_KEY]).
+ * fichero: `catalogo-unificado.json.gz` y su firma `catalogo-unificado.sig` en el repositorio `kaizen-sources`, con la misma clave ([app.kaizen.source.spec.SpecSources.PUBLIC_KEY]).
  *
  * El fichero es **portable**: no lleva ningún id local (los ids de serie de una instalación no valen en otra). Cada serie va con su nombre, año, nota y las fichas
  * (fuente + slug) que son la misma serie; quien lo lee asigna sus propios ids al aplicarlo. Lo genera `tools/make-catalog-seed.py` a partir de la fotografía del catálogo

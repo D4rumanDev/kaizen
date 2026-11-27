@@ -44,8 +44,8 @@ abstract class UserRowsDao : UserRows {
         for ((source, slug) in fichas) if (moveFavorite(source, slug, seriesId) > 0) break
     }
 
-    /** Favoritos que no pueden seguir a su ficha porque su serie nueva ya tiene otro: al borrarse se anotan para poder recuperarlos. */
-    @Query("SELECT source || ':' || slug FROM FavoriteAV1 WHERE EXISTS (SELECT 1 FROM Ficha m WHERE m.fuente = FavoriteAV1.source AND m.slug = FavoriteAV1.slug AND m.seriesId != FavoriteAV1.seriesId)")
+    /** Favoritos que no pueden seguir a su ficha porque su serie nueva ya tiene otro: al borrarse se anotan (con su categoría) para poder recuperarlos. */
+    @Query("SELECT source || ':' || slug || ' (' || category || ')' FROM FavoriteAV1 WHERE EXISTS (SELECT 1 FROM Ficha m WHERE m.fuente = FavoriteAV1.source AND m.slug = FavoriteAV1.slug AND m.seriesId != FavoriteAV1.seriesId)")
     abstract fun favoritesAboutToBeDropped(): List<String>
 
     @Query(

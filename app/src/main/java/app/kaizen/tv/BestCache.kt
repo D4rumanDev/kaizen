@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import app.kaizen.commons.KaizenStore
 import app.kaizen.commons.logError
 import app.kaizen.pojos.av1.SeriesSummary
+import app.kaizen.source.BestTop
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import kotlin.time.Duration
@@ -18,6 +19,9 @@ import kotlin.time.Duration.Companion.milliseconds
 internal object BestCache {
     /** Cuánto vale lo guardado antes de volver a pedirlo a las webs. */
     val MAX_AGE: Duration = 7.days
+
+    /** La clave con que se guarda la lista de [kind]: una por lista, para que «de siempre» y «en emisión» no se pisen. */
+    fun keyFor(kind: BestTop.Kind): String = "best-" + kind.name.lowercase()
 
     // Nombres fijos: el APK se ofusca (R8) y el JSON guardado debe sobrevivir a las actualizaciones.
     @Keep

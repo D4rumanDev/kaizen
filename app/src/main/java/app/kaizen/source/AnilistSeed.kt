@@ -11,7 +11,7 @@ import java.util.zip.GZIPInputStream
 
 /**
  * Enlaces de partida con AniList para una instalación limpia: el repositorio de fuentes (`enlaces-anilist.json.gz` y su firma `enlaces-anilist.sig`, con la misma clave que las
- * fuentes por fichero, [SpecSources.PUBLIC_KEY]) lleva los enlaces automáticos y aplicados que ya se emparejaron, y la app los guarda al empezar en lugar de buscar cada ficha
+ * fuentes por fichero, [app.kaizen.source.spec.SpecSources.PUBLIC_KEY]) lleva los enlaces automáticos y aplicados que ya se emparejaron, y la app los guarda al empezar en lugar de buscar cada ficha
  * en AniList. Cuidados:
  *  - **Firmado**: sin la firma de la clave privada no se usa nada (unos enlaces falsos mezclarían series sin avisar).
  *  - **Solo con la tabla de enlaces vacía**: no hace nada en una instalación que ya empareja, y lo guarda con `insertIfAbsent` (nunca pisa un enlace, ni uno del usuario).

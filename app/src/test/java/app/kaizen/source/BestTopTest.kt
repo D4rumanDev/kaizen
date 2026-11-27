@@ -88,6 +88,47 @@ class BestTopTest {
     }
 
     @Test
+    fun `en emision la consulta pide solo los que se emiten y de siempre no`() {
+        val queries = ArrayList<String>()
+        val client = AnilistClient { body -> queries += body; """{"data":{"Page":{"media":[]}}}""" }
+        runBlocking { client.top(10, 10_000, airing = true); client.top(10, 20_000, airing = false) }
+        assertTrue(queries[0].contains("status: RELEASING"))
+        assertFalse(queries[1].contains("status: RELEASING"))
+    }
+
+    @Test
+    fun `un top corto de verdad (AniList no tiene mas) sale completo`() {
+        var page = 0
+        val client = AnilistClient {
+            page++
+            if (page == 1) """{"data":{"Page":{"media":[{"id":1,"title":{"romaji":"A"},"averageScore":90,"seasonYear":2024},{"id":2,"title":{"romaji":"B"},"averageScore":80,"seasonYear":2025}]}}}"""
+            else """{"data":{"Page":{"media":[]}}}"""
+        }
+        val result = runBlocking { client.top(100, 10_000, airing = true) }
+        assertEquals(listOf(1L, 2L), result.items.map { it.id })
+        assertTrue(result.complete)
+    }
+
+    @Test
+    fun `un valor que no es numerico no tira la lista, el id malo se descarta y la nota mala queda en null`() {
+        val client = AnilistClient {
+            """{"data":{"Page":{"media":[{"id":"abc","title":{"romaji":"Malo"}},{"id":2,"title":{"romaji":"Dos"},"averageScore":"x","seasonYear":2020},{"id":3,"title":{"romaji":"Tres"},"averageScore":70}]}}}"""
+        }
+        val result = runBlocking { client.top(2, 1) }.items
+        assertEquals(listOf(2L, 3L), result.map { it.id })
+        assertEquals(null, result[0].score)
+        assertEquals(2020, result[0].year)
+        assertEquals(70, result[1].score)
+    }
+
+    @Test
+    fun `cada lista de Mejores se guarda con su clave`() {
+        val keys = BestTop.Kind.entries.map { app.kaizen.tv.BestCache.keyFor(it) }
+        assertEquals(BestTop.Kind.entries.size, keys.toSet().size)
+        assertEquals("best-airing", app.kaizen.tv.BestCache.keyFor(BestTop.Kind.AIRING))
+    }
+
+    @Test
     fun `la lista se construye con la nota de AniList entre 0 y 10 y solo con enlaces aplicados`() {
         val api = object : AnilistApi {
             override suspend fun search(titles: List<String>) = emptyList<List<AnilistMatcher.Candidate>>()
