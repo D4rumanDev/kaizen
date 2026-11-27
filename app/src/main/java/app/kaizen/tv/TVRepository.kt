@@ -5,12 +5,14 @@ import app.kaizen.pojos.av1.Series
 import app.kaizen.pojos.av1.AiringSeries
 import app.kaizen.pojos.av1.SeriesSummary
 import app.kaizen.source.AnimeSources
+import app.kaizen.commons.logError
+import app.kaizen.source.AnilistUnavailable
 import app.kaizen.source.BestTop
-import app.kaizen.source.Catalog
 import app.kaizen.source.SearchEngine
 import app.kaizen.source.SearchQuery
 import app.kaizen.source.SortBy
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Fachada de la UI de TV sobre las fuentes activas: todas las listas pasan por [SearchEngine]. */
@@ -27,9 +29,13 @@ object TVRepository {
         if (stored != null && BestCache.isFresh(stored.at, System.currentTimeMillis())) return stored.items
         val fresh = try {
             withTimeoutOrNull(LoadLimits.DATA) { BestTop.fromAnilist(kind, sources) }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
-        } catch (e: app.kaizen.source.AnilistUnavailable) {
+        } catch (e: AnilistUnavailable) {
+            null
+        } catch (e: Exception) {
+            // Otro fallo no deja la sección en «Reintentar» si hay algo guardado: se anota y se enseña lo guardado.
+            logError(e)
             null
         }
         if (fresh == null || fresh.cards.isEmpty()) return stored?.items

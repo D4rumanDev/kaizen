@@ -103,8 +103,8 @@ internal class AnilistClient(private val post: suspend (String) -> String) : Ani
             if (media.size() == 0) break
             media.mapNotNullTo(out) { element ->
                 val m = element.asObjectOrNull() ?: return@mapNotNullTo null
-                val id = m.get("id")?.takeIf { it.isJsonPrimitive }?.asLong ?: return@mapNotNullTo null
-                AnilistTop(id, m.get("title").asObjectOrNull()?.string("romaji").orEmpty(), m.get("averageScore")?.takeIf { it.isJsonPrimitive }?.asInt, m.get("seasonYear")?.takeIf { it.isJsonPrimitive }?.asInt)
+                val id = m.long("id") ?: return@mapNotNullTo null
+                AnilistTop(id, m.get("title").asObjectOrNull()?.string("romaji").orEmpty(), m.int("averageScore"), m.int("seasonYear"))
             }
             page++
         }
@@ -116,7 +116,7 @@ internal class AnilistClient(private val post: suspend (String) -> String) : Ani
         val variables = JsonObject().also { it.addProperty("id", id) }
         val media = request("query (${'$'}id: Int) { Media(id: ${'$'}id, type: ANIME) { trailer { id site } } }", variables)?.get("Media").asObjectOrNull() ?: return null
         val trailer = media.get("trailer").asObjectOrNull() ?: return null
-        fun text(key: String) = trailer.get(key)?.takeIf { it.isJsonPrimitive }?.asString
+        fun text(key: String) = trailer.string(key)
         return text("site") to text("id")
     }
 
@@ -129,24 +129,24 @@ internal class AnilistClient(private val post: suspend (String) -> String) : Ani
 
     private fun JsonArray?.candidates(): List<AnilistMatcher.Candidate> = orEmpty().mapNotNull { element ->
         val media = element.asObjectOrNull() ?: return@mapNotNull null
-        val id = media.get("id")?.takeIf { it.isJsonPrimitive }?.asLong ?: return@mapNotNull null
+        val id = media.long("id") ?: return@mapNotNull null
         val title = media.get("title").asObjectOrNull()
         AnilistMatcher.Candidate(
             id, media.string("format"), title?.string("romaji"), title?.string("english"), title?.string("native"),
             media.get("synonyms")?.takeIf { it.isJsonArray }?.asJsonArray.orEmpty().mapNotNull { it.takeIf { s -> s.isJsonPrimitive }?.asString },
-            media.get("seasonYear")?.takeIf { it.isJsonPrimitive }?.asInt ?: media.get("startDate").asObjectOrNull()?.get("year")?.takeIf { it.isJsonPrimitive }?.asInt,
-            media.get("episodes")?.takeIf { it.isJsonPrimitive }?.asInt, media.get("idMal")?.takeIf { it.isJsonPrimitive }?.asLong
+            media.int("seasonYear") ?: media.get("startDate").asObjectOrNull()?.int("year"),
+            media.int("episodes"), media.long("idMal")
         )
     }
 
     private fun raw(media: JsonObject): AnilistFichaRaw? {
-        val id = media.get("id")?.takeIf { it.isJsonPrimitive }?.asLong ?: return null
+        val id = media.long("id") ?: return null
         val title = media.get("title").asObjectOrNull()
         return AnilistFichaRaw(
-            id, media.get("idMal")?.takeIf { it.isJsonPrimitive }?.asLong, media.toString(),
+            id, media.long("idMal"), media.toString(),
             title?.string("romaji"), title?.string("english"), title?.string("native"),
-            media.get("seasonYear")?.takeIf { it.isJsonPrimitive }?.asInt ?: media.get("startDate").asObjectOrNull()?.get("year")?.takeIf { it.isJsonPrimitive }?.asInt,
-            media.string("format"), media.get("averageScore")?.takeIf { it.isJsonPrimitive }?.asInt, media.string("status")
+            media.int("seasonYear") ?: media.get("startDate").asObjectOrNull()?.int("year"),
+            media.string("format"), media.int("averageScore"), media.string("status")
         )
     }
 
