@@ -1140,3 +1140,15 @@ Al unificar la documentación, los párrafos fechados de §3.G de `architecture.
 - **Plan** en `backups/operacion-limpieza-uniones-2026-11-27/plan.md`. Auditoría independiente del plan v1: NO APROBADO (D3 por ADB imposible: los ajustes de copias no están en `AdbSettings` a propósito; la poda del NAS conserva las N más recientes, que son las malas; la sincronización reintroduciría las uniones; riesgo de lápidas al cambiar la ficha representante de una serie).
 - **Riesgo de lápidas (estimación offline, sin probar en la TV):** al separar, la clave de sincronización de una serie cambia si su ficha representante pasa a otra serie: BRAVIA, 22 series (20 de 300 favoritos y 264 de 6.725 capítulos vistos afectados); Shield, 7 series (7 y 78). Por debajo del tope «masivo» (50 %), así que se emitirían lápidas hacia la otra tele.
 - **Arreglo 6.2.20:** tras `SPLIT`, `SyncManager.rebase()` guarda el estado de la sincronización sin base (`Removals.rebased`): la próxima sincronización no calcula «quitados aquí» ni aplica lápidas ajenas, conserva las lápidas propias. Con dos pruebas (la función y el efecto con `Removals.step`).
+
+## 2026-11-27 (noche): limpieza de uniones malas en BRAVIA y Shield
+
+- SPLIT con la 6.2.20 (`backups/operacion-limpieza-uniones-2026-11-27/`): BRAVIA 56 de 56 grupos (el primer intento dio ANR a medias, 42 hechos; se lanzaron los 14 restantes con `split-bravia-restante.json`), Shield 24 de 24. Comprobado con copias nuevas (`tv-2026-11-27-2124` y `-2126`): ninguna ficha cambió fuera de la lista, favoritos, vistos y en curso intactos, `audit.py groups` 0 sospechosos en las dos.
+- El SPLIT no escribe «Catálogo reagrupado» (solo el arranque); se dio por terminado con la app a 0 % de CPU. Con la app ocupada en el arranque el receptor puede dar ANR: lanzar el SPLIT con la app tranquila.
+- `sync_auto` otra vez en `true` en las dos. BRAVIA sincronizó bien (descartó las 18 uniones del estado viejo de la Shield, sin elementos quitados). La Shield no llegó al NAS (SmbException al NAS, NAS en copia de seguridad): pendiente sincronizarla y comprobar `nas-despues-*`.
+- En el árbol, sin versión: ajustes de copias y carpeta de red por ADB (`smb_*`, `copias_*`, `estadisticas_dias`).
+
+## 2026-11-28: 6.2.21 (versionCode 264), ajustes de copias por ADB
+
+- `AdbSettings` añade `smb_url` (valida `smb://`, sin usuario ni clave dentro), `smb_usuario`, `smb_auto`, `smb_descubrir`, `smb_copias`, `copias_dias`, `copias_maximo` y `estadisticas_dias`. La contraseña de la carpeta de red y la de la sincronización siguen fuera (no deben quedar en el historial de una consola). Bajar días o máximo borra copias viejas en la siguiente limpieza, igual que desde el menú.
+- Pruebas: los nombres están en la lista, ninguno lleva contraseña, y la validación de `smb_url`.

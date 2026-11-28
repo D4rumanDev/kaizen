@@ -36,7 +36,7 @@ class AdbSetting(
 /**
  * Los ajustes de usuario que el control por ADB puede tocar. Quedan fuera, a propósito: «Control por ADB» (no se abre ni se cierra la puerta
  * por la propia puerta), los que activan trabajo en segundo plano con efectos (emparejado con AniList, relleno de fichas: tienen su botón y su
- * acción), los que al bajarlos borran datos antiguos sin remedio (días de estadísticas, días y máximo de copias: solo desde el menú, que lo avisa), el orden de botones y secciones, y todo el estado interno (migraciones, estados de series, copia aceptada).
+ * acción), la contraseña de la carpeta de red y de la sincronización (no deben quedar en el historial de una consola), el orden de botones y secciones, y todo el estado interno (migraciones, estados de series, copia aceptada).
  */
 object AdbSettings {
     private fun fmt(value: Float) = if (value % 1f == 0f) value.toInt().toString() else value.toString()
@@ -88,6 +88,16 @@ object AdbSettings {
             AdbSetting("sync_url", AdbSetting.Kind.TEXT, emptyList(), { KaizenSettings.syncUrl.orEmpty() }, { app.kaizen.commons.sync.SyncManager.setUrl(it) },
                 validate = { v -> if (v.isBlank() || app.kaizen.source.spec.RepoConfig.normalizeUrl(v) != null) null else "URL no válida (https, sin usuario ni ? ni #)" }),
             AdbSetting("sync_usuario", AdbSetting.Kind.TEXT, emptyList(), { KaizenSettings.syncUser.orEmpty() }, { KaizenSettings.syncUser = it.ifBlank { null } }),
+            // Copias: la carpeta de red (la contraseña solo desde el menú) y cuánto se guarda. Bajar los días o el máximo borra las copias más viejas en la siguiente limpieza.
+            AdbSetting("smb_url", AdbSetting.Kind.TEXT, emptyList(), { KaizenSettings.smbUrl.orEmpty() }, { KaizenSettings.smbUrl = it.ifBlank { null } },
+                validate = { v -> if (v.isBlank() || (v.startsWith("smb://", ignoreCase = true) && v.length <= 200 && '@' !in v && v.none { it.isWhitespace() || it == '?' || it == '#' })) null else "dirección no válida (smb://servidor/recurso/carpeta, sin usuario ni clave)" }),
+            AdbSetting("smb_usuario", AdbSetting.Kind.TEXT, emptyList(), { KaizenSettings.smbUser.orEmpty() }, { KaizenSettings.smbUser = it.ifBlank { null } }),
+            bool("smb_auto", KaizenSettings::smbAuto),
+            bool("smb_descubrir", KaizenSettings::smbDiscovery),
+            ints("smb_copias", KaizenSettings.SMB_KEEP_OPTIONS, KaizenSettings::smbKeep),
+            ints("copias_dias", KaizenSettings.BACKUP_DAYS_OPTIONS, KaizenSettings::backupDays),
+            ints("copias_maximo", KaizenSettings.BACKUP_FILES_OPTIONS, KaizenSettings::backupFiles),
+            ints("estadisticas_dias", KaizenSettings.STATS_DAYS_OPTIONS, KaizenSettings::statsDays),
             // Interfaz (los de tamaño se ven al reabrir la app)
             floats("tamano_interfaz", KaizenSettings.UI_SCALE_OPTIONS, KaizenSettings::uiScale),
             bool("ajustar_pantalla", KaizenSettings::autoFit),

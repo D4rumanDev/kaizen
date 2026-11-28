@@ -52,9 +52,20 @@ class AdbSettingsTest {
     }
 
     @Test
-    fun `lo que al bajarlo borra datos antiguos no se toca por ADB`() {
+    fun `las copias y la carpeta de red se tocan por ADB pero sin contrasenas`() {
         val names = AdbSettings.all.map { it.name }.toSet()
-        listOf("estadisticas_dias", "copias_dias", "copias_maximo").forEach { assertTrue("no debe estar: $it", it !in names) }
+        listOf("smb_url", "smb_usuario", "smb_auto", "smb_descubrir", "smb_copias", "copias_dias", "copias_maximo", "estadisticas_dias").forEach { assertTrue(it, it in names) }
+        assertTrue(names.none { "clave_smb" in it || "smb_clave" in it || "contrasena" in it || "password" in it })
+    }
+
+    @Test
+    fun `la direccion de red no admite usuario ni clave dentro`() {
+        val url = AdbSettings.find("smb_url")!!
+        assertNull(url.problem("smb://nas/video/copias"))
+        assertNull(url.problem(""))
+        assertNotNull(url.problem("smb://usuario:clave@nas/video"))
+        assertNotNull(url.problem("http://nas/video"))
+        assertNotNull(url.problem("smb://nas/a b"))
     }
 
     @Test
