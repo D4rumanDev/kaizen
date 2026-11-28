@@ -1152,3 +1152,10 @@ Al unificar la documentación, los párrafos fechados de §3.G de `architecture.
 
 - `AdbSettings` añade `smb_url` (valida `smb://`, sin usuario ni clave dentro), `smb_usuario`, `smb_auto`, `smb_descubrir`, `smb_copias`, `copias_dias`, `copias_maximo` y `estadisticas_dias`. La contraseña de la carpeta de red y la de la sincronización siguen fuera (no deben quedar en el historial de una consola). Bajar días o máximo borra copias viejas en la siguiente limpieza, igual que desde el menú.
 - Pruebas: los nombres están en la lista, ninguno lleva contraseña, y la validación de `smb_url`.
+
+## 2026-11-28: 6.2.22 (versionCode 265), tableta y orden de Recientes
+
+- **Control táctil de los dos paneles (`tv/ui/EdgeSwipes.kt`):** en la tableta no hay foco de mando, así que el menú de la izquierda y el panel de orden de la derecha no se podían abrir. Ahora un deslizamiento desde el borde izquierdo (96 dp, cubre la franja del menú cerrado) abre el menú y desde el borde derecho (72 dp) abre el panel; hacia el lado contrario, estando abiertos, los cierran. Solo observa los toques en la pasada inicial sin consumirlos: tarjetas, listas y botones no cambian. Las franjas dejan libre el borde exterior que usa el gesto de «atrás» del sistema. Sin probar en una tableta.
+- **El orden y el filtro de cada sección se guardan (`KaizenSettings.sortChoice`):** estaban en `rememberSaveable` y se perdían al cerrar la app (por eso «hoy» salía distinto de «ayer»). El orden de los datos de Recientes ya tenía desempate fijo (`newestFirst`, ver arriba). Si aun así cambia con la misma elección guardada, el origen es otro y hay que reproducirlo.
+- La sección «Últimos vistos» del menú se llama «Vistos».
+- Pruebas: `SortStateTest` (ida y vuelta del texto guardado y textos estropeados).

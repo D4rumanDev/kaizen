@@ -96,7 +96,7 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
     val statuses by SeriesStatuses.all.collectAsStateWithLifecycle()
     // Un orden por sección ordenable: se conserva al cambiar de sección y al girar la pantalla.
     val sortIds = remember { MainSections.CONFIGURABLE_ROWS.map { it.first } - MainSections.SOURCES }
-    val sortStates = sortIds.associateWith { rememberListSort() }
+    val sortStates = sortIds.associateWith { rememberSavedListSort(it) }
     // Ligados a la sección: al cambiar de sección empiezan cerrado y sin armar, sin carreras con el foco de la sección nueva.
     var sidePanelOpen by remember(current) { mutableStateOf(false) }
     var stripFocused by remember { mutableStateOf(false) }
@@ -176,6 +176,13 @@ fun LandingScreen(model: MainViewModel, activity: ComponentActivity, requested: 
 
     CompositionLocalProvider(LocalFavorites provides favorites, LocalStatuses provides statuses, LocalSectionSort provides sortStates[current], LocalOnCardFocus provides armPanel) {
         NavigationDrawer(
+            // Tableta: sin mando no hay foco, así que los dos paneles se abren y se cierran deslizando desde el borde (ver [edgeSwipes]).
+            modifier = Modifier.edgeSwipes(
+                onOpenMenu = { runCatching { menuTarget()?.requestFocus() } },
+                onOpenPanel = { if (sortStates[current] != null && !stripClosing) sidePanelOpen = true },
+                onCloseMenu = { if (menuFocused) runCatching { content.requestFocus() } },
+                onClosePanel = { if (sidePanelOpen) closeSidePanel() }
+            ),
             drawerContent = {
                 KaizenSidebar(headers, current, health, headerRequesters, onMenuFocus = { menuFocused = it },
                     onFocusedHeader = { focusedHeader = it }, onSelect = { selected = it; runCatching { content.requestFocus() } })

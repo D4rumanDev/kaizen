@@ -24,7 +24,7 @@ object MainSections {
         HOME to "Inicio",
         FAVORITES to "Favoritos",
         STATUS to "Mi lista",
-        LAST_SEEN to "Últimos vistos",
+        LAST_SEEN to "Vistos",
         STAFF to "Recomendados",
         // «Mejores» reúne las dos listas (en emisión y de siempre) con un conmutador arriba; BESTGLOBAL ya no tiene entrada propia en el menú.
         BEST to "Mejores",

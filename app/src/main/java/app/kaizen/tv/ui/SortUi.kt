@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import app.kaizen.commons.KaizenSettings
 import app.kaizen.domain.SeriesStatus
 import app.kaizen.domain.SeriesStatuses
 import app.kaizen.domain.StatusEntry
@@ -171,14 +172,34 @@ internal fun <T : Any> rememberSorted(items: List<T>, state: ListSortState, stat
     }
 }
 
+/** El orden y los filtros como texto («orden,descendente,estado,favoritas,capítulos») para guardarlos entre sesiones. */
+internal fun ListSortState.encode(): String = listOf(sort.ordinal, descending, filter, favoritesOnly, seen.ordinal).joinToString(",")
+
+/** Lo contrario de [encode]; null si el texto está vacío o no se entiende (entonces vale el orden de fábrica). */
+internal fun decodeListSort(text: String): ListSortState? {
+    val p = text.split(',')
+    if (p.size != 5) return null
+    return runCatching { ListSortState(ListSort.entries[p[0].toInt()], p[1].toBooleanStrict(), p[2].toInt(), p[3].toBooleanStrict(), SeenFilter.entries[p[4].toInt()]) }.getOrNull()
+}
+
+/** Como [rememberListSort], pero la elección de la [section] sobrevive a cerrar la app: se lee al empezar y se guarda al cambiar. */
 @Composable
-internal fun rememberListSort(): ListSortState = rememberSaveable(saver = androidx.compose.runtime.saveable.Saver<ListSortState, List<Any>>(
+internal fun rememberSavedListSort(section: Int): ListSortState {
+    val state = rememberListSort(KaizenSettings.sortChoice(section))
+    LaunchedEffect(state, section) {
+        androidx.compose.runtime.snapshotFlow { state.encode() }.collect { if (it != KaizenSettings.sortChoice(section)) KaizenSettings.setSortChoice(section, it) }
+    }
+    return state
+}
+
+@Composable
+internal fun rememberListSort(start: String = ""): ListSortState = rememberSaveable(saver = androidx.compose.runtime.saveable.Saver<ListSortState, List<Any>>(
     save = { listOf(it.sort.ordinal, it.descending, it.filter, it.favoritesOnly, it.seen.ordinal) },
     restore = {
         ListSortState(ListSort.entries[it[0] as Int], it[1] as Boolean, it[2] as Int,
             it.getOrNull(3) as? Boolean ?: false, SeenFilter.entries.getOrElse(it.getOrNull(4) as? Int ?: 0) { SeenFilter.ALL })
     }
-)) { ListSortState(ListSort.ORIGINAL, false) }
+)) { decodeListSort(start) ?: ListSortState(ListSort.ORIGINAL, false) }
 
 /** El orden de la sección que se está viendo (lo crea la pantalla principal; null en las que no se ordenan). */
 internal val LocalSectionSort = androidx.compose.runtime.compositionLocalOf<ListSortState?> { null }

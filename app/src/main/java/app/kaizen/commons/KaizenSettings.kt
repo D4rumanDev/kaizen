@@ -244,6 +244,10 @@ object KaizenSettings {
         get() = prefs.getString(KEY_MENU_ORDER, "").orEmpty()
         set(value) = prefs.edit { putString(KEY_MENU_ORDER, value) }
 
+    /** Orden y filtro elegidos en el panel de la derecha de una sección (ver `encode` en SortUi); vacío = el de fábrica. */
+    fun sortChoice(section: Int): String = prefs.getString("kaizen_sort_$section", "").orEmpty()
+    fun setSortChoice(section: Int, value: String) = prefs.edit { putString("kaizen_sort_$section", value) }
+
     /** Servidor preferido general; se usa si el anime no tiene uno recordado. */
     var preferredServer: String? by stringPref("kaizen_preferred_server", null)
 
